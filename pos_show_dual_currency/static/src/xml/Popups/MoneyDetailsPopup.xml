@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
-    <t t-name="MoneyDetailsPopupUSD" owl="1">
+    <t t-name="pos_show_dual_currency.MoneyDetailsPopupUSD" owl="1">
         <div class="popup money-details">
             <main class="body">
                 <div class="money-details-title">
@@ -13,16 +13,16 @@
                             <div class="money-details-value" t-on-input="updateMoneyDetailsAmountRef">
                                 <input class="pos-input" t-att-id="moneyValueRef" type="number"
                                        t-model.number="state.moneyDetailsRef[moneyValueRef]"/>
-                                <CurrencyAmount forTarget="moneyValueRef" currency="currency_ref"
-                                                amount="moneyValueRef"/>
+                                <!-- Replacing CurrencyAmount with standard formatting if needed, 
+                                     but keep for now if it works. Odoo 18 might not have it. -->
+                                <span t-esc="pos.format_currency_ref(moneyValueRef)"/>
                             </div>
                         </t>
                     </div>
                 </div>
                 <div class="total-section">
                     <span>Total</span>
-                    <CurrencyAmount currency="currency_ref"
-                                    amount="env.pos.format_currency_no_symbol(state.total_ref)"/>
+                    <span t-esc="pos.format_currency_ref(state.total_ref)"/>
                 </div>
             </main>
             <footer class="footer">

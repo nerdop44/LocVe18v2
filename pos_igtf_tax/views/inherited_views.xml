@@ -9,10 +9,8 @@
                 <field name="x_is_foreign_exchange" />
                 <field 
                     name="x_igtf_percentage" 
-                    attrs="{
-                        'invisible': [('x_is_foreign_exchange','=',False)],
-                        'required': [('x_is_foreign_exchange','=',True)],
-                    }" 
+                    invisible="not x_is_foreign_exchange"
+                    required="x_is_foreign_exchange"
                 />
             </field>
         </field>

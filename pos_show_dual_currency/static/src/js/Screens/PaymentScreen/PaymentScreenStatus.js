@@ -1,22 +1,22 @@
-odoo.define('pos_show_dual_currency.PaymentScreenStatusDual', function(require) {
-    'use strict';
+/** @odoo-module */
 
-    const PaymentScreenStatus = require('point_of_sale.PaymentScreenStatus');
-    const Registries = require('point_of_sale.Registries');
+import { PaymentScreenStatus } from "@point_of_sale/app/screens/payment_screen/payment_status/payment_status";
+import { patch } from "@web/core/utils/patch";
+import { usePos } from "@point_of_sale/app/store/pos_hook";
 
-    const PaymentScreenStatusDual = (PaymentScreenStatus) =>
-        class extends PaymentScreenStatus {
-            get remainingTextUSD() {
-                return this.env.pos.format_currency_no_symbol(
-                    this.props.order.get_due() > 0 ? (this.props.order.get_due() * this.env.pos.config.show_currency_rate) : 0
-                );
-            }
-            get changeTextUSD() {
-                return this.env.pos.format_currency_no_symbol(this.props.order.get_change() * this.env.pos.config.show_currency_rate);
-            }
-        };
-
-    Registries.Component.extend(PaymentScreenStatus, PaymentScreenStatusDual);
-
-    return PaymentScreenStatusDual;
+patch(PaymentScreenStatus.prototype, {
+    setup() {
+        super.setup();
+        this.pos = usePos();
+    },
+    get remainingTextUSD() {
+        if (!this.pos) return "";
+        const remaining = this.props.order.get_due() > 0 ? (this.props.order.get_due() * this.pos.config.show_currency_rate) : 0;
+        return this.pos.format_currency_ref(remaining);
+    },
+    get changeTextUSD() {
+        if (!this.pos) return "";
+        const change = this.props.order.get_change() * this.pos.config.show_currency_rate;
+        return this.pos.format_currency_ref(change);
+    }
 });

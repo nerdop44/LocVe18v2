@@ -2,7 +2,6 @@ from odoo import api, fields, models, _, Command
 from odoo.exceptions import UserError, ValidationError, AccessError, RedirectWarning
 from odoo.tools import (
     date_utils,
-    email_re,
     email_split,
     float_compare,
     float_is_zero,
@@ -65,77 +64,20 @@ class AccountMove(models.Model):
 
     invoice_payments_widget_bs = fields.Text(groups="account.group_account_invoice", copy=False)
 
+    move_igtf_id = fields.Many2one('account.move', string='Asiento IGTF', copy=False)
+
     same_currency = fields.Boolean(string="Mismo tipo de moneda", compute='_same_currency')
 
     verificar_pagos = fields.Boolean(string="Verificar pagos", compute='_verificar_pagos')
 
-    asset_remaining_value_ref = fields.Monetary(currency_field='currency_id_dif', string='Valor depreciable Ref.', copy=False, compute='_compute_depreciation_cumulative_value_ref')
-    asset_depreciated_value_ref = fields.Monetary(currency_field='currency_id_dif', string='Depreciación Acu. Ref.', copy=False, compute='_compute_depreciation_cumulative_value_ref')
 
-    move_igtf_id = fields.Many2one('account.move', string='Asiento Retención IGTF', copy=False)
-
-    depreciation_value_ref = fields.Monetary(
-        string="Depreciation Ref.",
-        compute="_compute_depreciation_value_ref", inverse="_inverse_depreciation_value_ref", store=True, copy=False
-    )
 
     def _post(self, soft=True):
         res = super(AccountMove, self)._post(soft=soft)
         for move in self:
             move._verificar_pagos()
 
-    @api.depends('asset_id', 'depreciation_value', 'asset_id.total_depreciable_value', 'asset_id.already_depreciated_amount_import')
-    def _compute_depreciation_cumulative_value(self):
-        super(AccountMove, self)._compute_depreciation_cumulative_value()
-        for move in self:
-            if move.asset_id:
-                move.asset_remaining_value_ref = (move.asset_remaining_value / move.tax_today) if move.tax_today != 0 else 0
-                move.asset_depreciated_value_ref = (move.asset_depreciated_value / move.tax_today) if move.tax_today != 0 else 0
 
-    @api.depends('line_ids.balance_usd')
-    def _compute_depreciation_value_ref(self):
-        for move in self:
-            asset = move.asset_id or move.reversed_entry_id.asset_id  # reversed moves are created before being assigned to the asset
-            if asset:
-                account = asset.account_depreciation_expense_id if asset.asset_type != 'sale' else asset.account_depreciation_id
-                asset_depreciation = sum(
-                    move.line_ids.filtered(lambda l: l.account_id == account).mapped('balance_usd')
-                )
-                # Special case of closing entry - only disposed assets of type 'purchase' should match this condition
-                if any(
-                        line.account_id == asset.account_asset_id
-                        and float_compare(-line.balance_usd, asset.original_value_ref,
-                                          precision_rounding=asset.currency_id.rounding) == 0
-                        for line in move.line_ids
-                ):
-                    account = asset.account_depreciation_id
-                    asset_depreciation = (
-                            asset.original_value_ref
-                            - asset.salvage_value_ref
-                            - sum(
-                        move.line_ids.filtered(lambda l: l.account_id == account).mapped(
-                            'debit_usd' if asset.original_value_ref > 0 else 'credit_usd'
-                        )
-                    ) * (-1 if asset.original_value_ref < 0 else 1)
-                    )
-            else:
-                asset_depreciation = 0
-            move.depreciation_value_ref = asset_depreciation
-
-    # -------------------------------------------------------------------------
-    # INVERSE METHODS
-    # -------------------------------------------------------------------------
-    def _inverse_depreciation_value(self):
-        for move in self:
-            asset = move.asset_id
-            amount = abs(move.depreciation_value_ref)
-            account = asset.account_depreciation_expense_id if asset.asset_type != 'sale' else asset.account_depreciation_id
-            move.write({'line_ids': [
-                Command.update(line.id, {
-                    'balance_usd': amount if line.account_id == account else -amount,
-                })
-                for line in move.line_ids
-            ]})
 
     def _verificar_pagos(self):
         for rec in self:
@@ -305,10 +247,8 @@ class AccountMove(models.Model):
             rec.edit_trm = edit_trm
 
     @api.depends(
-        'line_ids.matched_debit_ids.debit_move_id.move_id.payment_id.is_matched',
         'line_ids.matched_debit_ids.debit_move_id.move_id.line_ids.amount_residual',
         'line_ids.matched_debit_ids.debit_move_id.move_id.line_ids.amount_residual_currency',
-        'line_ids.matched_credit_ids.credit_move_id.move_id.payment_id.is_matched',
         'line_ids.matched_credit_ids.credit_move_id.move_id.line_ids.amount_residual',
         'line_ids.matched_credit_ids.credit_move_id.move_id.line_ids.amount_residual_currency',
         'line_ids.balance',
@@ -316,7 +256,6 @@ class AccountMove(models.Model):
         'line_ids.amount_currency',
         'line_ids.amount_residual',
         'line_ids.amount_residual_currency',
-        'line_ids.payment_id.state',
         'line_ids.full_reconcile_id','tax_today')
     def _compute_amount(self):
         for move in self:
@@ -345,14 +284,10 @@ class AccountMove(models.Model):
     def _amount_all_usd(self):
         for rec in self:
             if rec.is_invoice(include_receipts=True) and rec.tax_totals:
-                amount_untaxed = rec.tax_totals['amount_untaxed'] if rec.tax_totals['amount_untaxed'] else 0
-                amount_tax = 0
-                for product, income in rec.tax_totals['groups_by_subtotal'].items():
-                    ###print(product, income)
-                    for l in income:
-                        amount_tax += l['tax_group_amount']
+                amount_untaxed = rec.tax_totals.get('base_amount_currency', 0)
+                amount_tax = rec.tax_totals.get('tax_amount_currency', 0)
+                amount_total = rec.tax_totals.get('total_amount_currency', 0)
 
-                amount_total = rec.tax_totals['amount_total']
                 if rec.currency_id != self.env.company.currency_id:
                     rec.amount_untaxed_usd = rec.amount_untaxed
                     rec.amount_tax_usd = rec.amount_tax
@@ -694,15 +629,7 @@ class AccountMove(models.Model):
             move.invoice_outstanding_credits_debits_widget = payments_widget_vals
             move.invoice_has_outstanding = True
 
-    @api.model
-    def _prepare_move_for_asset_depreciation(self, vals):
-        move_vals = super(AccountMove, self)._prepare_move_for_asset_depreciation(vals)
-        asset_id = vals.get('asset_id')
-        move_vals['tax_today'] = asset_id.tax_today
-        move_vals['currency_id_dif'] = asset_id.currency_id_dif.id
-        #move_vals['asset_remaining_value_ref'] = move_vals['asset_remaining_value'] / asset_id.tax_today
-        #move_vals['asset_depreciated_value_ref'] = move_vals['asset_depreciated_value'] / asset_id.tax_today
-        return move_vals
+
 
     def js_remove_outstanding_partial(self, partial_id):
         ''' Called by the 'payment' widget to remove a reconciled entry to the present invoice.

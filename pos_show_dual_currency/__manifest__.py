@@ -3,7 +3,7 @@
     "name": """Venezuela: POS show dual currency""",
     "summary": """Adds price  of other currency at products in POS""",
     "category": "Point Of Sale",
-    "version": "18.0.1.0.0",
+    "version": "18.0.1.0.2",
     "application": False,
     'author': 'Remake Ing Nerdo Pulido',
     'company': 'José Luis Vizcaya López remake Ing Nerdo Pulido',

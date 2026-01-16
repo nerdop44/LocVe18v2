@@ -210,7 +210,7 @@ class AccountMove(models.Model):
         """
 
         self.ensure_one()
-        is_series_invoicing_enabled = self.company_id.group_sales_invoicing_series
+        is_series_invoicing_enabled = self.company_id.sales_invoicing_series
         sequence = self.env["ir.sequence"].sudo()
         correlative = None
 

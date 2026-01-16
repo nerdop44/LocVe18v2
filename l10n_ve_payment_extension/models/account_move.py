@@ -271,7 +271,7 @@ class AccountMoveRetention(models.Model):
             "partner_id": self.partner_id.id,
             "journal_id": journals[type_retention].id,
             "payment_type_retention": type_retention,
-            "payment_method_id": self.env.ref("account.account_payment_method_manual_in").id,
+            "payment_method_line_id": journals[type_retention].inbound_payment_method_line_ids.filtered(lambda l: l.code == 'manual')[0].id,
             "is_retention": True,
             "foreign_rate": self.foreign_rate,
             "foreign_inverse_rate": self.foreign_inverse_rate,

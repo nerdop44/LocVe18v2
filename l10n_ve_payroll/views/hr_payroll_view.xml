@@ -94,7 +94,7 @@
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='not_computed_in_net']" position="before">
                     <field name="origin_partner"/>
-                    <field name="partner_id" attrs="{'invisible':[('origin_partner','!=','otro')]}"/>
+                    <field name="partner_id" invisible="origin_partner != 'otro'"/>
                 </xpath>
             </field>
         </record>

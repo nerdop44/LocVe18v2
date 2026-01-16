@@ -12,10 +12,6 @@ class ResCurrency(models.Model):
     # habilitar sincronización automatica
     sincronizar = fields.Boolean(string="Sincronizar", default=False)
 
-    # campo listado de servidores, bcv o dolar today
-    server = fields.Selection([('bcv', 'BCV'), ('dolar_today', 'Dolar Today Promedio')], string='Servidor',
-                              default='bcv')
-
     act_productos = fields.Boolean(string="Actualizar Productos", default=False)
 
     def _convert(self, from_amount, to_currency, company, date, round=True):
@@ -148,37 +144,33 @@ class ResCurrency(models.Model):
         else:
             return False
 
-    def get_dolar_today_promedio(self):
-        url = "https://s3.amazonaws.com/dolartoday/data.json"
-        response = requests.get(url)
-        status_code = response.status_code
 
-        if status_code == 200:
-            response = response.json()
-            usd = float(response['USD']['transferencia'])
-            eur = float(response['EUR']['transferencia'])
-            if self.name == 'USD':
-                data = usd
-            elif self.name == 'EUR':
-                data = eur
-            else:
-                data = False
-
-            return data
-        else:
-            return False
 
     def actualizar_tasa(self):
         for rec in self:
             nueva_tasa = 0
-            if rec.server == 'bcv':
-                tasa_bcv = rec.get_bcv()
-                if tasa_bcv:
-                    nueva_tasa = tasa_bcv
-            elif rec.server == 'dolar_today':
-                tasa_dt = rec.get_dolar_today_promedio()
-                if tasa_dt:
-                    nueva_tasa = tasa_dt
+            
+            # Obtener tasa desde BCV
+            tasa_bcv = rec.get_bcv()
+            if tasa_bcv:
+                nueva_tasa = tasa_bcv
+            else:
+                # Registrar error si BCV falla
+                import logging
+                _logger = logging.getLogger(__name__)
+                _logger.error(f"No se pudo obtener tasa de BCV para {rec.name}")
+                
+                # Notificar en Chatter
+                try:
+                    channel_id = self.env.ref('account_dual_currency.trm_channel')
+                    channel_id.message_post(
+                        body=f"⚠️ Error: No se pudo obtener tasa de BCV para {rec.name}. "
+                             f"Verifique la conexión a https://www.bcv.org.ve/",
+                        message_type='notification',
+                        subtype_xmlid='mail.mt_comment',
+                    )
+                except:
+                    pass
 
             if nueva_tasa > 0:
                 channel_id = self.env.ref('account_dual_currency.trm_channel')
@@ -196,14 +188,14 @@ class ResCurrency(models.Model):
                         })
 
                     else:
-                        if rec.server== 'dolar_today':
-                            tasa_actual.rate = 1 / nueva_tasa
-                            nueva = False
+                        # Actualizar tasa existente del día
+                        tasa_actual.rate = 1 / nueva_tasa
+                        nueva = False
 
                 if nueva:
                     channel_id.message_post(
-                        body="Nueva tasa de cambio del %s: %s, actualizada desde %s a las %s." % (
-                            rec.name, nueva_tasa, rec.server,
+                        body="Nueva tasa de cambio del %s: %s Bs, actualizada desde BCV a las %s." % (
+                            rec.name, nueva_tasa,
                             datetime.strftime(fields.Datetime.context_timestamp(self, datetime.now()),
                                               "%d-%m-%Y %H:%M:%S")),
                         message_type='notification',
@@ -211,8 +203,8 @@ class ResCurrency(models.Model):
                     )
                 else:
                     channel_id.message_post(
-                        body="Tasa de cambio actualizada del %s: %s, desde %s a las %s." % (
-                            rec.name, nueva_tasa, rec.server,
+                        body="Tasa de cambio actualizada del %s: %s Bs, desde BCV a las %s." % (
+                            rec.name, nueva_tasa,
                             datetime.strftime(fields.Datetime.context_timestamp(self, datetime.now()),
                                               "%d-%m-%Y %H:%M:%S")),
                         message_type='notification',

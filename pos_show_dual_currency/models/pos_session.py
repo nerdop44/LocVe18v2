@@ -94,11 +94,33 @@ class PosSession(models.Model):
         res_currency = self.env['res.currency'].search_read(**params['search_params'])
         return res_currency[0]
 
-    def _pos_data_process(self, loaded_data):
+    def _load_pos_data(self, data):
+        import logging
+        _logger = logging.getLogger(__name__)
+        
+        result = super()._load_pos_data(data)
+        _logger.info("========== DUAL CURRENCY DEBUG ==========")
+        _logger.info(f"Session ID: {self.id}")
+        _logger.info(f"Config show_currency: {self.config_id.show_currency}")
+        _logger.info(f"ref_me_currency_id: {self.ref_me_currency_id}")
+        
         params = self._loader_params_res_currency_ref()
+        _logger.info(f"Loader params: {params}")
+        
         currency_ref = self._get_pos_ui_res_currency_ref(params)
-        loaded_data['res_currency_ref'] = currency_ref
-        super(PosSession, self)._pos_data_process(loaded_data)
+        _logger.info(f"Currency ref loaded: {currency_ref}")
+        
+        result['res_currency_ref'] = currency_ref
+        
+        # Inject into the data list to ensure it reaches the frontend even if custom keys are stripped
+        if result.get('data') and len(result['data']) > 0:
+            result['data'][0]['res_currency_ref'] = currency_ref
+            
+        _logger.info(f"Result keys: {result.keys()}")
+        _logger.info(f"Result structure: {type(result)}")
+        _logger.info("=" * 40)
+        
+        return result
 
     def try_cash_in_out_ref_currency(self, _type, amount, reason, extras, currency_ref):
         sign = 1 if _type == 'in' else -1
@@ -125,7 +147,7 @@ class PosSession(models.Model):
 
     @api.depends('config_id', 'payment_method_ids')
     def _compute_cash_all(self):
-        super(PosSession, self)._compute_cash_all()
+        # super(PosSession, self)._compute_cash_all() # Method removed in Odoo 18
         for session in self:
             session.me_ref_cash_journal_id = False
             cash_journal_ref = session.payment_method_ids.filtered(
@@ -358,7 +380,7 @@ class PosSession(models.Model):
                         'amount'))
                 closing_control_data['default_cash_details']['default_cash_details_ref'] = default_cash_details_ref
                 closing_control_data['default_cash_details']['moves'] = cash_in_out_list
-        closing_control_data['other_payment_methods'] = [{
+        closing_control_data['non_cash_payment_methods'] = [{
             'name': pm.name,
             'amount': sum(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm).mapped('amount')),
             'number': len(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm)),
@@ -568,11 +590,10 @@ class PosSession(models.Model):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         return self.action_pos_session_close_ref(balancing_account, amount_to_balance, bank_payment_method_diffs)
 
-    def _loader_params_pos_session(self):
-        search_params = super(PosSession, self)._loader_params_pos_session()
-        fields = search_params['search_params']['fields']
-        fields.append('cash_register_balance_start_mn_ref')
-        return search_params
+    def _load_pos_data_fields(self, config_id):
+        res = super()._load_pos_data_fields(config_id)
+        res.append('cash_register_balance_start_mn_ref')
+        return res
 
     def action_pos_session_open(self):
         for session in self.filtered(lambda session: session.state == 'opening_control'):
@@ -588,10 +609,6 @@ class PosSession(models.Model):
         for rec in self:
             rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
 
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].append('currency_id')
-        return result
 
     # def _get_pos_ui_pos_payment_method(self, params):
     #     payment_ids_new = []
