@@ -2,7 +2,7 @@ import logging
 import re
 from odoo import models, fields, api, _
 from odoo.exceptions import MissingError, ValidationError
-from ..tools import binaural_cne_query
+from odoo.addons.l10n_ve_contact.tools import binaural_cne_query
 
 _logger = logging.getLogger(__name__)
 
