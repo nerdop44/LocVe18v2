@@ -30,5 +30,5 @@ from . import account_bank_statement_line
 from . import account_analytic_account
 from . import account_analytic_line
 from . import product_pricelist
-from . import crossovered_budget_lines
+# from . import crossovered_budget_lines
 from . import bank_rec_widget
