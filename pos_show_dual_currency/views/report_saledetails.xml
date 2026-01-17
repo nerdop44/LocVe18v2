@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="pos_daily_report" inherit_id="point_of_sale.report_saledetails">
-        <xpath expr="//thead//tr//th[last()]" position="after">
+        <xpath expr="//table//tr[1]//th[last()]" position="after">
             <th class="text-end">Monto Ref</th>
         </xpath>
         <xpath expr="//tr[@t-foreach='products']//td[last()]" position="after">
