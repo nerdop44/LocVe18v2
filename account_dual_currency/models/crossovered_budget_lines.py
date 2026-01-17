@@ -1,8 +1,8 @@
 from odoo import api, fields, models, _
 from datetime import timedelta
 
-class CrossoveredBudgetLines(models.Model):
-    _inherit = 'crossovered.budget.lines'
+class AccountBudgetLine(models.Model):
+    _inherit = 'account.budget.line'
 
 
     currency_id_dif = fields.Many2one("res.currency", string="Moneda Ref.", related="company_id.currency_id_dif", store=True)
