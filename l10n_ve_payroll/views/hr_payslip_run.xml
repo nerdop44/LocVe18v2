@@ -12,12 +12,8 @@
                         </div>
                     </button>
                 </xpath>
-                <xpath expr="//form[1]/sheet[1]/group[1]" position="after">
-                    <group>
-                         <group>
-                            <field name="tasa_cambio" widget='monetary'></field>
-                         </group>
-                    </group>
+                <xpath expr="//field[@name='name']" position="after">
+                    <field name="tasa_cambio" widget='monetary'></field>
                 </xpath>
             </field>
          </record>
