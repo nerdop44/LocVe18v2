@@ -22,7 +22,7 @@
             </t>
         </xpath>
 
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[hasclass('mb-3')][1]//div[hasclass('text-muted')][1]" position="after">
+        <xpath expr="//div[hasclass('payment-methods-overview')]//div[hasclass('text-muted')][contains(.,'Expected')]" position="after">
              <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
                  <span>Reference Expected</span>
                  <span style="color: red;" t-esc="pos.format_currency_ref(props.default_cash_details.default_cash_details_ref.amount)"/>
