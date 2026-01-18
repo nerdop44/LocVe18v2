@@ -4,7 +4,7 @@
         <xpath expr="//table//tr[1]//th[last()]" position="after">
             <th class="text-end">Monto Ref</th>
         </xpath>
-        <xpath expr="//tr[@t-foreach='products']//td[last()]" position="after">
+        <xpath expr="//tr[@t-foreach='products_info[\'products\']']//td[last()]" position="after">
             <td class="text-end">
                 <span style="color: red">
                     <t t-esc='symbol_ref'/>
@@ -13,23 +13,24 @@
             </td>
         </xpath>
 
-        <xpath expr="//tr[@t-foreach='payments']" position="replace">
-            <tr t-foreach='payments' t-as='payment'>
-                <td>
-                    <t t-esc="payment['name']"/>
-                </td>
-                <td>
-                    <t t-esc="payment['total']" t-options="{'widget': 'float', 'precision': currency_precision}"/>
-                    <t t-esc='symbol'/>
-                    /
-                    <span style="color: red">
-                        <t t-esc='symbol_ref'/>
-                        <t t-esc="payment['total_ref']"
-                            t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-                    </span>
-
-                </td>
-            </tr>
+        <xpath expr="//t[@t-foreach='payments']" position="replace">
+            <t t-foreach='payments' t-as='method'>
+                <tr>
+                    <td>
+                        <t t-esc="method['name']"/>
+                    </td>
+                    <td>
+                        <t t-esc="method['final_count']" t-options="{'widget': 'float', 'precision': currency_precision}"/>
+                        <t t-esc='symbol'/>
+                        /
+                        <span style="color: red">
+                            <t t-esc='symbol_ref'/>
+                            <t t-esc="method['total_ref']"
+                                t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+                        </span>
+                    </td>
+                </tr>
+            </t>
         </xpath>
 
         <xpath expr="//tr[@t-foreach='taxes']" position="replace">
@@ -59,8 +60,7 @@
                 </td>
             </tr>
         </xpath>
-        <xpath expr="//t[@t-esc='total_paid']" position="after">
-            <t t-esc='symbol'/>
+        <xpath expr="//span[@t-out='products_info[\'total\']']" position="after">
             /
             <span style="color: red">
                 <t t-esc='symbol_ref'/>
