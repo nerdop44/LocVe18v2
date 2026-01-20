@@ -5,12 +5,20 @@ from odoo.exceptions import ValidationError
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
-    def _load_pos_data_fields(self, config_id):
-        params = super()._load_pos_data_fields(config_id)
-        params['pos.payment.method'].extend(['x_igtf_percentage', 'x_is_foreign_exchange'])
-        params['pos.config'].extend(['x_igtf_product_id', 'aplicar_igtf'])
-        params['pos.order.line'].append('x_is_igtf_line')
-        return params
+    def _loader_params_pos_payment_method(self):
+        res = super()._loader_params_pos_payment_method()
+        res['search_params']['fields'].extend(['x_igtf_percentage', 'x_is_foreign_exchange'])
+        return res
+
+    def _loader_params_pos_config(self):
+        res = super()._loader_params_pos_config()
+        res['search_params']['fields'].extend(['x_igtf_product_id', 'aplicar_igtf'])
+        return res
+
+    def _loader_params_pos_order_line(self):
+        res = super()._loader_params_pos_order_line()
+        res['search_params']['fields'].append('x_is_igtf_line')
+        return res
 
 class PosOrder(models.Model):
     _inherit = "pos.order"

@@ -2,23 +2,78 @@
 <odoo>
     <template id="pos_daily_report" inherit_id="point_of_sale.pos_session_sales_details">
         <!-- 1. Columna de Título en la Cabecera -->
-        <xpath expr="//table//tr[1]//th[last()]" position="after">
+        <xpath expr="//div[@id='sales']//table//thead//tr/th[last()]" position="after">
             <th class="text-end">Monto Ref</th>
         </xpath>
 
-        <!-- 2. Línea de Producto (Dentro del bucle anidado de Odoo 18) -->
-        <xpath expr="//tr[@t-foreach=&quot;category['products']&quot;]//td[last()]" position="after">
+        <!-- 2. Línea de Producto (Dentro del bucle anidado por categoría) -->
+        <xpath expr="//tr[contains(@t-foreach, 'category') and contains(@t-foreach, 'products')]//td[last()]" position="after">
             <td class="text-end">
                 <span style="color: red">
-                    <t t-esc='symbol_ref'/>
-                    <t t-esc='line["price_unit_ref"]' t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+                    <t t-out="symbol_ref"/>
+                    <t t-out="line['price_unit_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
                 </span>
             </td>
         </xpath>
 
-        <!-- 3. Bucle de Pagos (Session Control) -->
-        <xpath expr="//t[@t-foreach='payments']" position="replace">
-            <t t-foreach='payments' t-as='method'>
+        <!-- 3. Totales de Ventas (General) -->
+        <xpath expr="//div[@id='sales']//table//tbody/tr[last()]/td[last()]" position="inside">
+            /
+            <span style="color: red">
+                <t t-out="symbol_ref"/>
+                <t t-out="products_info['total_ref']"
+                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+            </span>
+        </xpath>
+
+        <!-- 4. Impuestos (Sales) -->
+        <xpath expr="//div[@id='taxe_sales']//tr[contains(@t-foreach, 'taxes')]" position="replace">
+            <tr t-foreach="taxes" t-as="tax" class="border-bottom border-secondary">
+                <td class="ps-2 fw-bold"><span t-out="tax['name']"/></td>
+                <td class="text-end">
+                    <t t-out="tax['tax_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
+                    <t t-out="currency['symbol']"/>
+                    /
+                    <span style="color: red">
+                        <t t-out="symbol_ref"/>
+                        <t t-out="tax['tax_amount_ref']"
+                           t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+                    </span>
+                </td>
+                <td class="text-end">
+                    <t t-out="tax['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
+                    <t t-out="currency['symbol']"/>
+                    /
+                    <span style="color: red">
+                        <t t-out="symbol_ref"/>
+                        <t t-out="tax['base_amount_ref']"
+                           t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+                    </span>
+                </td>
+            </tr>
+        </xpath>
+
+        <!-- 5. Totales de Impuestos (Sales) -->
+        <xpath expr="//div[@id='taxe_sales']//table//tbody/tr[last()]/td[2]" position="inside">
+            /
+            <span style="color: red">
+                <t t-out="symbol_ref"/>
+                <t t-out="taxes_info['tax_amount_ref']"
+                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+            </span>
+        </xpath>
+        <xpath expr="//div[@id='taxe_sales']//table//tbody/tr[last()]/td[3]" position="inside">
+            /
+            <span style="color: red">
+                <t t-out="symbol_ref"/>
+                <t t-out="taxes_info['base_amount_ref']"
+                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+            </span>
+        </xpath>
+
+        <!-- 6. Bucle de Pagos (Session Control) -->
+         <xpath expr="//t[@id='closing_session']//t[@t-foreach='payments']" position="replace">
+            <t t-foreach="payments" t-as="method">
                 <t t-if="method['count']">
                     <tr>
                         <td><strong><span t-out="method['name']"/></strong></td>
@@ -26,64 +81,28 @@
                         <td class="text-end">
                             <span t-if="currency['position']">
                                 <span t-out="method['final_count']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
-                                <span t-out='currency["symbol"]'/>
+                                <span t-out="currency['symbol']"/>
                             </span>
                             <span t-else="">
-                                <span t-out='currency["symbol"]'/>
+                                <span t-out="currency['symbol']"/>
                                 <span t-out="method['final_count']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
                             </span>
                             /
                             <span style="color: red">
-                                <t t-esc='symbol_ref'/>
-                                <t t-esc="method['total_ref']"
+                                <t t-out="symbol_ref"/>
+                                <t t-out="method['total_ref']"
                                     t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
                             </span>
                         </td>
-                        <!-- Otros campos de contado/diferencia (opcional agregar dual aquí) -->
                         <td t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">
-                             <span t-out="method['money_counted']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
+                            <span t-out="method['money_counted']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
                         </td>
-                         <td t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">
-                             <span t-out="method['money_difference']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
+                        <td t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">
+                            <span t-out="method['money_difference']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
                         </td>
                     </tr>
                 </t>
             </t>
-        </xpath>
-
-        <!-- 4. Totales de Ventas -->
-        <xpath expr="//div[@id='sales']//tr[last()]//td[last()]" position="inside">
-            /
-            <span style="color: red">
-                <t t-esc='symbol_ref'/>
-                <t t-esc="products_info['total_ref']"
-                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-            </span>
-        </xpath>
-
-        <!-- 5. Impuestos (Opcional, se mantiene por compatibilidad) -->
-        <xpath expr="//tr[@t-foreach='taxes']" position="replace">
-            <tr t-foreach='taxes' t-as='tax' class="border-bottom border-secondary">
-                <td class="ps-2 fw-bold"><span t-out="tax['name']"/></td>
-                <td class="text-end">
-                    <t t-esc="tax['tax_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
-                    /
-                    <span style="color: red">
-                        <t t-esc='symbol_ref'/>
-                        <t t-esc="tax['tax_amount_ref']"
-                           t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-                    </span>
-                </td>
-                <td class="text-end">
-                    <t t-esc="tax['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/>
-                    /
-                    <span style="color: red">
-                        <t t-esc='symbol_ref'/>
-                        <t t-esc="tax['base_amount_ref']"
-                           t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-                    </span>
-                </td>
-            </tr>
         </xpath>
     </template>
 </odoo>
