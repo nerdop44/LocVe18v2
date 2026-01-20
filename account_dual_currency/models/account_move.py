@@ -28,7 +28,7 @@ class AccountMove(models.Model):
 
     tax_today = fields.Float(string="Tasa", store=True,
                              default=lambda self: self.env.company.currency_id_dif.inverse_rate,
-                             tracking=True, digits='Dual_Currency_rate')
+                             tracking=True, digits=(12, 6))
 
     tax_today_edited = fields.Boolean(string="Tasa Manual", default=False)
 
@@ -36,15 +36,14 @@ class AccountMove(models.Model):
 
     name_rate = fields.Char(store=True, readonly=True, compute='_name_ref')
     amount_untaxed_usd = fields.Monetary(currency_field='currency_id_dif', string="Base imponible Ref.", store=True,
-                                         compute="_amount_all_usd", digits='Dual_Currency', copy=False)
-    amount_tax_usd = fields.Monetary(currency_field='currency_id_dif', string="Impuestos Ref.", store=True,
-                                     readonly=True, digits='Dual_Currency', compute="_amount_all_usd", copy=False)
-    amount_total_usd = fields.Monetary(currency_field='currency_id_dif', string='Total Ref.', store=True, readonly=True,
-                                       compute='_amount_all_usd',
-                                       digits='Dual_Currency', tracking=True)
+                                         compute="_amount_all_usd", digits=(16, 4), copy=False)
+    amount_tax_usd = fields.Monetary(string='Impuesto Ref $', currency_field='currency_id_dif',
+                                       digits=(16, 4), tracking=True)
+    amount_total_usd = fields.Monetary(string='Total Ref $', currency_field='currency_id_dif',
+                                          readonly=True, digits=(16, 4), store=True, copy=False)
 
-    amount_residual_usd = fields.Monetary(currency_field='currency_id_dif', compute='_compute_amount', string='Adeudado Ref.',
-                                          readonly=True, digits='Dual_Currency', store=True, copy=False)
+    amount_residual_usd = fields.Monetary(string='Monto Residual Ref $', currency_field='currency_id_dif',
+                                     readonly=True, digits=(16, 4), compute="_amount_all_usd", copy=False)
     invoice_payments_widget_usd = fields.Binary(groups="account.group_account_invoice,account.group_account_readonly",
                                               compute='_compute_payments_widget_reconciled_info_USD')
 
