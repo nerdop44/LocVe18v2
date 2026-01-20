@@ -24,28 +24,46 @@ class ReportSaleDetails(models.AbstractModel):
     @api.model
     def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
-        products = data['products']
+        
         pos_session = self.env['pos.session'].search([('id', 'in', session_ids)])
         rate_today = 1
-        values_data = self.update_key_values_data(date_start, date_stop, config_ids, session_ids)
-        if pos_session:
-            if pos_session[0].tax_today != 0:
-                rate_today = pos_session[0].tax_today
-        else:
-            products = values_data['products']
+        if pos_session and pos_session[0].tax_today != 0:
+            rate_today = pos_session[0].tax_today
+            
         currency_id_dif = self.env.company.currency_id_dif
-        data['currency_precision_ref'] = currency_id_dif.decimal_places
-        data['total_paid_ref'] = currency_id_dif.round(data['total_paid'] / rate_today) if pos_session else values_data[
-            'total_paid_ref']
-        data['symbol_ref'] = currency_id_dif.symbol
-        data['symbol'] = self.env.company.currency_id.symbol
-        data['rate_today'] = rate_today
-        for prod in products:
-            if pos_session:
-                prod['price_unit_ref'] = prod['price_unit'] / rate_today
-        data['products'] = products
-        data['payments'] = values_data['payments']
-        data['taxes'] = values_data['taxes']
+        data.update({
+            'currency_precision_ref': currency_id_dif.decimal_places,
+            'symbol_ref': currency_id_dif.symbol,
+            'symbol': self.env.company.currency_id.symbol,
+            'rate_today': rate_today,
+            'total_paid_ref': currency_id_dif.round(data.get('total_paid', 0) / rate_today),
+        })
+
+        # Process Products (Nested in Odoo 18)
+        products_categories = data.get('products', [])
+        for category in products_categories:
+            for line in category.get('products', []):
+                line['price_unit_ref'] = line.get('quantity') and (line.get('base_amount', 0) / line['quantity']) / rate_today or 0
+        
+        # Update products_info for totals
+        if 'products_info' in data:
+            data['products_info']['total_ref'] = currency_id_dif.round(data['products_info'].get('total', 0) / rate_today)
+            
+        # Update taxes with ref values
+        taxes = data.get('taxes', [])
+        for tax in taxes:
+            # We assume the base/tax amounts are coming from standard get_sale_details
+            tax['tax_amount_ref'] = currency_id_dif.round(tax.get('tax_amount', 0) / rate_today)
+            tax['base_amount_ref'] = currency_id_dif.round(tax.get('base_amount', 0) / rate_today)
+
+        if 'taxes_info' in data:
+            data['taxes_info']['tax_amount_ref'] = currency_id_dif.round(data['taxes_info'].get('tax_amount', 0) / rate_today)
+            data['taxes_info']['base_amount_ref'] = currency_id_dif.round(data['taxes_info'].get('base_amount', 0) / rate_today)
+
+        # Update payments
+        for payment in data.get('payments', []):
+            payment['total_ref'] = currency_id_dif.round(payment.get('total', payment.get('final_count', 0)) / rate_today)
+
         return data
 
     def update_key_values_data(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
