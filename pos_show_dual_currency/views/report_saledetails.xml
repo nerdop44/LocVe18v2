@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="pos_daily_report" inherit_id="point_of_sale.pos_session_sales_details">
-        <!-- 1. Columna de Título en la Cabecera -->
-        <xpath expr="//div[@id='sales']//table//thead//tr/th[last()]" position="after">
-            <th class="text-end">Monto Ref</th>
+        
+        <!-- 1. Columna de Título: La agregaremos a la fila de categoría ya que no hay thead -->
+        <xpath expr="//div[@id='sales']//tr[@t-foreach='products']//td[last()]" position="after">
+            <td class="text-end fw-bold">
+                <span style="color: red">
+                    <t t-out="symbol_ref"/>
+                    <t t-out="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
+                </span>
+            </td>
         </xpath>
 
-        <!-- 2. Línea de Producto (Dentro del bucle anidado por categoría) -->
-        <xpath expr="//tr[contains(@t-foreach, 'category') and contains(@t-foreach, 'products')]//td[last()]" position="after">
+        <!-- 2. Columna de Precio Ref en la fila de producto -->
+        <xpath expr="//tr[@t-foreach=&quot;category['products']&quot;]//td[last()]" position="after">
             <td class="text-end">
                 <span style="color: red">
                     <t t-out="symbol_ref"/>
@@ -16,8 +22,8 @@
             </td>
         </xpath>
 
-        <!-- 3. Totales de Ventas (General) -->
-        <xpath expr="//div[@id='sales']//table//tbody/tr[last()]/td[last()]" position="inside">
+        <!-- 3. Totales de Ventas (Inside the Total row td) -->
+        <xpath expr="//div[@id='sales']//table//tbody/tr[not(@t-foreach)]/td[last()]" position="inside">
             /
             <span style="color: red">
                 <t t-out="symbol_ref"/>
@@ -27,7 +33,7 @@
         </xpath>
 
         <!-- 4. Impuestos (Sales) -->
-        <xpath expr="//div[@id='taxe_sales']//tr[contains(@t-foreach, 'taxes')]" position="replace">
+        <xpath expr="//div[@id='taxe_sales']//tr[@t-foreach='taxes']" position="replace">
             <tr t-foreach="taxes" t-as="tax" class="border-bottom border-secondary">
                 <td class="ps-2 fw-bold"><span t-out="tax['name']"/></td>
                 <td class="text-end">
@@ -53,26 +59,8 @@
             </tr>
         </xpath>
 
-        <!-- 5. Totales de Impuestos (Sales) -->
-        <xpath expr="//div[@id='taxe_sales']//table//tbody/tr[last()]/td[2]" position="inside">
-            /
-            <span style="color: red">
-                <t t-out="symbol_ref"/>
-                <t t-out="taxes_info['tax_amount_ref']"
-                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-            </span>
-        </xpath>
-        <xpath expr="//div[@id='taxe_sales']//table//tbody/tr[last()]/td[3]" position="inside">
-            /
-            <span style="color: red">
-                <t t-out="symbol_ref"/>
-                <t t-out="taxes_info['base_amount_ref']"
-                   t-options="{'widget': 'float', 'precision': currency_precision_ref}"/>
-            </span>
-        </xpath>
-
-        <!-- 6. Bucle de Pagos (Session Control) -->
-         <xpath expr="//t[@id='closing_session']//t[@t-foreach='payments']" position="replace">
+        <!-- 5. Bucle de Pagos (Session Control - Bottom) -->
+        <xpath expr="//t[@t-foreach='payments']" position="replace">
             <t t-foreach="payments" t-as="method">
                 <t t-if="method['count']">
                     <tr>
@@ -104,5 +92,6 @@
                 </t>
             </t>
         </xpath>
+
     </template>
 </odoo>

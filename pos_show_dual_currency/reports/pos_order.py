@@ -42,8 +42,12 @@ class ReportSaleDetails(models.AbstractModel):
         # Process Products (Nested in Odoo 18)
         products_categories = data.get('products', [])
         for category in products_categories:
+            # We add total_ref to category for the category row
+            category['total_ref'] = currency_id_dif.round(category.get('total', 0) / rate_today)
             for line in category.get('products', []):
-                line['price_unit_ref'] = line.get('quantity') and (line.get('base_amount', 0) / line['quantity']) / rate_today or 0
+                # Calculate unit price ref from base_amount to be more accurate
+                qty = line.get('quantity', 0)
+                line['price_unit_ref'] = (line.get('base_amount', 0) / qty) / rate_today if qty else 0
         
         # Update products_info for totals
         if 'products_info' in data:
@@ -52,7 +56,6 @@ class ReportSaleDetails(models.AbstractModel):
         # Update taxes with ref values
         taxes = data.get('taxes', [])
         for tax in taxes:
-            # We assume the base/tax amounts are coming from standard get_sale_details
             tax['tax_amount_ref'] = currency_id_dif.round(tax.get('tax_amount', 0) / rate_today)
             tax['base_amount_ref'] = currency_id_dif.round(tax.get('base_amount', 0) / rate_today)
 
@@ -62,7 +65,9 @@ class ReportSaleDetails(models.AbstractModel):
 
         # Update payments
         for payment in data.get('payments', []):
-            payment['total_ref'] = currency_id_dif.round(payment.get('total', payment.get('final_count', 0)) / rate_today)
+            # Odoo 18 uses 'total' in the basic list and 'final_count' in session details
+            amount = payment.get('total') or payment.get('final_count', 0)
+            payment['total_ref'] = currency_id_dif.round(amount / rate_today)
 
         return data
 

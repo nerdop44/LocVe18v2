@@ -9,7 +9,7 @@
     'company': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'maintainer': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'website': 'https://github.com/birkot',
-    "depends": ["point_of_sale", "stock"],
+    "depends": ["point_of_sale", "stock", "account_dual_currency"],
     "data": [
         "views/pos_payment_method.xml",
         "views/pos_session.xml",
