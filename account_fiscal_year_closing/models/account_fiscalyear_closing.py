@@ -406,7 +406,7 @@ class AccountFiscalyearClosingConfig(models.Model):
         (
             "code_uniq",
             "unique(code, fyc_id)",
-            _("Code must be unique per fiscal year closing!"),
+            "Code must be unique per fiscal year closing!",
         ),
     ]
 

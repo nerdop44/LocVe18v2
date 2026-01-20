@@ -70,22 +70,18 @@ class AccountRetentionIvaLine(models.Model):
     base_amount = fields.Monetary(
         string="Base Imponible",
         currency_field="company_currency_id",
-        digits="Account",
     )
     retention_amount = fields.Monetary(
         string="Monto Retenido",
         currency_field="company_currency_id",
-        digits="Account",
     )
     foreign_base_amount = fields.Monetary(
         string="Base Imponible (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     foreign_retention_amount = fields.Monetary(
         string="Monto Retenido (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     # Faltante
     iva_amount = fields.Monetary(
@@ -95,36 +91,9 @@ class AccountRetentionIvaLine(models.Model):
         store=True,
         readonly=True,
     )
-    # Faltante
-    foreign_iva_amount = fields.Monetary(
-        string="Monto IVA (ME)",
-        currency_field='foreign_currency_id',
-        compute='_compute_foreign_iva_amount',
-        store=True,
-        readonly=True,
-    )
-    # --- CAMBIO: AÑADIDO ESTE CAMPO ---
-    invoice_amount = fields.Monetary(
-        string="Monto de Factura",
-        related="move_id.amount_total", # O podrías ser 'move_id.amount_untaxed', 'move_id.amount_tax', dependiendo de lo que 'invoice_amount' deba representar.
-        currency_field="company_currency_id",
-        store=True,
-        readonly=True,
-    )
-    # ---------------------------------
-    # --- CAMBIO: AÑADIDO ESTE CAMPO ---
-    iva_amount = fields.Monetary(
-        string="Monto IVA",
-        related="move_id.amount_tax", # O podrías ser 'move_id.amount_total' si el IVA es el total en algún contexto específico.
-        currency_field="company_currency_id",
-        store=True,
-        readonly=True,
-    )
-    # ---------------------------------
-    # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     foreign_invoice_amount = fields.Monetary(
         string="Monto de Factura (ME)",
-        related="move_id.foreign_total_billed",  # ¡IMPORTANTE! Verifica que este sea el campo correcto en account.move
+        related="move_id.foreign_total_billed",
         currency_field="foreign_currency_id",
         store=True,
         readonly=True,
@@ -231,11 +200,10 @@ class AccountRetentionIslrLine(models.Model):
         readonly=True,
         store=True # Opcional, para que se guarde en la DB
     )
-    # **Añade esta línea (o similar, según tu necesidad):**
     payment_concept_id = fields.Many2one(
-        'tu.modelo.de.concepto.de.pago', # <--- ¡IMPORTANTE! Reemplaza esto con el nombre real de tu modelo de concepto de pago (ej. 'account.payment.concept' o similar)
+        'payment.concept',
         string='Concepto de Pago',
-        required=True # O False, si es opcional
+        required=True
     )
     foreign_currency_id = fields.Many2one(
         related="move_id.foreign_currency_id",
@@ -279,12 +247,10 @@ class AccountRetentionIslrLine(models.Model):
     base_amount = fields.Monetary(
         string="Base Imponible",
         currency_field="company_currency_id",
-        digits="Account",
     )
     retention_amount = fields.Monetary(
         string="Monto Retenido",
         currency_field="company_currency_id",
-        digits="Account",
     )
     # Faltante
     related_percentage_fees = fields.Float(
@@ -296,18 +262,15 @@ class AccountRetentionIslrLine(models.Model):
     related_amount_subtract_fees = fields.Monetary(
         string="Monto a Restar de Honorarios",
         currency_field="company_currency_id",
-        digits="Account",
         default=0.0,
     )
     foreign_base_amount = fields.Monetary(
         string="Base Imponible (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     foreign_retention_amount = fields.Monetary(
         string="Monto Retenido (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     invoice_amount = fields.Monetary(
@@ -463,22 +426,18 @@ class AccountRetentionMunicipalLine(models.Model):
     base_amount = fields.Monetary(
         string="Base Imponible",
         currency_field="company_currency_id",
-        digits="Account",
     )
     retention_amount = fields.Monetary(
         string="Monto Retenido",
         currency_field="company_currency_id",
-        digits="Account",
     )
     foreign_base_amount = fields.Monetary(
         string="Base Imponible (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     foreign_retention_amount = fields.Monetary(
         string="Monto Retenido (ME)",
         currency_field="foreign_currency_id",
-        digits="Account",
     )
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     invoice_amount = fields.Monetary(
@@ -546,9 +505,8 @@ class AccountRetentionMunicipalLine(models.Model):
     date = fields.Date(
         related="move_id.date", string="Fecha de Factura", store=True
     )
-    # Faltante
     economic_activity_id = fields.Many2one(
-        'your.economic.activity.model', # ¡IMPORTANTE! Reemplaza con el nombre real de tu modelo de actividad económica
+        'economic.activity',
         string='Actividad Económica',
         required=True
     )
