@@ -7,13 +7,13 @@
             <field name="arch" type="xml">
                 <xpath expr="//sheet" position="before">
                     <field name="facturas_por_actualizar" invisible="1"/>
-                    <div class="alert alert-danger" role="alert" style="margin-bottom:0px;" invisible="facturas_por_actualizar">
+                    <div class="alert alert-danger" role="alert" style="margin-bottom:0px;" invisible="not facturas_por_actualizar">
                         <strong>
                             - Existen facturas por actualizar a la nueva tasa
                         </strong>
                     </div>
                     <header>
-                        <button name="actualizar_facturas" string="Actualizar Facturas" class="oe_highlight" type="object" invisible="facturas_por_actualizar"/>
+                        <button name="actualizar_facturas" string="Actualizar Facturas" class="oe_highlight" type="object" invisible="not facturas_por_actualizar"/>
                         <button name="actualizar_productos" string="Actualizar Productos" class="oe_highlight" type="object"/>
                     </header>
                 </xpath>

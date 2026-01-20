@@ -15,9 +15,8 @@
         "l10n_ve_tax",
         "l10n_ve_contact",
         "l10n_ve_rate",
-        #####
-        ##"l10n_ve_payment_extension", # Dependencia de Binaural Retenciones
-        ##"l10n_ve_invoice", # Dependencia de Binaural Facturación
+        "l10n_ve_payment_extension",
+        "l10n_ve_invoice",
     ],
     # always loaded
     "data": [

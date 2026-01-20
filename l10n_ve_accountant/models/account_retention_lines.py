@@ -100,7 +100,7 @@ class AccountRetentionIvaLine(models.Model):
     )
     # ---------------------------------
     aliquot = fields.Float(
-        string="Alicuota (%)", digits="Account", default=0.0
+        string="Alicuota (%)", default=0.0
     )
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     invoice_total = fields.Monetary(
@@ -132,7 +132,6 @@ class AccountRetentionIvaLine(models.Model):
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     related_percentage_tax_base = fields.Float(
         string="Porcentaje de Base Imponible Relacionado",
-        digits="Account",
         default=0.0,
     )
     date = fields.Date(
@@ -255,7 +254,6 @@ class AccountRetentionIslrLine(models.Model):
     # Faltante
     related_percentage_fees = fields.Float(
         string="Porcentaje de Honorarios Relacionados",
-        digits="Account",
         default=0.0,
     )
     # Faltante
@@ -300,7 +298,7 @@ class AccountRetentionIslrLine(models.Model):
     )
     # ---------------------------------
     aliquot = fields.Float(
-        string="Alicuota (%)", digits="Account", default=0.0
+        string="Alicuota (%)", default=0.0
     )
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     invoice_total = fields.Monetary(
@@ -332,7 +330,6 @@ class AccountRetentionIslrLine(models.Model):
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     related_percentage_tax_base = fields.Float(
         string="Porcentaje de Base Imponible Relacionado",
-        digits="Account",
         default=0.0,
     )
     date = fields.Date(
@@ -467,7 +464,7 @@ class AccountRetentionMunicipalLine(models.Model):
     )
     # ---------------------------------
     aliquot = fields.Float(
-        string="Alicuota (%)", digits="Account", default=0.0
+        string="Alicuota (%)", default=0.0
     )
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     invoice_total = fields.Monetary(
@@ -499,7 +496,6 @@ class AccountRetentionMunicipalLine(models.Model):
     # --- CAMBIO: AÑADIDO ESTE CAMPO ---
     related_percentage_tax_base = fields.Float(
         string="Porcentaje de Base Imponible Relacionado",
-        digits="Account",
         default=0.0,
     )
     date = fields.Date(
