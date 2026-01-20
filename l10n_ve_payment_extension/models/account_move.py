@@ -20,6 +20,8 @@ class AccountMoveRetention(models.Model):
 
     base_currency_is_vef = fields.Boolean(
         compute="_compute_currency_fields",
+        store=True,
+        help="Indica si la moneda base de la compañía es el Bolívar Venezolano (VEF/VES)."
     )
 
     apply_islr_retention = fields.Boolean(
@@ -84,10 +86,11 @@ class AccountMoveRetention(models.Model):
                 move.invoice_date = move.date
 
     def _compute_currency_fields(self):
+        vef_currency = self.env.ref('base.VES', raise_if_not_found=False)
+        if not vef_currency:
+            vef_currency = self.env['res.currency'].search([('name', 'in', ['VEF', 'VES'])], limit=1)
         for retention in self:
-            retention.base_currency_is_vef = self.env.company.currency_id == self.env.ref(
-                "base.VEF"
-            )
+            retention.base_currency_is_vef = self.env.company.currency_id == vef_currency
 
     def action_post(self):
         """
