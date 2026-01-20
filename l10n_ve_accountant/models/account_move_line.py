@@ -26,7 +26,7 @@ class AccountMoveLine(models.Model):
     foreign_price = fields.Float(
         help="Foreign Price of the line",
         compute="_compute_foreign_price",
-        digits="Foreign Product Price",
+        digits=(16, 4),
         store=True,
         readonly=False,
     )

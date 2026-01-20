@@ -25,8 +25,11 @@ class AccountPaymentRegister(models.TransientModel):
     )
 
     foreign_rate = fields.Float(
-        help="The rate of the payment",
-        digits="Tasa",
+        compute="_compute_foreign_currency_id",
+        digits=(12, 6),
+        required=True,
+        readonly=False,
+        store=True,
     )
     foreign_inverse_rate = fields.Float(
         help=(
