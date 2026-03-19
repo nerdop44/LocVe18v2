@@ -923,7 +923,7 @@ export const FiscalPrinterMixin = {
 
     // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio (REVERSIÓN v120)");
+        console.warn("[FISCAL] setTotal - Inicio (Restauración v126 Truth)");
         this.printerCommands.push("3"); // Subtotal
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
@@ -938,12 +938,14 @@ export const FiscalPrinterMixin = {
             const printer_code = payment.payment_method_id?.x_printer_code || '01';
             
             if ((i + 1) === array.length && array.length === 1) {
-                // Pago Único (1 prefijo)
+                // Pago Único (Prefijo 1)
                 this.printerCommands.push("1" + printer_code);
             } else {
-                // Pago Parcial (v120 Logic)
-                let amount = convert(Math.abs(payment.amount), 2).replace(",", "").padStart(10, "0");
-                this.printerCommands.push("2" + printer_code + amount);
+                // Pago Parcial (33-digit Logic)
+                let amount_parts = convert(Math.abs(payment.amount), 2).split(",");
+                amount_parts[0] = amount_parts[0].padStart(10, "0");
+                let monto = amount_parts.join("");
+                this.printerCommands.push("2" + printer_code + monto);
             }
         });
 
@@ -1060,14 +1062,18 @@ export const FiscalPrinterMixin = {
                 }
 
 
-                // Pachacutec: v124 REVERSIÓN - Estructura HKA Estándar (v120)
-                // Tag(1) + Precio(10) + Cantidad(8) = 19 dígitos numéricos.
-                let price_str = convert(unitPrice, 2).replace(",", "").padStart(10, "0");
-                
+                // Pachacutec: v126 RESTAURACIÓN - Estructura HKA-NG (33 dígitos DATA)
+                // Precio (16 dígitos) + Cantidad (17 dígitos) = 33 dígitos DATA.
+                let price_parts = convert(unitPrice, 2).split(",");
+                price_parts[0] = price_parts[0].padStart(14, "0"); // 14 + 2 = 16
+                let price = price_parts.join("");
+
                 let qty_val = Math.abs(line.qty || line.quantity || 0);
-                let qty_str = convert(qty_val, 3).replace(",", "").padStart(8, "0");
+                let qty_parts = convert(qty_val, 3).split(",");
+                qty_parts[0] = qty_parts[0].padStart(14, "0"); // 14 + 1? No, 14 enteros + 3 decimales = 17
+                let quantity = qty_parts.join("");
                 
-                let command = tag + price_str + qty_str;
+                let command = tag + price + quantity;
                 
                 // Pachacutec: v111 - Sintonía de Fidelidad v16 (Estructural)
                 // Se restaura el formato exacto: Solo tuberías if code exists.
