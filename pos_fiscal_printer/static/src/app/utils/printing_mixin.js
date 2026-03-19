@@ -379,7 +379,13 @@ export const FiscalPrinterMixin = {
             }
 
         }
-        console.log("Factura finalizada, puerto permanece abierto.");
+        // Pachacutec: v122 - Margen de seguridad para CORTE FÍSICO
+        // Algunas impresoras requieren tiempo para que el firmware termine el ciclo de corte
+        // iniciado por el comando 101/199 antes de que la sesión se libere.
+        console.warn("[FISCAL] Esperando 3 segundos para procesado y corte final...");
+        await new Promise(res => setTimeout(res, 3000));
+
+        console.log("Factura finalizada y cortada (margen v122).");
     },
 
     async write_s2() {
@@ -890,43 +896,46 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v108 - Labels ASCII y Truncado de Referencia
+    // Pachacutec: v122 - Fidelidad v16 (setHeader Exacto)
     setHeader(payload) {
         const order = this.pos.get_order();
-        const client = order.partner;
+        // v122: En Odoo 18, order.partner puede ser Proxy. Intentamos get_partner() si existe.
+        const client = order.get_partner ? order.get_partner() : (order.partner || order.partner_id);
+        
+        console.warn("[FISCAL] setHeader - Partner extraído:", client?.name, "VAT:", client?.vat);
+
         if (payload) {
             this.printerCommands.push("iF*" + payload.invoiceNumber.padStart(11, "0"));
             this.printerCommands.push("iD*" + payload.date);
             this.printerCommands.push("iI*" + payload.printerCode);
         }
-        // v113: RIF v16 Fidelity ("No tiene"). El espacio es clave en el entorno funcional v16.
-        let vat = client?.vat || "No tiene";
 
-        this.printerCommands.push("iR*" + sanitize(vat));
+        // v122: Mapeo Campo por Campo v16 Truth
+        this.printerCommands.push("iR*" + sanitize(client?.vat || "No tiene"));
         this.printerCommands.push("iS*" + sanitize(client?.name || "CLIENTE GENERAL"));
 
-        // v111: Etiquetas ASCII y Referencia v16 (Sin truncado agresivo).
+        // Etiquetas ASCII v16 con tildes sanitizadas
         this.printerCommands.push("i00Telefono: " + sanitize(client?.phone || "No tiene"));
         this.printerCommands.push("i01Direccion: " + sanitize(client?.street || "No tiene"));
         this.printerCommands.push("i02Email: " + sanitize(client?.email || "No tiene"));
+        
         if (order.name) {
             this.printerCommands.push("i03Ref: " + sanitize(order.name));
         }
 
-        console.warn("[FISCAL] v108 - Ráfaga de apertura (ASCII Pura) preparada.");
+        console.warn("[FISCAL] v122 - Ráfaga de apertura (v16 Truth) preparada.");
     },
 
+    // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio");
-        this.printerCommands.push("3"); // Subtotal
+        console.warn("[FISCAL] setTotal - Inicio (v122 Truth)");
+        this.printerCommands.push("3"); // Subtotal (Obligatorio en v16)
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const has_divisas = this.order.payment_ids.some(p => p.payment_method_id?.x_is_foreign_exchange);
         const use_igtf_closing = aplicar_igtf && has_divisas;
 
         const paymentlines = this.order.payment_ids;
-        console.warn("[FISCAL] setTotal - Pagos:", paymentlines.length, "Cierre IGTF (199):", use_igtf_closing);
-        
         const es_nota = this.order.lines.some((l) => Boolean(l.refunded_orderline_id));
         const active_payments = es_nota ? paymentlines.filter(p => p.amount < 0) : paymentlines.filter(p => p.amount > 0);
 
@@ -934,34 +943,28 @@ export const FiscalPrinterMixin = {
             const printer_code = payment.payment_method_id?.x_printer_code || '01';
             
             if ((i + 1) === array.length && array.length === 1) {
-                // Pago Único (1 prefijo)
-                console.warn("[FISCAL] v102 - Pago Único (Cierre):", "1" + printer_code);
+                // Pago Único (Prefijo 1)
                 this.printerCommands.push("1" + printer_code);
             } else {
-                // Pachacutec: v106 - Pago Parcial (Logic v16 convert split join)
+                // Pago Parcial (v16 Logic)
                 let amount_parts = convert(Math.abs(payment.amount), 2).split(",");
                 amount_parts[0] = amount_parts[0].padStart(10, "0");
                 let monto = amount_parts.join("");
-                console.warn("[FISCAL] v106 - Pago Parcial (v16):", "2" + printer_code + monto);
                 this.printerCommands.push("2" + printer_code + monto);
             }
         });
 
-        // Pachacutec: v32 - El comando 199 CERRARÁ la factura si se detectaron divisas
+        // v122: Cierre v16 Truth
         if (use_igtf_closing) {
-            console.warn("[FISCAL] setTotal - Enviando cierre 199 (IGTF)");
+            console.warn("[FISCAL] setTotal - Cierre 199 (IGTF)");
             this.printerCommands.push("199");
         } else {
-            // v59 - Cierre preventivo 101 solo si no hay un comando de cierre ya emitido
             const lastCmd = this.printerCommands[this.printerCommands.length - 1];
-            const isClosing = lastCmd && lastCmd.startsWith("1") && lastCmd.length >= 3;
-            if (!isClosing) {
-                // v76 - Comando de cierre 101 sin padding (Trama Corta)
+            if (lastCmd !== "101") {
                 this.printerCommands.push("101");
             }
         }
-
-        console.warn("[FISCAL] setTotal - Comandos finales:", this.printerCommands);
+        console.warn("[FISCAL] setTotal - Finalizado:", this.printerCommands);
     },
 
     printFiscal() {
