@@ -248,13 +248,17 @@ export const FiscalPrinterMixin = {
                     }
                     if (esperando > 20) {
                         console.error("[FISCAL] Timeout esperando respuesta");
-                        this.printing = false;
                         leer = false;
-                        break;
+                        await this.reader.releaseLock();
+                        this.reader = false;
+                        return false;
                     }
                 } catch (error) {
-                    console.error("Error al leer puerto:", error);
+                    console.error("Error en lectura:", error);
                     leer = false;
+                    await this.reader.releaseLock();
+                    this.reader = false;
+                    return false;
                 } finally {
                     if (this.reader) {
                         try { await this.reader.releaseLock(); } catch (e) { }
@@ -313,9 +317,9 @@ export const FiscalPrinterMixin = {
                 if (success) {
                     console.warn(`[FISCAL] Comando [${i + 1}] EXITOSO (ACK).`);
                 } else {
-                    // Pachacutec: v123 - Los comandos de encabezado ('i') NO deben ser fatales
-                    if (command.startsWith("i")) {
-                        console.warn("[FISCAL] v123 - Comando de encabezado falló (NAK), ignorando...", command);
+                    // Pachacutec: v70 - Tolerancia a NAK en encabezados opcionales (i00-i03)
+                    if (command.substring(0, 2) === "i0") {
+                        console.warn("[FISCAL] v70 - Encabezado opcional falló (NAK), continuando factura...", command);
                         continue;
                     }
 
@@ -920,40 +924,35 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v124 REVERSIÓN ESTRUCTURAL + METADATOS
+    // Pachacutec: v1.1.7 (BACKUP SUCCESS STATE) - Labels ASCII y Truncado de Referencia
     setHeader(payload) {
         const order = this.pos.get_order();
-        const client = order.get_partner ? order.get_partner() : (order.partner || order.partner_id);
-        
-        console.warn("[FISCAL] setHeader v124 - Partner:", client?.name, "VAT:", client?.vat);
-
+        const client = order.partner;
         if (payload) {
             this.printerCommands.push("iF*" + payload.invoiceNumber.padStart(11, "0"));
             this.printerCommands.push("iD*" + payload.date);
             this.printerCommands.push("iI*" + payload.printerCode);
         }
-
-        // Normalización de RIF (v123 Successor)
-        let vat = (client?.vat || "").toUpperCase().trim();
-        if (vat && !/^[VJGEPC]/.test(vat)) {
-            vat = vat.includes('-') ? "J" + vat : "V" + vat;
-        }
-        if (!vat) vat = "No tiene";
+        // v113: RIF v16 Fidelity ("No tiene"). El espacio es clave en el entorno funcional v16.
+        let vat = client?.vat || "No tiene";
 
         this.printerCommands.push("iR*" + sanitize(vat));
         this.printerCommands.push("iS*" + sanitize(client?.name || "CLIENTE GENERAL"));
+
+        // v111: Etiquetas ASCII y Referencia v16 (Sin truncado agresivo).
         this.printerCommands.push("i00Telefono: " + sanitize(client?.phone || "No tiene"));
         this.printerCommands.push("i01Direccion: " + sanitize(client?.street || "No tiene"));
         this.printerCommands.push("i02Email: " + sanitize(client?.email || "No tiene"));
-        
         if (order.name) {
             this.printerCommands.push("i03Ref: " + sanitize(order.name));
         }
+
+        console.warn("[FISCAL] v1.1.7 - Ráfaga de apertura (ASCII Pura) restaurada desde RESPALDO.");
     },
 
     // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio (Restauración v126 Truth)");
+        console.warn("[FISCAL] setTotal - Inicio (v1.1.7 Truth)");
         this.printerCommands.push("3"); // Subtotal
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
@@ -961,6 +960,8 @@ export const FiscalPrinterMixin = {
         const use_igtf_closing = aplicar_igtf && has_divisas;
 
         const paymentlines = this.order.payment_ids;
+        console.warn("[FISCAL] setTotal - Pagos:", paymentlines.length, "Cierre IGTF (199):", use_igtf_closing);
+        
         const es_nota = this.order.lines.some((l) => Boolean(l.refunded_orderline_id));
         const active_payments = es_nota ? paymentlines.filter(p => p.amount < 0) : paymentlines.filter(p => p.amount > 0);
 
@@ -968,26 +969,34 @@ export const FiscalPrinterMixin = {
             const printer_code = payment.payment_method_id?.x_printer_code || '01';
             
             if ((i + 1) === array.length && array.length === 1) {
-                // Pago Único (Prefijo 1)
+                // Pago Único (1 prefijo)
+                console.warn("[FISCAL] v102 - Pago Único (Cierre):", "1" + printer_code);
                 this.printerCommands.push("1" + printer_code);
             } else {
-                // Pago Parcial (33-digit Logic)
+                // Pachacutec: v106 - Pago Parcial (Logic v16 convert split join)
                 let amount_parts = convert(Math.abs(payment.amount), 2).split(",");
                 amount_parts[0] = amount_parts[0].padStart(10, "0");
                 let monto = amount_parts.join("");
+                console.warn("[FISCAL] v106 - Pago Parcial (v16):", "2" + printer_code + monto);
                 this.printerCommands.push("2" + printer_code + monto);
             }
         });
 
+        // Pachacutec: v32 - El comando 199 CERRARÁ la factura si se detectaron divisas
         if (use_igtf_closing) {
+            console.warn("[FISCAL] setTotal - Enviando cierre 199 (IGTF)");
             this.printerCommands.push("199");
         } else {
+            // v59 - Cierre preventivo 101 solo si no hay un comando de cierre ya emitido
             const lastCmd = this.printerCommands[this.printerCommands.length - 1];
             const isClosing = lastCmd && lastCmd.startsWith("1") && lastCmd.length >= 3;
             if (!isClosing) {
+                // v76 - Comando de cierre 101 sin padding (Trama Corta)
                 this.printerCommands.push("101");
             }
         }
+
+        console.warn("[FISCAL] setTotal - Comandos finales:", this.printerCommands);
     },
 
     printFiscal() {
@@ -1092,15 +1101,15 @@ export const FiscalPrinterMixin = {
                 }
 
 
-                // Pachacutec: v126 RESTAURACIÓN - Estructura HKA-NG (33 dígitos DATA)
-                // Precio (16 dígitos) + Cantidad (17 dígitos) = 33 dígitos DATA.
+                // Pachacutec: v1.1.7 (BACKUP SUCCESS STATE) - Estructura HKA-NG (33 dígitos DATA)
+                // Inferencia del log: ! + Precio (16 dígitos) + Cantidad (17 dígitos) = 33 dígitos DATA.
                 let price_parts = convert(unitPrice, 2).split(",");
                 price_parts[0] = price_parts[0].padStart(14, "0"); // 14 + 2 = 16
                 let price = price_parts.join("");
 
                 let qty_val = Math.abs(line.qty || line.quantity || 0);
                 let qty_parts = convert(qty_val, 3).split(",");
-                qty_parts[0] = qty_parts[0].padStart(14, "0"); // 14 + 1? No, 14 enteros + 3 decimales = 17
+                qty_parts[0] = qty_parts[0].padStart(14, "0"); // 14 + 3 = 17
                 let quantity = qty_parts.join("");
                 
                 let command = tag + price + quantity;
@@ -1116,7 +1125,7 @@ export const FiscalPrinterMixin = {
                 }
                 command += desc_clean.substring(0, 30);
                 
-                console.warn(`[FISCAL] v120 - Línea (${command.length} chars DATA):`, command);
+                console.warn(`[FISCAL] v1.1.7 - Línea (${command.length} chars DATA) restaurada:`, command);
                 this.printerCommands.push(command);
 
                 if (line.discount > 0) {

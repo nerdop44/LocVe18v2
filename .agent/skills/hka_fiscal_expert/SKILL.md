@@ -3,44 +3,39 @@ name: hka_fiscal_expert
 description: Repositorio maestro de conocimiento para el protocolo fiscal HKA/Z1F en Odoo.sh. Centraliza logros, evita regresiones y asegura la trazabilidad del Checksum (LRC) y estructura de tramas.
 ---
 
-# HKA Fiscal Expert Skill
+# HKA Fiscal Expert (Source of Truth)
 
-Este skill centraliza la experiencia acumulada en la integración de Odoo con impresoras fiscales HKA/Z1F (Específicamente modelos como HKA80). Su objetivo es prevenir la pérdida de contexto ante cambios de agente y evitar la repetición de errores de protocolo ya resueltos.
+Este skill preserva el conocimiento crítico adquirido durante la estabilización del driver fiscal HKA para Odoo 18. **Úsese como referencia obligatoria antes de cualquier cambio en el driver.**
 
-## 🏆 Base de Conocimiento de Logros (Hechos Validados)
+## Protocolo HKA-NG (New Generation)
 
-1.  **Parámetros de Puerto (Crítico)**:
-    - **Baudrate**: 19200 (Fijado tras Self-Test del hardware).
-    - **Parity**: `"even"` (Mandatorio).
-    - No intentar velocidades automáticas; forzar estos valores en el `setPort`.
+### 1. Estructura de Trama (Padding)
+Las impresoras HKA modernas (etiquetadas como NG o con firmwares recientes) requieren campos de datos fijos y extendidos.
+- **Comando de Item (!)**:
+  - **Precio**: 16 dígitos (14 enteros + 2 decimales sin punto, ej: `0000000000058728` para 587.28).
+  - **Cantidad**: 17 dígitos (14 enteros + 3 decimales sin punto, ej: `00000000000001000` para 1.000).
+- **Total Data**: 33 dígitos exactos antes de cualquier partición (`|`).
+- **Consecuencia de error**: La impresora devuelve `NAK` (21) y reporta "Error de Protocolo" o "Inconsistencia de Datos".
 
-2.  **Cálculo de Checksum (LRC) - Estrategia Híbrida**:
-    - **Cabeceras (`i`)**: Usan **LRC = DATA ^ ETX** (Excluye STX). Validado con ACK.
-    - **Ítems y Pagos (`!`, `2`)**: Algunos firmwares HKA80 requieren **LRC = STX ^ DATA ^ ETX** (Incluye STX). Si el ítem da NAK 21 con LRC Pure, forzar el XOR con STX.
-    - **VERDAD ABSOLUTA**: Siempre verificar el ACK de las cabeceras primero para asegurar que el baudrate y paridad son correctos. Si las cabeceras dan ACK y el ítem da NAK, el problema es el Checksum del ítem o el padding.
+### 2. Configuración de Puerto (Baudrate)
+- **Velocidad Estándar**: **9600** baudios.
+- **Paridad**: `even` (par).
+- **Data Bits**: 8.
+- **Stop Bits**: 1.
+- **Señales**: `DTR/RTS` deben estar activos (`true`) para que la impresora abra el buffer de recepción.
 
-3.  **Apertura Documental Estricta**:
-    - Se requiere una ráfaga de 6 encabezados para garantizar la apertura: `iR*`, `iS*`, `i00`, `i01`, `i02`, `i03`.
-    - El comando `i03` (Información de Referencia) suele actuar como el disparador final para que la impresora entre en estado de factura.
+### 3. Checksum (LRC)
+- **Algoritmo**: XOR acumulativo de todos los bytes de la DATA + el byte ETX (3).
+- **Exclusión**: El byte STX (2) **NUNCA** se incluye en el cálculo del LRC en el protocolo Z1F puro.
+- **Trama Final**: `[STX, ...DATA, ETX, LRC]`
 
-4.  **Estructura de Trama de Venta (v16 Truth)**:
-    - Formato (Flag 21 = False): `[Tag][Precio(10)][Cantidad(8)]|[Opción:Código]|[Descripción(30)]`.
-    - **Punto Crítico (Padding)**: El precio usa 8 enteros + 2 decimales = 10 chars. La cantidad usa 5 enteros + 3 decimales = 8 chars.
-    - **Punto Crítico (Estética)**: El hardware HKA80 prefiere **TitleCase** (Caso Original) en las descripciones. Forzar Mayúsculas con `cleanText` radical puede causar **NAK (21)** por desvío de la firma de datos esperada.
-    - **REQUISITO MANDATORIO**: El precio enviado debe ser el **PRECIO BASE** (Sin impuestos).
+### 4. Interpretación de Respuestas
+- **ACK (0x06)**: Comando aceptado.
+- **NAK (0x15)**: Error.
+- **Lectura S1 (Correlativo)**: El número de factura se encuentra en el reporte `S1`, usualmente tras la segunda partición de salto de línea (`\n`).
 
-## 🚫 Tabú de Errores (Lo que NO se debe repetir)
+## Estrategia de Rollback
+- Siempre mantener una rama `stable-hka-ng` con la versión de padding 33 válida.
+- No aplicar bloqueos preventivos `Swal` basados en bytes de estado; preferir notificaciones informativas para permitir que el hardware maneje las excepciones.
 
-- **ERROR 01**: Incluir el STX en el cálculo del XOR (Basado en falsas premisas de "Resultado 9"). El hardware HKA80 en este entorno espera un LRC puro de la DATA y el ETX.
-- **ERROR 02**: Olvidar que el precio tiene 2 decimales implícitos (Precio * 100) y la cantidad 3 (Cantidad * 1000).
-- **ERROR 05**: Usar etiquetas en MAYÚSCULAS en los encabezados. v16 usa Label case (`Teléfono: `) para asegurar el ACK y la apertura del documento.
-
-## 🛠️ Instrucciones para Nuevos Agentes
-
-1.  **PRIMER PASO**: Leer íntegramente este `SKILL.md` antes de proponer cualquier cambio al `printing_mixin.js`.
-2.  **CONSTRUCCIÓN**: Siempre usar la función `toBytes` con lógica híbrida si el hardware lo requiere.
-3.  **TRAZABILIDAD**: Cada versión del módulo Odoo debe reflejar el avance en el manifest y en el plan de implementación.
-4.  **REGLA DE ORO**: Si las cabeceras dan ACK y el ítem da NAK, el problema es el Checksum del ítem o la falta de `i03`. No revertir a XOR sin STX para los ítems si ya se probó que fallan.
-
----
-*Este skill es acumulativo. Actualizar con cada nuevo hito confirmado.*
+Pachacutec.
