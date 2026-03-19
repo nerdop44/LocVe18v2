@@ -60,8 +60,15 @@ const patchConfig = {
         return this.props?.order || this.pos?.get_order?.() || this.pos?.currentOrder;
     },
 
-    orderDone() {
+    async orderDone() {
         const order = this.props.order;
+        // Pachacutec: v127 - Cierre de seguridad SIEMPRE al terminar el flujo de recibo
+        try {
+            await this.closePort();
+        } catch (e) {
+            console.warn("[FISCAL] Error no-crítico cerrando puerto en Nueva Orden:", e);
+        }
+
         if (order && order.impresa) {
             super.orderDone();
         } else {
@@ -82,7 +89,7 @@ const mixinMethods = [
     'write', 'write_s2', 'write_Z', 'escribe_leer',
     'setHeader', 'setLines', 'setTotal',
     'printFiscal', 'printNoFiscal', 'printNotaCredito',
-    'doPrinting', 'fetchStatusDiagnosis', 'checkFiscalStatus'
+    'doPrinting', 'fetchStatusDiagnosis', 'checkFiscalStatus', 'closePort'
 ];
 
 for (const method of mixinMethods) {

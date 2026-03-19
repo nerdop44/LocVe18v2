@@ -382,6 +382,36 @@ export const FiscalPrinterMixin = {
         console.log("Factura finalizada, puerto permanece abierto.");
     },
 
+    /**
+     * Pachacutec: v127 - Cierre Seguro de Puerto
+     * Libera lectores, escritores y cierra el recurso de hardware.
+     */
+    async closePort() {
+        console.warn("[FISCAL] v127 - Iniciando cierre seguro de puerto...");
+        try {
+            if (this.reader) {
+                console.log("[FISCAL] Liberando reader...");
+                await this.reader.releaseLock();
+                this.reader = false;
+            }
+            if (this.writer) {
+                console.log("[FISCAL] Liberando writer...");
+                await this.writer.releaseLock();
+                this.writer = false;
+            }
+            if (this.port) {
+                console.log("[FISCAL] Cerrando puerto serial...");
+                await this.port.close();
+                this.port = false;
+                console.warn("[FISCAL] Puerto CERRADO exitosamente.");
+            }
+        } catch (e) {
+            console.error("[FISCAL] Error al cerrar puerto:", e);
+            // Si falla el cierre gracefully, forzamos null para permitir re-apertura
+            this.port = false;
+        }
+    },
+
     async write_s2() {
         this.writer = this.port.writable.getWriter();
         const TIME = this.pos.config.x_fiscal_commands_time || 750;
