@@ -379,13 +379,7 @@ export const FiscalPrinterMixin = {
             }
 
         }
-        // Pachacutec: v122 - Margen de seguridad para CORTE FÍSICO
-        // Algunas impresoras requieren tiempo para que el firmware termine el ciclo de corte
-        // iniciado por el comando 101/199 antes de que la sesión se libere.
-        console.warn("[FISCAL] Esperando 3 segundos para procesado y corte final...");
-        await new Promise(res => setTimeout(res, 3000));
-
-        console.log("Factura finalizada y cortada (margen v122).");
+        console.log("Factura finalizada, puerto permanece abierto.");
     },
 
     async write_s2() {
@@ -896,12 +890,12 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v123 - Normalización de RIF (Evitar NAK iR*)
+    // Pachacutec: v124 REVERSIÓN ESTRUCTURAL + METADATOS
     setHeader(payload) {
         const order = this.pos.get_order();
         const client = order.get_partner ? order.get_partner() : (order.partner || order.partner_id);
         
-        console.warn("[FISCAL] setHeader - Partner extraído:", client?.name, "VAT:", client?.vat);
+        console.warn("[FISCAL] setHeader v124 - Partner:", client?.name, "VAT:", client?.vat);
 
         if (payload) {
             this.printerCommands.push("iF*" + payload.invoiceNumber.padStart(11, "0"));
@@ -909,19 +903,15 @@ export const FiscalPrinterMixin = {
             this.printerCommands.push("iI*" + payload.printerCode);
         }
 
-        // v123: Normalización de RIF (Debe empezar con V, J, G, E, P, C)
+        // Normalización de RIF (v123 Successor)
         let vat = (client?.vat || "").toUpperCase().trim();
         if (vat && !/^[VJGEPC]/.test(vat)) {
-            // Asumimos V (Natural) si solo hay números, o J si tiene guiones
             vat = vat.includes('-') ? "J" + vat : "V" + vat;
-            console.warn("[FISCAL] v123 - RIF Normalizado:", vat);
         }
         if (!vat) vat = "No tiene";
 
         this.printerCommands.push("iR*" + sanitize(vat));
         this.printerCommands.push("iS*" + sanitize(client?.name || "CLIENTE GENERAL"));
-
-        // Etiquetas ASCII v16 con tildes sanitizadas
         this.printerCommands.push("i00Telefono: " + sanitize(client?.phone || "No tiene"));
         this.printerCommands.push("i01Direccion: " + sanitize(client?.street || "No tiene"));
         this.printerCommands.push("i02Email: " + sanitize(client?.email || "No tiene"));
@@ -929,14 +919,12 @@ export const FiscalPrinterMixin = {
         if (order.name) {
             this.printerCommands.push("i03Ref: " + sanitize(order.name));
         }
-
-        console.warn("[FISCAL] v123 - Ráfaga de apertura (v16 Truth + RIF Fix) preparada.");
     },
 
     // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio (v122 Truth)");
-        this.printerCommands.push("3"); // Subtotal (Obligatorio en v16)
+        console.warn("[FISCAL] setTotal - Inicio (REVERSIÓN v120)");
+        this.printerCommands.push("3"); // Subtotal
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const has_divisas = this.order.payment_ids.some(p => p.payment_method_id?.x_is_foreign_exchange);
@@ -950,28 +938,24 @@ export const FiscalPrinterMixin = {
             const printer_code = payment.payment_method_id?.x_printer_code || '01';
             
             if ((i + 1) === array.length && array.length === 1) {
-                // Pago Único (Prefijo 1)
+                // Pago Único (1 prefijo)
                 this.printerCommands.push("1" + printer_code);
             } else {
-                // Pago Parcial (v16 Logic)
-                let amount_parts = convert(Math.abs(payment.amount), 2).split(",");
-                amount_parts[0] = amount_parts[0].padStart(10, "0");
-                let monto = amount_parts.join("");
-                this.printerCommands.push("2" + printer_code + monto);
+                // Pago Parcial (v120 Logic)
+                let amount = convert(Math.abs(payment.amount), 2).replace(",", "").padStart(10, "0");
+                this.printerCommands.push("2" + printer_code + amount);
             }
         });
 
-        // v122: Cierre v16 Truth
         if (use_igtf_closing) {
-            console.warn("[FISCAL] setTotal - Cierre 199 (IGTF)");
             this.printerCommands.push("199");
         } else {
             const lastCmd = this.printerCommands[this.printerCommands.length - 1];
-            if (lastCmd !== "101") {
+            const isClosing = lastCmd && lastCmd.startsWith("1") && lastCmd.length >= 3;
+            if (!isClosing) {
                 this.printerCommands.push("101");
             }
         }
-        console.warn("[FISCAL] setTotal - Finalizado:", this.printerCommands);
     },
 
     printFiscal() {
@@ -1076,18 +1060,14 @@ export const FiscalPrinterMixin = {
                 }
 
 
-                // Pachacutec: v120 - Estructura HKA-NG (Fidelidad v16 Log)
-                // Inferencia del log: ! + Precio (16 dígitos) + Cantidad (17 dígitos) = 33 dígitos DATA.
-                let price_parts = convert(unitPrice, 2).split(",");
-                price_parts[0] = price_parts[0].padStart(14, "0"); // 14 + 2 = 16
-                let price = price_parts.join("");
-
-                let qty_val = Math.abs(line.qty || line.quantity || 0);
-                let qty_parts = convert(qty_val, 3).split(",");
-                qty_parts[0] = qty_parts[0].padStart(14, "0"); // 14 + 1 = 15? No, 14 integers + 3 decimals = 17
-                let quantity = qty_parts.join("");
+                // Pachacutec: v124 REVERSIÓN - Estructura HKA Estándar (v120)
+                // Tag(1) + Precio(10) + Cantidad(8) = 19 dígitos numéricos.
+                let price_str = convert(unitPrice, 2).replace(",", "").padStart(10, "0");
                 
-                let command = tag + price + quantity;
+                let qty_val = Math.abs(line.qty || line.quantity || 0);
+                let qty_str = convert(qty_val, 3).replace(",", "").padStart(8, "0");
+                
+                let command = tag + price_str + qty_str;
                 
                 // Pachacutec: v111 - Sintonía de Fidelidad v16 (Estructural)
                 // Se restaura el formato exacto: Solo tuberías if code exists.
