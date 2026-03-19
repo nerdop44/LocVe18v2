@@ -313,9 +313,9 @@ export const FiscalPrinterMixin = {
                 if (success) {
                     console.warn(`[FISCAL] Comando [${i + 1}] EXITOSO (ACK).`);
                 } else {
-                    // Pachacutec: v70 - Tolerancia a NAK en encabezados opcionales (i00-i03)
-                    if (command.substring(0, 2) === "i0") {
-                        console.warn("[FISCAL] v70 - Encabezado opcional falló (NAK), continuando factura...", command);
+                    // Pachacutec: v123 - Los comandos de encabezado ('i') NO deben ser fatales
+                    if (command.startsWith("i")) {
+                        console.warn("[FISCAL] v123 - Comando de encabezado falló (NAK), ignorando...", command);
                         continue;
                     }
 
@@ -896,10 +896,9 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v122 - Fidelidad v16 (setHeader Exacto)
+    // Pachacutec: v123 - Normalización de RIF (Evitar NAK iR*)
     setHeader(payload) {
         const order = this.pos.get_order();
-        // v122: En Odoo 18, order.partner puede ser Proxy. Intentamos get_partner() si existe.
         const client = order.get_partner ? order.get_partner() : (order.partner || order.partner_id);
         
         console.warn("[FISCAL] setHeader - Partner extraído:", client?.name, "VAT:", client?.vat);
@@ -910,8 +909,16 @@ export const FiscalPrinterMixin = {
             this.printerCommands.push("iI*" + payload.printerCode);
         }
 
-        // v122: Mapeo Campo por Campo v16 Truth
-        this.printerCommands.push("iR*" + sanitize(client?.vat || "No tiene"));
+        // v123: Normalización de RIF (Debe empezar con V, J, G, E, P, C)
+        let vat = (client?.vat || "").toUpperCase().trim();
+        if (vat && !/^[VJGEPC]/.test(vat)) {
+            // Asumimos V (Natural) si solo hay números, o J si tiene guiones
+            vat = vat.includes('-') ? "J" + vat : "V" + vat;
+            console.warn("[FISCAL] v123 - RIF Normalizado:", vat);
+        }
+        if (!vat) vat = "No tiene";
+
+        this.printerCommands.push("iR*" + sanitize(vat));
         this.printerCommands.push("iS*" + sanitize(client?.name || "CLIENTE GENERAL"));
 
         // Etiquetas ASCII v16 con tildes sanitizadas
@@ -923,7 +930,7 @@ export const FiscalPrinterMixin = {
             this.printerCommands.push("i03Ref: " + sanitize(order.name));
         }
 
-        console.warn("[FISCAL] v122 - Ráfaga de apertura (v16 Truth) preparada.");
+        console.warn("[FISCAL] v123 - Ráfaga de apertura (v16 Truth + RIF Fix) preparada.");
     },
 
     // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
