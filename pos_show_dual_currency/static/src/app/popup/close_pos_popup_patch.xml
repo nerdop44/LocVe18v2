@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <!-- Pachacutec: v135 - Migración Extension XML Cierre de Caja Odoo 18 -->
+    <t t-name="ClosePosPopupPatch" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
+        
+        <!-- TRM Global para cálculos rápidos -->
+        <xpath expr="." position="inside">
+            <t t-set="trm" t-value="pos.config.show_currency_rate ? (1 / pos.config.show_currency_rate) : 1"/>
+        </xpath>
+
+        <!-- Total Orders in USD -->
+        <xpath expr="//div[hasclass('total-orders')]//span[hasclass('amount')]" position="after">
+            <t t-if="trm != 0">
+                <span class="currency-ref-total" style="color: #6c757d; font-size: 0.9em; margin-left: 5px;">
+                    (<t t-esc="pos.format_currency_ref(ordersDetails.amount / trm)"/>)
+                </span>
+            </t>
+        </xpath>
+
+        <!-- Cash Overview headers / body modifications -->
+        <!-- Injecting USD counted cash row -->
+        <xpath expr="//tbody[hasclass('cash-overview')]" position="before">
+            <tbody class="cash-overview-usd">
+                <tr class="cash-row-usd">
+                    <td><t t-esc="defaultCashDetails.default_cash_details_ref.name"/></td>
+                    <td class="text-end">
+                        <span style="color: #008784;" t-esc="pos.format_currency_ref(defaultCashDetails.default_cash_details_ref.amount)"/>
+                    </td>
+                    <td class="flex text-end" t-on-input="() => this.handleInputChangeUSD(defaultCashDetails.default_cash_details_ref.id)">
+                        <input class="pos-input" type="number" step="0.01"
+                               t-model.number="state.payments_usd[defaultCashDetails.default_cash_details_ref.id].counted"/>
+                        <div class="button icon" t-on-click="openDetailsPopupUSD">
+                            <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
+                        </div>
+                    </td>
+                    <td class="text-end" t-att-class="{'warning': state.payments_usd[defaultCashDetails.default_cash_details_ref.id].difference}">
+                        <t t-esc="pos.format_currency_ref(state.payments_usd[defaultCashDetails.default_cash_details_ref.id].difference)"/>
+                    </td>
+                </tr>
+            </tbody>
+        </xpath>
+
+        <!-- Money Details Popup Instance (v18 compatible component) -->
+        <xpath expr="//div[hasclass('popup')]" position="after">
+            <MoneyDetailsPopupUSD
+                t-if="state.displayMoneyDetailsPopupUSD"
+                manualInputCashCountUSD="manualInputCashCountUSD"
+                onConfirm.bind="updateCountedCashUSD"
+                onDiscard.bind="closeDetailsPopupUSD"
+            />
+        </xpath>
+        
+        <!-- Multi-currency columns in payment methods (Legacy style but adapted) -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]//table//tbody//tr//td[@t-esc='pos.format_currency(pm.amount)']" position="inside">
+            <t t-if="trm != 0">
+                <div class="usd-amount" style="font-size: 0.8em; color: #6c757d;">
+                    <t t-esc="pos.format_currency_ref(pm.amount / trm)"/>
+                </div>
+            </t>
+        </xpath>
+    </t>
+</templates>

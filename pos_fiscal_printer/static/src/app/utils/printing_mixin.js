@@ -27,38 +27,27 @@ export function cleanText(string) {
     }
 }
 
-// Pachacutec: v111 - Función Sanitize v16 Truth (Absolute Fidelity)
-// Solo reemplaza acentos. No remueve caracteres de protocolo (|!*).
-export function sanitize(string) {
-    if (!string) return "";
-    return string.replace(EXPRESSION, (char) => CHAR_MAP[char]);
-}
-
-// Pachacutec: v106 - Función Convert v16 Truth
-export function convert(amount, fixed = 2) {
-    return (amount || 0).toFixed(fixed).replace(".", ",");
-}
-
 // Pachacutec: v66 - Restauración Estricta XOR v16 (1 solo byte de Checksum)
 // Pachacutec: v73 - Restauración XOR Binario (1 solo byte)
 // Requisito final HKA: 1 solo byte binario para el checksum.
-// Pachacutec: v97 - Reversión Final v16 Pure (XOR EXCLUYENTE STX)
-// Validado Matemáticamente: v16 Pure SIEMPRE excluye el STX (2) del Checksum.
-// El LRC es DATA ^ ETX solamente.
+// Pachacutec: v96 - Protocolo Híbrido Validado (XOR Inteligente)
+// - Cabeceras ('i'): El Checksum (LRC) es DATA ^ ETX. STX (2) queda FUERA. Correcto para ACK.
+// - Ventas/Pagos ('!', ' ', '2', etc.): El Checksum DEBE incluir STX (2) para el "Resultado 9".
 export function toBytes(command) {
     const encoder = new TextEncoder();
     const dataBytes = Array.from(encoder.encode(command));
     const ETX = 3;
     const STX = 2;
 
-    // v97: DATA + ETX solamente (v16 Pure). Independiente del tipo de comando.
+    // Pachacutec: v134 - LRC Pure Z1F (Excluir STX siempre)
+    // El log de éxito v16 confirma que el LRC es [DATA ^ ETX] sin el STX(2).
     let lrc = 0; 
     for (const byte of dataBytes) {
         lrc ^= byte;
     }
     lrc ^= ETX;
 
-    // La trama física SI incluye STX al inicio: [STX, DATA, ETX, LRC]
+    // Retornamos la trama final: [STX, DATA, ETX, LRC]
     const finalFrame = [STX, ...dataBytes, ETX, lrc];
     return new Uint8Array(finalFrame);
 }
@@ -88,21 +77,19 @@ export const FiscalPrinterMixin = {
                     port = await navigator.serial.requestPort();
                 }
 
-                // Pachacutec: v84 - FORZAR VELOCIDAD (HKA80 Self-Test)
-                // Se ignoran variables externas y se fuerzan 19200 baudios y paridad even.
+                // Pachacutec: v133 - BAUD 9600 (Alineación Éxito v16)
                 const parity = "even";
-                const baudRate = 19200;
-                console.warn("[FISCAL] v84 - Forzando Puerto: 19200 baudios, Parity: Even");
+                const baudRate = 9600;
+                console.warn("[FISCAL] v133 - Alineación Éxito v16: 9600 baudios, Parity: Even");
 
-                // Pachacutec: v84/v120 - Baudrate dinámico v16 Truth
                 try {
                     await port.open({
-                        baudRate: this.pos.config.x_fiscal_command_baudrate || 9600,
+                        baudRate: baudRate,
                         parity: parity,
                         dataBits: 8,
                         stopBits: 1,
                     });
-                    console.log("Puerto abierto exitosamente (v16 Alignment).");
+                    console.log("Puerto abierto exitosamente a 9600.");
                 } catch (e) {
                     if (e.name === "InvalidStateError") {
                         console.log("El puerto ya estaba abierto. Continuando...");
@@ -110,7 +97,7 @@ export const FiscalPrinterMixin = {
                         console.warn("Fallo al reutilizar puerto persistente (" + e.name + "), solicitando nuevo...");
                         port = await navigator.serial.requestPort();
                         await port.open({
-                            baudRate: this.pos.config.x_fiscal_command_baudrate || 9600,
+                            baudRate: baudRate,
                             parity: parity,
                             dataBits: 8,
                             stopBits: 1,
@@ -235,10 +222,6 @@ export const FiscalPrinterMixin = {
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
-
-                            // Pachacutec: v103 - Diagnóstico en Caliente
-                            await this.fetchStatusDiagnosis();
-
                             return false; 
                         }
                     } else {
@@ -248,17 +231,13 @@ export const FiscalPrinterMixin = {
                     }
                     if (esperando > 20) {
                         console.error("[FISCAL] Timeout esperando respuesta");
+                        this.printing = false;
                         leer = false;
-                        await this.reader.releaseLock();
-                        this.reader = false;
-                        return false;
+                        break;
                     }
                 } catch (error) {
-                    console.error("Error en lectura:", error);
+                    console.error("Error al leer puerto:", error);
                     leer = false;
-                    await this.reader.releaseLock();
-                    this.reader = false;
-                    return false;
                 } finally {
                     if (this.reader) {
                         try { await this.reader.releaseLock(); } catch (e) { }
@@ -296,30 +275,25 @@ export const FiscalPrinterMixin = {
         // Pachacutec: v52 - ELIMINADA sanitización global que borraba '!', '*', '|'
         console.log("Comandos a enviar: ", this.printerCommands);
         var cantidad_comandos = this.printerCommands.length;
-        for (let i = 0; i < this.printerCommands.length; i++) {
-            const command = this.printerCommands[i];
+        for (const command of this.printerCommands) {
             var is_linea = false;
             if (command.substring(0, 1) === ' ' || command.substring(0, 1) === '!' || command.substring(0, 1) === 'd' || command.substring(0, 1) === '-') {
                 is_linea = true;
             }
-            const TIME = this.pos.config.x_fiscal_commands_time || 750;
-            const wait_time = TIME;
-
             if (this.printing) {
+                // Pachacutec: v36 - VALIDACIÓN ACK ESTRICTA (AWAIT directo y chequeo de éxito)
                 const success = await new Promise((res) => {
                     setTimeout(async () => {
-                        console.warn(`[FISCAL] Enviando (${i + 1}/${this.printerCommands.length}):`, command);
                         const res_ok = await this.escribe_leer(command, is_linea);
                         res(res_ok);
-                    }, wait_time);
+                    }, TIME);
                 });
 
-                if (success) {
-                    console.warn(`[FISCAL] Comando [${i + 1}] EXITOSO (ACK).`);
-                } else {
+                if (!success) {
                     // Pachacutec: v70 - Tolerancia a NAK en encabezados opcionales (i00-i03)
                     if (command.substring(0, 2) === "i0") {
                         console.warn("[FISCAL] v70 - Encabezado opcional falló (NAK), continuando factura...", command);
+                        cantidad_comandos--; // Descontamos para que la cuenta final sea 0 si todo lo demás pasa
                         continue;
                     }
 
@@ -386,36 +360,6 @@ export const FiscalPrinterMixin = {
         console.log("Factura finalizada, puerto permanece abierto.");
     },
 
-    /**
-     * Pachacutec: v127 - Cierre Seguro de Puerto
-     * Libera lectores, escritores y cierra el recurso de hardware.
-     */
-    async closePort() {
-        console.warn("[FISCAL] v127 - Iniciando cierre seguro de puerto...");
-        try {
-            if (this.reader) {
-                console.log("[FISCAL] Liberando reader...");
-                await this.reader.releaseLock();
-                this.reader = false;
-            }
-            if (this.writer) {
-                console.log("[FISCAL] Liberando writer...");
-                await this.writer.releaseLock();
-                this.writer = false;
-            }
-            if (this.port) {
-                console.log("[FISCAL] Cerrando puerto serial...");
-                await this.port.close();
-                this.port = false;
-                console.warn("[FISCAL] Puerto CERRADO exitosamente.");
-            }
-        } catch (e) {
-            console.error("[FISCAL] Error al cerrar puerto:", e);
-            // Si falla el cierre gracefully, forzamos null para permitir re-apertura
-            this.port = false;
-        }
-    },
-
     async write_s2() {
         this.writer = this.port.writable.getWriter();
         const TIME = this.pos.config.x_fiscal_commands_time || 750;
@@ -476,12 +420,15 @@ export const FiscalPrinterMixin = {
                         console.warn("[FISCAL] Respuesta S1 recibida:", string);
                         
                         if (string.length > 0) {
-                            // Pachacutec: v120 - Alineación v16 (Partición por \n, índice 2)
-                            const myArray = string.split('\n');
-                            const num_factura = myArray[2];
-                            if (num_factura) {
-                                console.warn("[FISCAL] v120 - Numero de factura extraído (v16 Truth): ", num_factura);
-                                this.order.num_factura = num_factura.padStart(11, "0"); // v16 wide number
+                            // Pachacutec: v36 - CAPTURA ROBUSTA CON REGEX (Compatible con cualquier impresora HKA)
+                            // Buscamos una secuencia de dígitos (generalmente 8 o más) que represente el número fiscal
+                            const match = string.match(/\d{5,15}/g); 
+                            if (match && match.length > 0) {
+                                // El número de factura suele ser el último o penúltimo grupo de números grandes
+                                // En HKA-NG el reporte S1 devuelve varios campos, el correlativo es clave.
+                                const num_factura = match[match.length - 1]; 
+                                console.warn("[FISCAL] Numero de factura extraído con Regex: ", num_factura);
+                                this.order.num_factura = num_factura.padStart(8, "0");
                                 leer = false;
                                 break;
                             } else {
@@ -610,22 +557,17 @@ export const FiscalPrinterMixin = {
         try {
             const result = await this.setPort();
             if (!result) return;
-
-            // Pachacutec: v120 - Verificación Informativa (v16 Truth)
-            // Ya no bloquea la impresión (return), solo notifica al usuario.
-            const fiscal_status = await this.checkFiscalStatus();
-            if (!fiscal_status.ok) {
-                let msg = "";
-                if (fiscal_status.z_required) msg = _t("Atención: Reporte Z Sugerido.");
-                if (fiscal_status.paper_low) msg += (msg ? " " : "") + _t("Aviso: Poco Papel.");
-                
-                if (msg) {
-                    this.env.services.notification.add(msg, { type: "warning" });
-                }
-            }
-
             await this.write();
         } finally {
+            if (this.port) {
+                try {
+                    await this.port.close();
+                    console.log("[FISCAL] v133 - Puerto cerrado exitosamente (Libre).");
+                    this.port = false;
+                } catch (e) {
+                    console.warn("[FISCAL] Error al cerrar puerto:", e);
+                }
+            }
             this.printing_lock = false;
         }
     },
@@ -924,76 +866,42 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v1.1.7 (BACKUP SUCCESS STATE) - Labels ASCII y Truncado de Referencia
+    // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
+    // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        const order = this.pos.get_order();
-        const client = order.partner;
-        if (payload) {
-            this.printerCommands.push("iF*" + payload.invoiceNumber.padStart(11, "0"));
-            this.printerCommands.push("iD*" + payload.date);
-            this.printerCommands.push("iI*" + payload.printerCode);
-        }
-        // v113: RIF v16 Fidelity ("No tiene"). El espacio es clave en el entorno funcional v16.
-        let vat = client?.vat || "No tiene";
-
-        this.printerCommands.push("iR*" + sanitize(vat));
-        this.printerCommands.push("iS*" + sanitize(client?.name || "CLIENTE GENERAL"));
-
-        // v111: Etiquetas ASCII y Referencia v16 (Sin truncado agresivo).
-        this.printerCommands.push("i00Telefono: " + sanitize(client?.phone || "No tiene"));
-        this.printerCommands.push("i01Direccion: " + sanitize(client?.street || "No tiene"));
-        this.printerCommands.push("i02Email: " + sanitize(client?.email || "No tiene"));
-        if (order.name) {
-            this.printerCommands.push("i03Ref: " + sanitize(order.name));
-        }
-
-        console.warn("[FISCAL] v1.1.7 - Ráfaga de apertura (ASCII Pura) restaurada desde RESPALDO.");
+        const client = this.pos.get_order().partner;
+        const cleanVat = (client?.vat || "").replace(/[^0-9VvJjGgEe]/g, "");
+        const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
+        const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
+        const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
+        
+        this.printerCommands.push(`iR*${cleanVat || "0"}`);
+        this.printerCommands.push(`iS*${cleanName}`);
+        
+        // Ráfaga completa v16 para asegurar estado "Fiscal Open"
+        this.printerCommands.push(`i00TELEFONO: ${cleanPhone}`);
+        this.printerCommands.push(`i01DIRECCION: ${cleanAddr}`);
+        this.printerCommands.push(`i02EMAIL: ${cleanText(client?.email || "").substring(0, 30)}`);
+        this.printerCommands.push(`i03REF: ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
+        
+        console.warn("[FISCAL] v95 - Ráfaga de apertura v16 (6 comandos) enviada.");
     },
 
-    // Pachacutec: v122 - Fidelidad v16 (setTotal Exacto)
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio (v1.1.7 Truth)");
+        console.warn("[FISCAL] setTotal - Inicio");
         this.printerCommands.push("3"); // Subtotal
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const has_divisas = this.order.payment_ids.some(p => p.payment_method_id?.x_is_foreign_exchange);
         const use_igtf_closing = aplicar_igtf && has_divisas;
 
-        const paymentlines = this.order.payment_ids;
-        console.warn("[FISCAL] setTotal - Pagos:", paymentlines.length, "Cierre IGTF (199):", use_igtf_closing);
-        
-        const es_nota = this.order.lines.some((l) => Boolean(l.refunded_orderline_id));
-        const active_payments = es_nota ? paymentlines.filter(p => p.amount < 0) : paymentlines.filter(p => p.amount > 0);
+        // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
+        // Se elimina el bucle de comandos '2' para evitar incoherencias de monto.
+        this.printerCommands.push("101");
 
-        active_payments.forEach((payment, i, array) => {
-            const printer_code = payment.payment_method_id?.x_printer_code || '01';
-            
-            if ((i + 1) === array.length && array.length === 1) {
-                // Pago Único (1 prefijo)
-                console.warn("[FISCAL] v102 - Pago Único (Cierre):", "1" + printer_code);
-                this.printerCommands.push("1" + printer_code);
-            } else {
-                // Pachacutec: v106 - Pago Parcial (Logic v16 convert split join)
-                let amount_parts = convert(Math.abs(payment.amount), 2).split(",");
-                amount_parts[0] = amount_parts[0].padStart(10, "0");
-                let monto = amount_parts.join("");
-                console.warn("[FISCAL] v106 - Pago Parcial (v16):", "2" + printer_code + monto);
-                this.printerCommands.push("2" + printer_code + monto);
-            }
-        });
-
-        // Pachacutec: v32 - El comando 199 CERRARÁ la factura si se detectaron divisas
         if (use_igtf_closing) {
-            console.warn("[FISCAL] setTotal - Enviando cierre 199 (IGTF)");
+            console.warn("[FISCAL] setTotal - Enviando cierre extra 199 (IGTF)");
             this.printerCommands.push("199");
-        } else {
-            // v59 - Cierre preventivo 101 solo si no hay un comando de cierre ya emitido
-            const lastCmd = this.printerCommands[this.printerCommands.length - 1];
-            const isClosing = lastCmd && lastCmd.startsWith("1") && lastCmd.length >= 3;
-            if (!isClosing) {
-                // v76 - Comando de cierre 101 sin padding (Trama Corta)
-                this.printerCommands.push("101");
-            }
         }
 
         console.warn("[FISCAL] setTotal - Comandos finales:", this.printerCommands);
@@ -1074,24 +982,28 @@ export const FiscalPrinterMixin = {
                 }
 
                 // Pachacutec: v41 - Determinación de Carácter Fiscal (Seguro Social)
-                // Sintonía v16: Lógica de Tags simplificada.
-                // ! = General, " = Reducido, # = Adicional, Espacio = Exento.
-                let tag = " "; // Default exento
+                let tag = (char === "GC") ? "d0" : " "; // Default exento
+                
                 if (tax_records.length > 0) {
                     const first_tax = tax_records[0];
                     const type = first_tax.x_tipo_alicuota || first_tax.attr?.x_tipo_alicuota;
+                    // v55 - Uso de amount como respaldo (IVA 16% es General)
                     const amount = first_tax.amount !== undefined ? first_tax.amount : (first_tax.attr?.amount || 0);
 
-                    if (type === 'general' || amount === 16) {
-                        tag = (char === "GC") ? "d1" : "!";
-                    } else if (type === 'reducido' || amount === 8 || amount === 12) {
-                        tag = (char === "GC") ? "d2" : "\"";
-                    } else if (type === 'adicional' || amount === 31) {
-                        tag = (char === "GC") ? "d3" : "#";
-                    }
+                    console.warn("[FISCAL] v55 - Analizando Tax:", {type, amount});
+
+                    if (type === 'general' || amount === 16) tag = '!'; // v77: ! = 16% (General)
+                    else if (type === 'reducido' || amount === 8 || amount === 12) tag = '"';
+                    else if (type === 'adicional' || amount === 31) tag = '#';
+                    else tag = ' '; // Espacio = Exento
+                } 
+                // Pachacutec: v56 - Failsafe: Si hay IDs pero no records, usar espacio (Exento) por seguridad
+                else if (tax_ids.length > 0) {
+                    console.warn("[FISCAL] v56 - Failsafe: IDs presentes pero records vacíos. Usando ' ' (Exento)");
+                    tag = ' ';
+                } else {
+                    tag = ' '; // Exento
                 }
-                
-                if (tag === " " && char === "GC") tag = "d0";
 
                 // Cálculo de precios y cantidades (v16 alignment)
                 let unitPrice = line.get_unit_display_price ? line.get_unit_display_price() : (line.price_unit || 0);
@@ -1100,32 +1012,22 @@ export const FiscalPrinterMixin = {
                     unitPrice = all_prices.priceWithoutTaxBeforeDiscount / (line.qty || 1);
                 }
 
-
-                // Pachacutec: v1.1.7 (BACKUP SUCCESS STATE) - Estructura HKA-NG (33 dígitos DATA)
-                // Inferencia del log: ! + Precio (16 dígitos) + Cantidad (17 dígitos) = 33 dígitos DATA.
-                let price_parts = convert(unitPrice, 2).split(",");
-                price_parts[0] = price_parts[0].padStart(14, "0"); // 14 + 2 = 16
-                let price = price_parts.join("");
-
-                let qty_val = Math.abs(line.qty || line.quantity || 0);
-                let qty_parts = convert(qty_val, 3).split(",");
-                qty_parts[0] = qty_parts[0].padStart(14, "0"); // 14 + 3 = 17
-                let quantity = qty_parts.join("");
+                // Pachacutec: v133 - PADDING 33 DÍGITOS (Alineación v16 HKA-NG)
+                // Estructura v16: [Tag][Precio(16)][Qty(17)]|[Cod]|[Nombre]
+                let price = String(Math.round((unitPrice || 0) * 100)).padStart(16, '0').slice(-16);
+                let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(17, '0').slice(-17);
                 
                 let command = tag + price + quantity;
                 
-                // Pachacutec: v111 - Sintonía de Fidelidad v16 (Estructural)
-                // Se restaura el formato exacto: Solo tuberías if code exists.
+                // v16 injects default code with pipes if available
                 const product = this.pos.models["product.product"]?.get(line.product_id?.id || line.product_id);
-                const desc_clean = sanitize(line.full_product_name || product?.display_name || "PROD");
-                const code_clean = sanitize(product?.default_code || "");
-                
-                if (code_clean) {
-                    command += `|${code_clean.substring(0, 10)}|`;
+                if (product?.default_code) {
+                    command += `|${cleanText(product.default_code).substring(0, 10)}|`;
                 }
-                command += desc_clean.substring(0, 30);
                 
-                console.warn(`[FISCAL] v1.1.7 - Línea (${command.length} chars DATA) restaurada:`, command);
+                command += cleanText(line.product_id?.display_name || line.product_name || "Producto").substring(0, 30);
+                
+                console.warn("[FISCAL] v95 - Línea con Pipes v16:", command);
                 this.printerCommands.push(command);
 
                 if (line.discount > 0) {
@@ -1161,60 +1063,5 @@ export const FiscalPrinterMixin = {
         this.setLines("GC");
         this.setTotal();
         return true;
-    },
-
-    // Pachacutec: v114 - Verificación de Estado Proactiva
-    // Retorna "Z_REQUIRED" si detecta el bit de bloqueo por tiempo.
-    // Pachacutec: v118 - Diagnóstico de Sensores Unificado
-    // Retorna objeto con flags de estado para toma de decisiones compleja.
-    async checkFiscalStatus() {
-        const response = await this.fetchStatusDiagnosis();
-        const status = { z_required: false, paper_low: false, busy: false, ok: true };
-        
-        if (response && response.length >= 6) {
-            const b1 = response[3]; // Status Byte 1
-            const b2 = response[4]; // Status Byte 2 (Error)
-            const b3 = response[5]; // Status Byte 3 (Misc)
-            
-            console.warn(`[FISCAL] v118 - B1 (Status): ${b1.toString(2).padStart(8, '0')}`);
-            console.warn(`[FISCAL] v118 - B2 (Error):  ${b2.toString(2).padStart(8, '0')}`);
-            console.warn(`[FISCAL] v118 - B3 (Misc):   ${b3.toString(2).padStart(8, '0')}`);
-
-            // Mapeo Bits HKA
-            if (b3 & 8) status.z_required = true;  // Bit 3: Z Needed
-            if (b3 & 2) status.paper_low = true;   // Bit 1: Paper Low
-            if (b1 & 1) status.busy = true;        // Bit 0: Busy (Typical HKA)
-
-            if (status.z_required || status.paper_low) {
-                status.ok = false;
-            }
-        }
-        return status;
-    },
-
-    // Pachacutec: v103 - Diagnóstico de Status HKA80 refactorizado v114
-    async fetchStatusDiagnosis() {
-        console.warn("[FISCAL] v114 - Solicitando Diagnóstico de Status (S1)...");
-        try {
-            const cmdStatus = toBytes("S1");
-            const writerStatus = this.port.writable.getWriter();
-            await writerStatus.write(cmdStatus);
-            await writerStatus.releaseLock();
-            
-            await new Promise(res => setTimeout(res, 500));
-            
-            const readerStatus = this.port.readable.getReader();
-            const { value } = await readerStatus.read();
-            await readerStatus.releaseLock();
-
-            if (value) {
-                const ascii_resp = Array.from(value).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : ".").join("");
-                console.warn("[FISCAL] v114 - RESPUESTA S1 (ASCII):", ascii_resp);
-                return value;
-            }
-        } catch (e) {
-            console.error("[FISCAL] v114 - Fallo en diagnóstico S1:", e);
-        }
-        return null;
     }
 };

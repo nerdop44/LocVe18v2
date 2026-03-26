@@ -69,7 +69,9 @@ const patchConfig = {
             console.warn("[FISCAL] Error no-crítico cerrando puerto en Nueva Orden:", e);
         }
 
-        if (order && order.impresa) {
+        // Pachacutec: v136 - Fallback robusto para evitar bloqueo de "Nuevo Pedido"
+        // Si tiene num_factura, es que se imprimió con éxito aunque el flag 'impresa' falle.
+        if (order && (order.impresa || order.num_factura)) {
             super.orderDone();
         } else {
             this.dialog.add(ConfirmationDialog, {

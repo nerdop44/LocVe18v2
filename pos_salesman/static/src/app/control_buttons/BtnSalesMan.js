@@ -11,6 +11,7 @@ import { registry } from "@web/core/registry";
 
 export class BtnSalesMan extends Component {
     static template = "pos_salesman.BtnSalesMan";
+    static props = { "*": true }; // Pachacutec: v137 - Validación OWL 18
     setup() {
         this.pos = usePos();
         this.dialog = useService("dialog");
