@@ -127,7 +127,7 @@ class PosSession(models.Model):
     @api.model
     def _loader_params_res_partner(self):
         result = super()._get_res_partner_loader_params() if hasattr(super(), '_get_res_partner_loader_params') else super()._loader_params_res_partner()
-        result['search_params']['fields'].extend(['company_type', 'prefix_vat'])
+        result['search_params']['fields'].extend(['company_type', 'prefix_vat', 'full_vat', 'email'])
         return result
 class AccountTax(models.Model):
     _inherit = "account.tax"

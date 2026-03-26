@@ -870,21 +870,27 @@ export const FiscalPrinterMixin = {
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
         const client = this.pos.get_order().partner;
-        const cleanVat = (client?.vat || "").replace(/[^0-9VvJjGgEe]/g, "");
+        
+        // Pachacutec: v138 - Uso de full_vat y limpieza estricta (Anti-NAK)
+        // El RIF para iR* debe contener solo letras y números, sin guiones.
+        const rawVat = client?.full_vat || client?.vat || "0";
+        const cleanVat = rawVat.replace(/[^0-9VvJjGgEe]/g, "").toUpperCase();
+        
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
         const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
         const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
+        const cleanEmail = cleanText(client?.email || "N/A").substring(0, 30);
         
-        this.printerCommands.push(`iR*${cleanVat || "0"}`);
+        this.printerCommands.push(`iR*${cleanVat}`);
         this.printerCommands.push(`iS*${cleanName}`);
         
-        // Ráfaga completa v16 para asegurar estado "Fiscal Open"
+        // Pachacutec: v138 - Orden Estricto Metadatos v16
         this.printerCommands.push(`i00TELEFONO: ${cleanPhone}`);
         this.printerCommands.push(`i01DIRECCION: ${cleanAddr}`);
-        this.printerCommands.push(`i02EMAIL: ${cleanText(client?.email || "").substring(0, 30)}`);
-        this.printerCommands.push(`i03REF: ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
+        this.printerCommands.push(`i02EMAIL:    ${cleanEmail}`);
+        this.printerCommands.push(`i03REF:      ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
         
-        console.warn("[FISCAL] v95 - Ráfaga de apertura v16 (6 comandos) enviada.");
+        console.warn("[FISCAL] v138 - Cabecera sincronizada v16 enviada con full_vat:", cleanVat);
     },
 
     setTotal() {
@@ -892,19 +898,42 @@ export const FiscalPrinterMixin = {
         this.printerCommands.push("3"); // Subtotal
 
         const aplicar_igtf = this.pos.config.aplicar_igtf;
-        const has_divisas = this.order.payment_ids.some(p => p.payment_method_id?.x_is_foreign_exchange);
-        const use_igtf_closing = aplicar_igtf && has_divisas;
+        const rate = this.pos.config.show_currency_rate || 1;
+        
+        // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
+        const total = this.order.get_total_with_tax() || 0;
+        const totalUSD = (total / rate).toFixed(2);
+        this.printerCommands.push(`80*TOTAL REF USD:  $ ${totalUSD}`);
+
+        // Pachacutec: v138 - Detalle IGTF (3%)
+        let totalIGTF = 0;
+        const paymentsInDivisas = this.order.payment_ids.filter(p => p.payment_method_id?.x_is_foreign_exchange);
+        if (aplicar_igtf && paymentsInDivisas.length > 0) {
+            const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
+            totalIGTF = sumDivisas * 0.03;
+            this.printerCommands.push(`80*BASE IGTF 3%:  Bs ${sumDivisas.toFixed(2)}`);
+            this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2)}`);
+        }
 
         // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
-        // Se elimina el bucle de comandos '2' para evitar incoherencias de monto.
         this.printerCommands.push("101");
+
+        const has_divisas = paymentsInDivisas.length > 0;
+        const use_igtf_closing = aplicar_igtf && has_divisas;
 
         if (use_igtf_closing) {
             console.warn("[FISCAL] setTotal - Enviando cierre extra 199 (IGTF)");
             this.printerCommands.push("199");
         }
 
-        console.warn("[FISCAL] setTotal - Comandos finales:", this.printerCommands);
+        // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
+        // 4 avances de papel para que el ticket salga del cortador
+        this.printerCommands.push("81 ");
+        this.printerCommands.push("81 ");
+        this.printerCommands.push("81 ");
+        this.printerCommands.push("81 ");
+
+        console.warn("[FISCAL] setTotal - Comandos finales v138 con Corte inyectado.");
     },
 
     printFiscal() {
