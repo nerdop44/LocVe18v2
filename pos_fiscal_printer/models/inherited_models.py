@@ -9,22 +9,25 @@ class PosOrder(models.Model):
     z_report = fields.Char("Reporte Z", related="session_id.x_pos_z_report_number", store=True)
 
     num_factura = fields.Char("Num. Factura Fiscal", store=True)
+    impresa = fields.Boolean("Impresa Fiscal", default=False)
 
     def set_num_factura(self, name, number):
         o = self.env['pos.order'].search([('pos_reference','=',name)])
         if o:
-            o.write({"num_factura": number})
+            o.write({"num_factura": number, "impresa": True})
 
     @api.model
     def _order_fields(self, ui_order):
         order_fields = super(PosOrder, self)._order_fields(ui_order)
         order_fields['num_factura'] = ui_order.get('num_factura')
+        order_fields['impresa'] = ui_order.get('impresa')
         return order_fields
 
     def _export_for_ui(self, order):
         result = super(PosOrder, self)._export_for_ui(order)
         result.update({
             'num_factura': order.num_factura,
+            'impresa': order.impresa,
         })
         return result
 

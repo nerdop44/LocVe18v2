@@ -1092,5 +1092,29 @@ export const FiscalPrinterMixin = {
         this.setLines("GC");
         this.setTotal();
         return true;
+    },
+
+    async closePort() {
+        if (this.port) {
+            try {
+                await this.port.close();
+                console.log("[FISCAL] Puerto cerrado manualmente.");
+            } catch (e) {
+                console.warn("[FISCAL] Error al cerrar puerto:", e);
+            } finally {
+                this.port = false;
+            }
+        }
+    },
+
+    // Pachacutec: v139 - Stubs para compatibilidad de parche
+    async checkFiscalStatus() {
+        console.warn("[FISCAL] checkFiscalStatus no implementado en este firmware.");
+        return true;
+    },
+
+    async fetchStatusDiagnosis() {
+        console.warn("[FISCAL] fetchStatusDiagnosis no implementado en este firmware.");
+        return [];
     }
 };
