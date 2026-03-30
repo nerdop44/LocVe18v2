@@ -903,7 +903,7 @@ export const FiscalPrinterMixin = {
         // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
         const total = this.order.get_total_with_tax() || 0;
         const totalUSD = (total / rate).toFixed(2);
-        this.printerCommands.push(`80*TOTAL REF USD:  $ ${totalUSD}`);
+        this.printerCommands.push(`80*${cleanText("TOTAL REF USD: USD " + totalUSD)}`);
 
         // Pachacutec: v138 - Detalle IGTF (3%)
         let totalIGTF = 0;
@@ -911,8 +911,8 @@ export const FiscalPrinterMixin = {
         if (aplicar_igtf && paymentsInDivisas.length > 0) {
             const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
             totalIGTF = sumDivisas * 0.03;
-            this.printerCommands.push(`80*BASE IGTF 3%:  Bs ${sumDivisas.toFixed(2)}`);
-            this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2)}`);
+            this.printerCommands.push(`80*${cleanText("BASE IGTF 3 PORCIENTO:  Bs " + sumDivisas.toFixed(2))}`);
+            this.printerCommands.push(`80*${cleanText("MONTO IGTF:    Bs " + totalIGTF.toFixed(2))}`);
         }
 
         // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
@@ -1082,7 +1082,7 @@ export const FiscalPrinterMixin = {
         if (this.order.amount_return) {
             this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2));
         }
-        this.printerCommands.push("81$TOTAL: " + (this.order.get_total_with_tax()).toFixed(2));
+        this.printerCommands.push("81TOTAL: " + (this.order.get_total_with_tax()).toFixed(2));
     },
 
     async printNotaCredito() {
