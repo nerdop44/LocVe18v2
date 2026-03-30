@@ -9,7 +9,7 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 // Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
 // Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
 
-patch(ClosePosPopup, "pos_show_dual_currency.ClosePosPopupProps", {
+patch(ClosePosPopup, {
     // Definición de props estáticos (v18)
     props: {
         ...ClosePosPopup.props,
@@ -18,7 +18,7 @@ patch(ClosePosPopup, "pos_show_dual_currency.ClosePosPopupProps", {
     }
 });
 
-patch(ClosePosPopup.prototype, "pos_show_dual_currency.ClosePosPopupLogic", {
+patch(ClosePosPopup.prototype, {
     setup() {
         super.setup();
         this.dialog = useService("dialog"); // Pachacutec: v136 - Requisito Owl 18
