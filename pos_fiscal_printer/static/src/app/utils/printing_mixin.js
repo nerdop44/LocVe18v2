@@ -52,22 +52,32 @@ export function formatTextAmount(amount, fixed = 2) {
 // - Ventas/Pagos ('!', ' ', '2', etc.): El Checksum DEBE incluir STX (2) para el "Resultado 9".
 export function toBytes(command) {
     const encoder = new TextEncoder();
-    const dataBytes = Array.from(encoder.encode(command));
-    const ETX = 3;
+    const dataBytes = encoder.encode(command);
+    // Pachacutec: v149 - HARD-FIX Checksum (Garantía ACK)
+    // Reconstruimos la trama manualmente para asegurar control total.
     const STX = 2;
-
-    // Pachacutec: v148 - LRC Pure v16 (MANDATORIO: Excluir STX)
-    // El LRC se calcula como (DATA XOR ETX) sin incluir el STX(2).
-    // Esto es crítico para que la impresora acepte (ACK) la cabecera.
-    let lrc = 0; 
-    for (const byte of dataBytes) {
-        lrc ^= byte;
+    const ETX = 3;
+    const frameLength = dataBytes.length + 3; // [STX] + [DATA] + [ETX] + [LRC]
+    const finalFrame = new Uint8Array(frameLength);
+    
+    finalFrame[0] = STX;
+    for (let i = 0; i < dataBytes.length; i++) {
+        finalFrame[i + 1] = dataBytes[i];
+    }
+    finalFrame[frameLength - 2] = ETX;
+    
+    // El LRC es XOR de DATA + ETX (excluyendo STX siempre).
+    let lrc = 0;
+    console.warn(`[FISCAL] v149 - Iniciando XOR para: ${command}`);
+    for (let i = 0; i < dataBytes.length; i++) {
+        lrc ^= dataBytes[i];
+        // console.log(`Byte ${i} (${dataBytes[i]}): lrc=${lrc}`);
     }
     lrc ^= ETX;
-
-    // Retornamos la trama final: [STX, DATA, ETX, LRC]
-    const finalFrame = [STX, ...dataBytes, ETX, lrc];
-    return new Uint8Array(finalFrame);
+    finalFrame[frameLength - 1] = lrc;
+    
+    console.warn(`[FISCAL] v149 - LRC Final Calculado: ${lrc} (Hex: ${lrc.toString(16)})`);
+    return finalFrame;
 }
 
 // FiscalPrinterMixin as a plain object with methods only.
@@ -889,17 +899,23 @@ export const FiscalPrinterMixin = {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        console.warn("[FISCAL] v148 - LLAVES CLIENTE:", client ? Object.keys(client) : "NULL");
-        console.warn("[FISCAL] v148 - CLIENTE DATA:", client);
+        console.warn("[FISCAL] v149 - AUDITORIA CLIENTE:", client ? Object.keys(client) : "NULL");
+        if (client) {
+            console.log("RIF Check: prefix_vat=", client.prefix_vat, "l10n_ve_rif_prefix=", client.l10n_ve_rif_prefix, "full_vat=", client.full_vat);
+        }
         
-        // Pachacutec: v148 - RIF Dinámico Sin Hardcode
-        // 1. Intentamos full_vat (computado backend).
-        // 2. Si falla, concatenamos prefijo + vat originales.
-        const rif_prefijo = client?.prefix_vat || "";
+        // Pachacutec: v149 - RIF Dinámico Multicapa
+        // Buscamos cualquier rastro del prefijo venezolano.
+        const rif_prefijo = client?.prefix_vat || client?.l10n_ve_rif_prefix || "";
         const rif_base = client?.vat || "";
-        const vat = client?.full_vat || (rif_prefijo + rif_base) || "No tiene";
+        let vat = client?.full_vat || (rif_prefijo + rif_base) || "No tiene";
         
-        console.warn(`[FISCAL] v148 - RIF DETECTADO: prefix(${rif_prefijo}) + vat(${rif_base}) -> final(${vat})`);
+        // Si sigue siendo solo números, auditamos por qué fallan los campos.
+        if (vat !== "No tiene" && /^\d+$/.test(vat)) {
+             console.error("[FISCAL] v149 - RIF NUMERICO DETECTADO. El Loader no trajo prefijos.");
+        }
+
+        console.warn(`[FISCAL] v149 - RIF FINAL: ${vat}`);
         
         const cleanVat = sanitize(vat).substring(0, 20);
         
