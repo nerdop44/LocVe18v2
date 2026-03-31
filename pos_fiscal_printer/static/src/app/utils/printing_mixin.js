@@ -899,41 +899,55 @@ export const FiscalPrinterMixin = {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        console.warn("[FISCAL] v149 - AUDITORIA CLIENTE:", client ? Object.keys(client) : "NULL");
+        console.warn("[FISCAL] v150 - AUDITORIA PROFUNDA CLIENTE:", client ? Object.keys(client) : "NULL");
+        
+        let vat = "V00000000";
+        let name = "CONTADO";
+        let addr = "SIN DIRECCION";
+        let phone = "0000";
+        let email = "N/A";
+
         if (client) {
-            console.log("RIF Check: prefix_vat=", client.prefix_vat, "l10n_ve_rif_prefix=", client.l10n_ve_rif_prefix, "full_vat=", client.full_vat);
-        }
-        
-        // Pachacutec: v149 - RIF Dinámico Multicapa
-        // Buscamos cualquier rastro del prefijo venezolano.
-        const rif_prefijo = client?.prefix_vat || client?.l10n_ve_rif_prefix || "";
-        const rif_base = client?.vat || "";
-        let vat = client?.full_vat || (rif_prefijo + rif_base) || "No tiene";
-        
-        // Si sigue siendo solo números, auditamos por qué fallan los campos.
-        if (vat !== "No tiene" && /^\d+$/.test(vat)) {
-             console.error("[FISCAL] v149 - RIF NUMERICO DETECTADO. El Loader no trajo prefijos.");
+            // v150: Extraer todos los campos posibles de identificación venezolana
+            const pVat = client.prefix_vat || client.l10n_ve_rif_prefix || "";
+            const fVat = client.full_vat || "";
+            const rawVat = client.vat || "";
+            console.log(`RIF Audit: prefix_vat=${client.prefix_vat}, l10n_ve_rif_prefix=${client.l10n_ve_rif_prefix}, full_vat=${client.full_vat}, vat=${client.vat}`);
+            
+            // Pachacutec: v150 - RIF Dinámico con Fallback Inteligente
+            vat = fVat || (pVat + rawVat) || rawVat || "No tiene";
+            
+            // Si sigue siendo solo números y NO es "No tiene", algo anda mal con el loader.
+            if (vat !== "No tiene" && /^\d+$/.test(vat)) {
+                 console.error("[FISCAL] v150 - RIF NUMERICO SIN LETRA. La impresora dará NAK.");
+                 // Auditamos si existe algúna propiedad que contenga 'vat' o 'rif'
+                 for (let key in client) {
+                     if (key.includes('vat') || key.includes('rif')) {
+                         console.log(`  Campo sospechoso: ${key} = ${client[key]}`);
+                     }
+                 }
+            }
+            name = client.name || "CLIENTE GENERAL";
+            addr = client.street || "SIN DIRECCION";
+            phone = client.phone || "0000";
+            email = client.email || "N/A";
         }
 
-        console.warn(`[FISCAL] v149 - RIF FINAL: ${vat}`);
-        
         const cleanVat = sanitize(vat).substring(0, 20);
-        
-        const cleanName = sanitize(client?.name || "CLIENTE GENERAL").substring(0, 30);
-        const cleanAddr = sanitize(client?.street || "SIN DIRECCION").substring(0, 30);
-        const cleanPhone = sanitize(client?.phone || "0000").substring(0, 30);
-        const cleanEmail = sanitize(client?.email || "N/A").substring(0, 30);
+        const cleanName = sanitize(name).substring(0, 30);
+        const cleanAddr = sanitize(addr).substring(0, 30);
+        const cleanPhone = sanitize(phone).substring(0, 30);
+        const cleanEmail = sanitize(email).substring(0, 30);
+        const cleanRef = sanitize(order.name || "").substring(0, 30);
+
+        console.warn(`[FISCAL] v150 - ENVIANDO CABECERA RIF: ${cleanVat}`);
         
         this.printerCommands.push(`iR*${cleanVat}`);
         this.printerCommands.push(`iS*${cleanName}`);
-        
-        // Pachacutec: v138 - Orden Estricto Metadatos v16
         this.printerCommands.push(`i00TELEFONO: ${cleanPhone}`);
         this.printerCommands.push(`i01DIRECCION: ${cleanAddr}`);
         this.printerCommands.push(`i02EMAIL:    ${cleanEmail}`);
-        this.printerCommands.push(`i03REF:      ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
-        
-        console.warn("[FISCAL] v138 - Cabecera sincronizada v16 enviada con full_vat:", cleanVat);
+        this.printerCommands.push(`i03REF:      ${cleanRef}`);
     },
 
     setTotal() {
