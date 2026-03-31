@@ -1183,7 +1183,33 @@ export const FiscalPrinterMixin = {
     },
 
     async fetchStatusDiagnosis() {
-        console.warn("[FISCAL] fetchStatusDiagnosis no implementado en este firmware.");
-        return [];
+        if (!this.port || !this.port.writable) {
+            console.error("[FISCAL] Puerto cerrado o no disponible para S1.");
+            return null;
+        }
+        console.warn("[FISCAL] v152 - Solicitando Diagnóstico de Status (S1)...");
+        try {
+            const cmdStatus = toBytes("S1");
+            const writerStatus = this.port.writable.getWriter();
+            await writerStatus.write(cmdStatus);
+            await writerStatus.releaseLock();
+            
+            await new Promise(res => setTimeout(res, 500));
+            
+            if (this.port.readable) {
+                const readerStatus = this.port.readable.getReader();
+                const { value } = await readerStatus.read();
+                await readerStatus.releaseLock();
+                
+                if (value) {
+                    console.warn("[FISCAL] v152 - RESPUESTA DIAGNÓSTICO S1:", value);
+                    return value;
+                }
+            }
+        } catch (e) {
+            console.error("[FISCAL] v152 - Fallo en diagnóstico S1:", e);
+            throw e;
+        }
+        return null;
     }
 };

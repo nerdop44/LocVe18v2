@@ -125,6 +125,40 @@ const patchConfig = {
                 this.printing_lock = false;
             }
         }
+    },
+
+    async checkPrinterStatusCmd() {
+        if (this.printing_lock) {
+            console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+            return;
+        }
+        this.printing_lock = true;
+        try {
+            const result = await this.setPort();
+            if (!result) {
+                Swal.fire('Error', 'No se pudo abrir puerto.', 'error');
+                return;
+            }
+            const status_bytes = await this.fetchStatusDiagnosis();
+            if (status_bytes) {
+                const ascii_resp = Array.from(status_bytes).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : `[${b}]`).join("");
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Estado de Impresora (S1)',
+                    html: `<pre>Hex/Bruto:\n${ascii_resp}</pre>`
+                });
+            } else {
+                Swal.fire('Estado', 'Sin respuesta de S1 o NAK', 'warning');
+            }
+        } catch (e) {
+            Swal.fire('Error S1', e.message, 'error');
+        } finally {
+            if (this.port) {
+                try { await this.port.close(); } catch(e){}
+                this.port = false;
+            }
+            this.printing_lock = false;
+        }
     }
 };
 
@@ -135,7 +169,7 @@ const mixinMethods = [
     'printViaApi', 'printZViaApi', 'printXViaApi',
     'write', 'write_s2', 'write_Z', 'escribe_leer',
     'setHeader', 'setLines', 'setTotal',
-    'printFiscal', 'printNoFiscal',
+    'printFiscal', 'printNoFiscal', 'fetchStatusDiagnosis',
     // 'showPopup' is NOT in mixin, we implemented it above.
 ];
 
