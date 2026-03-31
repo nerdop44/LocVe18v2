@@ -77,10 +77,22 @@ const patchConfig = {
         if (this.pos.config.connection_type === "api") {
             this.printZViaApi();
         } else {
-            this.printerCommands = [];
-            this.read_Z = false; // Reset flag
-            this.printerCommands.push("I0Z");
-            await this.actionPrint();
+            if (this.printing_lock) {
+                console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+                return;
+            }
+            this.printing_lock = true;
+            try {
+                const result = await this.setPort();
+                if (!result) return;
+                await this.write_Z();
+            } finally {
+                if (this.port) {
+                    try { await this.port.close(); } catch(e){}
+                    this.port = false;
+                }
+                this.printing_lock = false;
+            }
         }
     },
 
@@ -88,10 +100,30 @@ const patchConfig = {
         if (this.pos.config.connection_type === "api") {
             this.printXViaApi();
         } else {
-            this.printerCommands = [];
-            this.read_Z = false; // Reset flag
-            this.printerCommands.push("I0X");
-            await this.actionPrint();
+            if (this.printing_lock) {
+                console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+                return;
+            }
+            this.printing_lock = true;
+            try {
+                const result = await this.setPort();
+                if (!result) return;
+                
+                // Mismo flujo de write_Z pero para X
+                this.writer = this.port.writable.getWriter();
+                this.printerCommands = ["I0X"]; 
+                const command = this.printerCommands[0];
+                if (this.writer) { await this.writer.releaseLock(); this.writer = false; }
+                
+                await this.escribe_leer(command, false);
+                // No esperamos lectura extendida para Reporte X usualmente
+            } finally {
+                if (this.port) {
+                    try { await this.port.close(); } catch(e){}
+                    this.port = false;
+                }
+                this.printing_lock = false;
+            }
         }
     }
 };
