@@ -896,19 +896,19 @@ export const FiscalPrinterMixin = {
         // FIXME: No asumir 'V' permanentemente. Resolver inyección de campos VE en Odoo 18 Server.
         // Si no hay letras (V, J, G, E, P) y el RIF tiene < 9 dígitos, asumimos 'V' para evitar NAK.
         if (rawVat && !/[VvJjGgEePp]/.test(rawVat)) {
-            console.warn("[FISCAL] v165 - DEDUCCIÓN: No se halló prefijo. Asumiendo 'V'.");
+            console.warn("[FISCAL] v166 - DEDUCCIÓN: No se halló prefijo. Asumiendo 'V'.");
             rawVat = "V" + rawVat;
         }
 
         let cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
 
-        // Pachacutec: v165 - Homologación 10 Dígitos (Anti-NAK)
-        // El RIF debe ser [Prefijo (1) + Números (9) = 10 total]
+        // Pachacutec: v166 - Homologación 10 Dígitos NUMÉRICOS (v16 Truth)
+        // El RIF debe ser [Prefijo (1) + Números (10) = 11 total]
         if (cleanVat !== "No tiene") {
             const prefix = cleanVat.substring(0, 1);
             const digits = cleanVat.substring(1).replace(/[^0-9]/g, "");
-            cleanVat = prefix + digits.padStart(9, "0");
-            console.warn("[FISCAL] v165 - RIF Homologado (10 chars):", cleanVat);
+            cleanVat = prefix + digits.padStart(10, "0");
+            console.warn("[FISCAL] v166 - RIF Homologado (11 chars):", cleanVat);
         }
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
