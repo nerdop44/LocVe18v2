@@ -126,9 +126,9 @@ class PosSession(models.Model):
     @api.model
     def _loader_params_res_partner(self):
         result = super()._loader_params_res_partner() if hasattr(super(), '_loader_params_res_partner') else {}
-        # Pachacutec: v162 - Inyección de full_vat para RIF completo
+        # Pachacutec: v164 - Inyección Exhaustiva (RIF + Prefijos)
         fields_to_add = [
-            'company_type', 'vat', 'prefix_vat', 'full_vat'
+            'company_type', 'vat', 'prefix_vat', 'full_vat', 'l10n_ve_vat', 'l10n_ve_vat_prefix'
         ]
         if result and 'search_params' in result:
             for f in fields_to_add:
@@ -139,9 +139,9 @@ class PosSession(models.Model):
     @api.model
     def _get_res_partner_loader_params(self):
         result = super()._get_res_partner_loader_params()
-        # Pachacutec: v162 - Redundancia Segura
+        # Pachacutec: v164 - Redundancia Segura
         fields_to_add = [
-            'company_type', 'vat', 'prefix_vat', 'full_vat'
+            'company_type', 'vat', 'prefix_vat', 'full_vat', 'l10n_ve_vat', 'l10n_ve_vat_prefix'
         ]
         if result and 'search_params' in result:
             for f in fields_to_add:

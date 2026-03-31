@@ -878,18 +878,28 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        // Pachacutec: v163 - Fuerza de Datos Odoo 18 (Dependency l10n_ve_binaural)
+        // Pachacutec: v164 - Blindaje Total (full_vat + Fallback Deducción)
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
         if (client) {
-            console.warn("[FISCAL] v163 - DEBUG PARTNER Odoo 18:", client);
+            console.warn("[FISCAL] v164 - DEBUG PARTNER Odoo 18:", client);
             try {
-                console.warn("[FISCAL] v163 - KEYS DISPONIBLES:", Object.keys(client));
+                console.warn("[FISCAL] v164 - KEYS DISPONIBLES:", Object.keys(client));
             } catch(e) {}
         }
 
-        const rawVat = client?.full_vat || (client?.prefix_vat || "") + (client?.vat || "");
+        // Prioridad: full_vat > prefix_vat + vat > vat
+        let rawVat = client?.full_vat || (client?.prefix_vat || "") + (client?.vat || "");
+        
+        // Pachacutec: v164 - DEDUCCIÓN INTELIGENTE (Provisional para avanzar)
+        // FIXME: No asumir 'V' permanentemente. Resolver inyección de campos VE en Odoo 18 Server.
+        // Si no hay letras (V, J, G, E, P) y el RIF tiene < 9 dígitos, asumimos 'V' para evitar NAK.
+        if (rawVat && !/[VvJjGgEePp]/.test(rawVat) && rawVat.length <= 9) {
+            console.warn("[FISCAL] v164 - DEDUCCIÓN: No se halló prefijo. Asumiendo 'V' por longitud de RIF.");
+            rawVat = "V" + rawVat;
+        }
+
         const cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
