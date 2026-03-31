@@ -869,17 +869,18 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
+        // Pachacutec: v160 - Depuración y Prefijos (Fidelidad v16)
         const client = this.pos.get_order().partner;
-        
-        // Pachacutec: v138 - Uso de full_vat y limpieza estricta (Anti-NAK)
-        // El RIF para iR* debe contener solo letras y números, sin guiones.
-        const rawVat = client?.full_vat || client?.vat || "0";
-        const cleanVat = rawVat.replace(/[^0-9VvJjGgEe]/g, "").toUpperCase();
+        console.warn("[FISCAL] DEBUG PARTNER Odoo 18:", client);
+
+        const rawVatNum = client?.vat || "";
+        const rawVatPrefix = client?.prefix_vat || "";
+        const cleanVat = (rawVatPrefix + rawVatNum).replace(/[^0-9VvJjGgEe]/g, "").toUpperCase() || "No tiene";
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
         const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
-        const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
-        const cleanEmail = cleanText(client?.email || "N/A").substring(0, 30);
+        const cleanPhone = cleanText(client?.phone || "No tiene").substring(0, 30);
+        const cleanEmail = cleanText(client?.email || "No tiene").substring(0, 30);
         
         // Pachacutec: v158 - Restauración Fidelidad v16 (Source of Truth)
         // Se anteponen iR* (Rif) e iS* (Nombre) antes de los descriptivos i00-i03.
@@ -891,7 +892,7 @@ export const FiscalPrinterMixin = {
         this.printerCommands.push(`i02Email:     ${cleanEmail}`);
         this.printerCommands.push(`i03Ref:       ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
         
-        console.warn("[FISCAL] v158 - Cabecera HKA-NG (RIF/Name) inyectada:", {cleanVat, cleanName});
+        console.warn("[FISCAL] v160 - Cabecera enviada (Rif/Prefix):", {cleanVat, cleanName});
     },
 
     setTotal() {
