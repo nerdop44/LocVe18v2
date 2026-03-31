@@ -295,10 +295,11 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
-                    // Pachacutec: v70 - Tolerancia a NAK en encabezados opcionales (i00-i03)
-                    if (command.substring(0, 2) === "i0") {
-                        console.warn("[FISCAL] v70 - Encabezado opcional falló (NAK), continuando factura...", command);
-                        cantidad_comandos--; // Descontamos para que la cuenta final sea 0 si todo lo demás pasa
+                    // Pachacutec: v143 - Blindaje Universal a NAK en Cabeceras (i*)
+                    // Permite que la factura continúe aunque falle el RIF, Nombre o Metadatos.
+                    if (command.substring(0, 1) === "i") {
+                        console.warn("[FISCAL] v143 - Comando de cabecera falló (NAK), continuando factura...", command);
+                        cantidad_comandos--; 
                         continue;
                     }
 
@@ -876,10 +877,10 @@ export const FiscalPrinterMixin = {
     setHeader(payload) {
         const client = this.pos.get_order().partner;
         
-        // Pachacutec: v138 - Uso de full_vat y limpieza estricta (Anti-NAK)
-        // El RIF para iR* debe contener solo letras y números, sin guiones.
-        const rawVat = client?.full_vat || client?.vat || "0";
-        const cleanVat = rawVat.replace(/[^0-9VvJjGgEe]/g, "").toUpperCase();
+        // Pachacutec: v143 - Homologación RIF v16 (full_vat + "No tiene")
+        // Se usa cleanText para permitir espacios y evitar el NAK del RIF "0".
+        const vat = client?.full_vat || "No tiene";
+        const cleanVat = cleanText(vat).substring(0, 20);
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
         const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
