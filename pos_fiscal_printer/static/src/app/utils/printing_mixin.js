@@ -888,12 +888,11 @@ export const FiscalPrinterMixin = {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        console.warn("[FISCAL] v146 - DIAGNÓSTICO CLIENTE:", client);
-        console.warn("[FISCAL] v146 - DIAGNÓSTICO ORDEN:", order);
+        console.warn("[FISCAL] v147 - LLAVES CLIENTE:", client ? Object.keys(client) : "NULL");
+        console.warn("[FISCAL] v147 - CLIENTE ENTERO (Proxy):", client);
         
-        // Pachacutec: v144 - Réplica Exacta v16 (sanitize + mixed case)
-        // Se usa sanitize() para mantener la fidelidad absoluta al protocolo v16 (No tiene).
-        const vat = client?.full_vat || "No tiene";
+        // Pachacutec: v147 - Fidelidad v16: Intentar vat si full_vat falta en el Proxy
+        const vat = client?.full_vat || client?.vat || "No tiene";
         const cleanVat = sanitize(vat).substring(0, 20);
         
         const cleanName = sanitize(client?.name || "CLIENTE GENERAL").substring(0, 30);
@@ -949,9 +948,10 @@ export const FiscalPrinterMixin = {
 
         // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
         // 4 avances de papel para que el ticket salga del cortador
-        // Pachacutec: v146 - Cierre Total con PUNTOS (Fiel a v16)
-        // El NAK en 81$TOTAL era causado por el separador decimal (coma).
+        // Pachacutec: v147 - Cierre Total con PUNTOS (Fiel a v16: Absolute Truth)
         this.printerCommands.push("81$TOTAL: " + formatTextAmount(total));
+        
+        // Pachacutec: v133 - Secuencia Éxito v16
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
