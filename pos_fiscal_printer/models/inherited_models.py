@@ -124,6 +124,20 @@ class PosSession(models.Model):
         return result
 
     @api.model
+    def _loader_params_res_partner(self):
+        result = super()._loader_params_res_partner() if hasattr(super(), '_loader_params_res_partner') else {}
+        # Pachacutec: v152 - Loader Duplicado para Odoo 18
+        fields_to_add = [
+            'company_type', 'vat', 'prefix_vat', 'full_vat', 
+            'l10n_ve_rif_prefix', 'l10n_latam_identification_type_id', 'l10n_ve_vat_type'
+        ]
+        if result and 'search_params' in result:
+            for f in fields_to_add:
+                if f not in result['search_params']['fields']:
+                    result['search_params']['fields'].append(f)
+        return result
+
+    @api.model
     def _get_res_partner_loader_params(self):
         result = super()._get_res_partner_loader_params()
         # Pachacutec: v151 - Redundancia Agresiva para Localización Venezolana
