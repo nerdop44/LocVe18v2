@@ -1039,17 +1039,23 @@ export const FiscalPrinterMixin = {
                     unitPrice = all_prices.priceWithoutTaxBeforeDiscount / (line.qty || 1);
                 }
 
-                // Pachacutec: v156 - PADDING Gen 1 (PnP PF300)
-                // Estructura Gen1: [Tag][Precio(10)][Qty(8)][Nombre]
-                let price = String(Math.round((unitPrice || 0) * 100)).padStart(10, '0').slice(-10);
-                let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(8, '0').slice(-8);
+                // Pachacutec: v157 - Restauración de Estructura Exacta v16 (Fuente de Verdad)
+                // Basado en el skill hka_fiscal_expert: 16 Precio + 17 Cantidad + Pipes
+                let price = String(Math.round((unitPrice || 0) * 100)).padStart(16, '0').slice(-16);
+                let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(17, '0').slice(-17);
                 
                 let command = tag + price + quantity;
                 
-                // Agregamos solo el nombre (sin pipes) ya que PnP no lo soporta de forma estándar
-                command += cleanText(line.product_id?.display_name || line.product_name || "Producto").substring(0, 40);
+                const code_clean = cleanText(line.product_id?.default_code || "");
+                if (code_clean) {
+                    command += `|${code_clean.substring(0, 10)}|`;
+                } else {
+                    command += `|`; // Empty pipe for no code to maintain partition
+                }
                 
-                console.warn("[FISCAL] v156 - Línea Gen 1 ensamblada:", command);
+                command += cleanText(line.product_id?.display_name || line.product_name || "Producto").substring(0, 30);
+                
+                console.warn("[FISCAL] v157 - Línea Ensamblada (HKA-NG):", command);
                 this.printerCommands.push(command);
 
                 if (line.discount > 0) {
