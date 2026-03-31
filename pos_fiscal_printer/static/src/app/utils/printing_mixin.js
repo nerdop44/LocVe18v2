@@ -27,6 +27,11 @@ export function cleanText(string) {
     }
 }
 
+// Pachacutec: v142 - Homologación v16: Separador decimal (coma)
+export function formatAmount(amount, fixed = 2) {
+    return (amount || 0).toFixed(fixed).replace(".", ",");
+}
+
 // Pachacutec: v66 - Restauración Estricta XOR v16 (1 solo byte de Checksum)
 // Pachacutec: v73 - Restauración XOR Binario (1 solo byte)
 // Requisito final HKA: 1 solo byte binario para el checksum.
@@ -902,7 +907,7 @@ export const FiscalPrinterMixin = {
         
         // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
         const total = this.order.get_total_with_tax() || 0;
-        const totalUSD = (total / rate).toFixed(2);
+        const totalUSD = formatAmount(total / rate);
         this.printerCommands.push(`80*${cleanText("TOTAL REF USD: USD " + totalUSD)}`);
 
         // Pachacutec: v138 - Detalle IGTF (3%)
@@ -911,8 +916,9 @@ export const FiscalPrinterMixin = {
         if (aplicar_igtf && paymentsInDivisas.length > 0) {
             const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
             totalIGTF = sumDivisas * 0.03;
-            this.printerCommands.push(`80*${cleanText("BASE IGTF 3 PORCIENTO:  Bs " + sumDivisas.toFixed(2))}`);
-            this.printerCommands.push(`80*${cleanText("MONTO IGTF:    Bs " + totalIGTF.toFixed(2))}`);
+            // Pachacutec: v142 - Sanitización Anti-NAK (Sin %) y Coma Decimal
+            this.printerCommands.push(`80*${cleanText("BASE IGTF 3 PORC:  BS " + formatAmount(sumDivisas))}`);
+            this.printerCommands.push(`80*${cleanText("MONTO IGTF:    BS " + formatAmount(totalIGTF))}`);
         }
 
         // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
@@ -928,7 +934,8 @@ export const FiscalPrinterMixin = {
 
         // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
         // 4 avances de papel para que el ticket salga del cortador
-        this.printerCommands.push("81 ");
+        // Pachacutec: v142 - Restauración v16: Comando 81 con prefijo $ y Coma Decimal
+        this.printerCommands.push("81$TOTAL: " + formatAmount(total));
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
@@ -1076,13 +1083,14 @@ export const FiscalPrinterMixin = {
                 const name = cleanText(line.product_id?.display_name || "");
                 const code = line.product_id?.default_code || "";
                 this.printerCommands.push(`80 ${name} [${code}]`);
-                this.printerCommands.push(`80*x${line.qty} ${(line.get_price_with_tax()).toFixed(2)}`);
+                this.printerCommands.push(`80*x${line.qty} ${formatAmount(line.get_price_with_tax())}`);
             });
 
         if (this.order.amount_return) {
-            this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2));
+            this.printerCommands.push("80*CAMBIO: " + formatAmount(this.order.amount_return));
         }
-        this.printerCommands.push("81TOTAL: " + (this.order.get_total_with_tax()).toFixed(2));
+        // Pachacutec: v142 - Homologación v16 (Prefijo $ y Coma)
+        this.printerCommands.push("81$TOTAL: " + formatAmount(this.order.get_total_with_tax()));
     },
 
     async printNotaCredito() {
