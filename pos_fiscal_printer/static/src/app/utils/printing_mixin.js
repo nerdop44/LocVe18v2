@@ -219,6 +219,15 @@ export const FiscalPrinterMixin = {
                             return true;
                         } else if (value[0] == 21) {
                             console.error("[FISCAL] Impresora devolvió NAK.");
+                            // Pachacutec: v161 - Reintento automático de primer comando (Solo iR*)
+                            // El log de éxito v16 muestra que a veces el primer iR* da NAK y el segundo ACK.
+                            if (!is_retry && command.startsWith("iR*")) {
+                                console.warn("[FISCAL] v161 - Detectado NAK en comando inicial. Reintentando (Wake-up v16)...");
+                                leer = false;
+                                if (this.reader) await this.reader.releaseLock();
+                                this.reader = false;
+                                return await this.escribe_leer(command, is_linea, true);
+                            }
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
@@ -869,9 +878,10 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        // Pachacutec: v160 - Depuración y Prefijos (Fidelidad v16)
-        const client = this.pos.get_order().partner;
-        console.warn("[FISCAL] DEBUG PARTNER Odoo 18:", client);
+        // Pachacutec: v161 - Acceso Robusto Odoo 18 (Método vs Propiedad)
+        const order = this.pos.get_order();
+        const client = order?.get_partner?.() || order?.partner || order?.get_client?.();
+        console.warn("[FISCAL] DEBUG PARTNER Odoo 18 (v161):", client);
 
         const rawVatNum = client?.vat || "";
         const rawVatPrefix = client?.prefix_vat || "";
