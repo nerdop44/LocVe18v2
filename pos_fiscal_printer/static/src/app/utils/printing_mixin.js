@@ -878,10 +878,16 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        // Pachacutec: v162 - Uso de full_vat (RIF Completo con Prefijo)
+        // Pachacutec: v163 - Fuerza de Datos Odoo 18 (Dependency l10n_ve_binaural)
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
-        console.warn("[FISCAL] DEBUG PARTNER Odoo 18 (v162):", client);
+        
+        if (client) {
+            console.warn("[FISCAL] v163 - DEBUG PARTNER Odoo 18:", client);
+            try {
+                console.warn("[FISCAL] v163 - KEYS DISPONIBLES:", Object.keys(client));
+            } catch(e) {}
+        }
 
         const rawVat = client?.full_vat || (client?.prefix_vat || "") + (client?.vat || "");
         const cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
@@ -901,7 +907,7 @@ export const FiscalPrinterMixin = {
         this.printerCommands.push(`i02Email:     ${cleanEmail}`);
         this.printerCommands.push(`i03Ref:       ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
         
-        console.warn("[FISCAL] v160 - Cabecera enviada (Rif/Prefix):", {cleanVat, cleanName});
+        console.warn("[FISCAL] v163 - Cabecera enviada (Rif/Prefix):", {cleanVat, cleanName});
     },
 
     setTotal() {

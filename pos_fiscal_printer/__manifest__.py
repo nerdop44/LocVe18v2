@@ -1,6 +1,6 @@
 {
     'name': '[LOCVE] Venezuela: POS fiscal printer',
-    'version': '18.0.1.6.2',
+    'version': '18.0.1.6.3',
     'category': 'LocVe [Localization]',
     'summary': 'Fiscal printing using serial ports',
     'author': 'Remake Ing Nerdo Pulido',
@@ -8,7 +8,7 @@
     'maintainer': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'website': 'https://github.com/birkot',
     'description': 'Impresoras modelos SRP812, DT230, HKA80, PP9, PP9-PLUS, PD3100DL, TD1140.',
-    'depends': ['point_of_sale', 'pos_igtf_tax'],
+    'depends': ['point_of_sale', 'pos_igtf_tax', 'l10n_ve_binaural'],
     'data': [
         'security/ir.model.access.csv',
         'views/inherited_views.xml',
