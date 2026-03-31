@@ -901,10 +901,10 @@ export const FiscalPrinterMixin = {
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const rate = this.pos.config.show_currency_rate || 1;
         
-        // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
+        // Pachacutec: v159 - Estabilización de Texto (Anti-NAK: Sin $, Con Comas)
         const total = this.order.get_total_with_tax() || 0;
-        const totalUSD = (total / rate).toFixed(2);
-        this.printerCommands.push(`80*TOTAL REF USD:  $ ${totalUSD}`);
+        const totalUSD = (total / rate).toFixed(2).replace(".", ",");
+        this.printerCommands.push(`80*TOTAL REF USD:    ${totalUSD}`);
 
         // Pachacutec: v138 - Detalle IGTF (3%)
         let totalIGTF = 0;
@@ -912,8 +912,8 @@ export const FiscalPrinterMixin = {
         if (aplicar_igtf && paymentsInDivisas.length > 0) {
             const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
             totalIGTF = sumDivisas * 0.03;
-            this.printerCommands.push(`80*BASE IGTF 3%:  Bs ${sumDivisas.toFixed(2)}`);
-            this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2)}`);
+            this.printerCommands.push(`80*BASE IGTF 3%:  Bs ${sumDivisas.toFixed(2).replace(".", ",")}`);
+            this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2).replace(".", ",")}`);
         }
 
         // Pachacutec: v158 - Secuencia Determinística Éxito v16 (3 -> 101 -> 199)
@@ -1073,13 +1073,13 @@ export const FiscalPrinterMixin = {
                 const name = cleanText(line.product_id?.display_name || "");
                 const code = line.product_id?.default_code || "";
                 this.printerCommands.push(`80 ${name} [${code}]`);
-                this.printerCommands.push(`80*x${line.qty} ${(line.get_price_with_tax()).toFixed(2)}`);
+                this.printerCommands.push(`80*x${line.qty} ${(line.get_price_with_tax()).toFixed(2).replace(".", ",")}`);
             });
 
         if (this.order.amount_return) {
-            this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2));
+            this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2).replace(".", ","));
         }
-        this.printerCommands.push("81$TOTAL: " + (this.order.get_total_with_tax()).toFixed(2));
+        this.printerCommands.push("81 TOTAL: " + (this.order.get_total_with_tax()).toFixed(2).replace(".", ","));
     },
 
     async printNotaCredito() {

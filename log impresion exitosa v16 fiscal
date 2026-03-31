@@ -1,0 +1,222 @@
+web.assets_common.min.js:6294 Tour Manager is ready.  running_tour=null
+/pos/ui?config_id=13#cids=2:1 [Intervention] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: https://kantal.mi-erp.app/web/static/fonts/lato/Lato-Reg-webfont.woff
+point_of_sale.assets.min.js:13 [Intervention] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: https://kantal.mi-erp.app/point_of_sale/static/src/fonts/Inconsolata.otf
+/pos/ui?config_id=13#cids=2:1 [Intervention] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: https://kantal.mi-erp.app/web/static/fonts/lato/Lato-Bol-webfont.woff
+point_of_sale.assets.min.js:5547 total_dolares 709.1
+point_of_sale.assets.min.js:5547 this Proxy(PosHrOrder) {cid: 'c1', locked: false, pos: Proxy(PosHrSalesmanPosGlobalState), selected_orderline: PosSaleOrderline, selected_paymentline: Payment, …}
+point_of_sale.assets.min.js:5547 igtf_monto 0
+point_of_sale.assets.min.js:5547 max_igtf 21.273
+point_of_sale.assets.min.js:5547 total_dolares 709.1
+point_of_sale.assets.min.js:5547 this Proxy(PosHrOrder) {cid: 'c1', locked: false, pos: Proxy(PosHrSalesmanPosGlobalState), selected_orderline: PosSaleOrderline, selected_paymentline: Payment, …}
+point_of_sale.assets.min.js:5547 igtf_monto 0
+point_of_sale.assets.min.js:5547 max_igtf 21.273
+point_of_sale.assets.min.js:5547 total_dolares 709.1
+point_of_sale.assets.min.js:5547 this Proxy(PosHrOrder) {cid: 'c1', locked: false, pos: Proxy(PosHrSalesmanPosGlobalState), selected_orderline: PosSaleOrderline, selected_paymentline: Payment, …}
+point_of_sale.assets.min.js:5547 igtf_monto 0
+point_of_sale.assets.min.js:5547 max_igtf 21.273
+point_of_sale.assets.min.js:5547 total_dolares 709.1
+point_of_sale.assets.min.js:5547 this Proxy(PosHrOrder) {cid: 'c1', locked: false, pos: Proxy(PosHrSalesmanPosGlobalState), selected_orderline: PosSaleOrderline, selected_paymentline: Payment, …}
+point_of_sale.assets.min.js:5547 igtf_monto 0
+point_of_sale.assets.min.js:5547 max_igtf 21.273
+point_of_sale.assets.min.js:5570 es_nota false
+point_of_sale.assets.min.js:5609 Comandos:  (10) ['iR*No tiene', 'iS*PABLO PULIDO', 'i00Telefono: No tiene', 'i01Direccion: CARACAS', 'i02Email: No tiene', 'i03Ref: Pedido 06392-006-0001', '!000000000006112900000000000001000|PEZ-149|CARACOL MANZANA', '3', '101', '199']
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 iR*No tiene
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(14) [2, 105, 82, 42, 78, 111, 32, 116, 105, 101, 110, 101, 3, 96, buffer: ArrayBuffer(14), byteLength: 14, byteOffset: 0, length: 14, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [21, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 21
+point_of_sale.assets.min.js:5603 Comando no reconocido
+point_of_sale.assets.min.js:5611 Error en impresion, factura anulada
+point_of_sale.assets.min.js:5614 Antes de cerrar el puerto
+point_of_sale.assets.min.js:5614 Puerto cerrado
+point_of_sale.assets.min.js:5570 es_nota false
+point_of_sale.assets.min.js:5594 Verificando si el puerto esta abierto
+point_of_sale.assets.min.js:5594 SerialPort {onconnect: null, ondisconnect: null, readable: null, writable: null, connected: true}
+point_of_sale.assets.min.js:5609 Comandos:  (10) ['iR*No tiene', 'iS*PABLO PULIDO', 'i00Telefono: No tiene', 'i01Direccion: CARACAS', 'i02Email: No tiene', 'i03Ref: Pedido 06392-006-0001', '!000000000006112900000000000001000|PEZ-149|CARACOL MANZANA', '3', '101', '199']
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 iR*No tiene
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(14) [2, 105, 82, 42, 78, 111, 32, 116, 105, 101, 110, 101, 3, 96, buffer: ArrayBuffer(14), byteLength: 14, byteOffset: 0, length: 14, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 iS*PABLO PULIDO
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(18) [2, 105, 83, 42, 80, 65, 66, 76, 79, 32, 80, 85, 76, 73, 68, 79, 3, 104, buffer: ArrayBuffer(18), byteLength: 18, byteOffset: 0, length: 18, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 i00Telefono: No tiene
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(24) [2, 105, 48, 48, 84, 101, 108, 101, 102, 111, 110, 111, 58, 32, 78, 111, 32, 116, 105, 101, 110, 101, 3, 50, buffer: ArrayBuffer(24), byteLength: 24, byteOffset: 0, length: 24, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 i01Direccion: CARACAS
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(24) [2, 105, 48, 49, 68, 105, 114, 101, 99, 99, 105, 111, 110, 58, 32, 67, 65, 82, 65, 67, 65, 83, 3, 99, buffer: ArrayBuffer(24), byteLength: 24, byteOffset: 0, length: 24, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 i02Email: No tiene
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(21) [2, 105, 48, 50, 69, 109, 97, 105, 108, 58, 32, 78, 111, 32, 116, 105, 101, 110, 101, 3, 76, buffer: ArrayBuffer(21), byteLength: 21, byteOffset: 0, length: 21, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 i03Ref: Pedido 06392-006-0001
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(32) [2, 105, 48, 51, 82, 101, 102, 58, 32, 80, 101, 100, 105, 100, 111, 32, 48, 54, 51, 57, 50, 45, 48, 48, 54, 45, 48, 48, 48, 49, 3, 56, buffer: ArrayBuffer(32), byteLength: 32, byteOffset: 0, length: 32, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 !000000000006112900000000000001000|PEZ-149|CARACOL MANZANA
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(61) [2, 33, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 54, 49, 49, 50, 57, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 48, 48, 48, 124, 80, 69, 90, 45, 49, 52, 57, 124, 67, 65, 82, 65, 67, 79, 76, 32, 77, 65, 78, 90, 65, 78, 65, 3, 103, buffer: ArrayBuffer(61), byteLength: 61, byteOffset: 0, length: 61, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 3
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(4) [2, 51, 3, 48, buffer: ArrayBuffer(4), byteLength: 4, byteOffset: 0, length: 4, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 101
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(6) [2, 49, 48, 49, 3, 51, buffer: ArrayBuffer(6), byteLength: 6, byteOffset: 0, length: 6, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5595 Escribiendo comando: 
+point_of_sale.assets.min.js:5595 199
+point_of_sale.assets.min.js:5596 Comando codificado: 
+point_of_sale.assets.min.js:5596 Uint8Array(6) [2, 49, 57, 57, 3, 50, buffer: ArrayBuffer(6), byteLength: 6, byteOffset: 0, length: 6, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5597 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5597 signals DSR:  true
+point_of_sale.assets.min.js:5597 signals CTS:  true
+point_of_sale.assets.min.js:5599 Empezando lectura
+point_of_sale.assets.min.js:5603 Respuesta de comando: 
+point_of_sale.assets.min.js:5603 Uint8Array [6, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5603 Respuesta detallada: 
+point_of_sale.assets.min.js:5603 6
+point_of_sale.assets.min.js:5603 Finalizanda lectura
+point_of_sale.assets.min.js:5603 comando aceptado
+point_of_sale.assets.min.js:5611 Comandos finalizados
+point_of_sale.assets.min.js:5615 Escribiendo S1 [Uint8Array(5)]
+point_of_sale.assets.min.js:5617 Leyendo S1 ReadableStream {locked: false}
+point_of_sale.assets.min.js:5618 signals:  {clearToSend: true, dataCarrierDetect: false, dataSetReady: true, ringIndicator: false}
+point_of_sale.assets.min.js:5618 signals DSR:  true
+point_of_sale.assets.min.js:5621 Uint8Array [2, buffer: ArrayBuffer(1), byteLength: 1, byteOffset: 0, length: 1, Symbol(Symbol.toStringTag): 'Uint8Array']
+point_of_sale.assets.min.js:5621 
+point_of_sale.assets.min.js:5621 Uint8Array(132) [83, 49, 48, 48, 10, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 50, 52, 50, 49, 49, 53, 10, 48, 48, 48, 48, 48, 48, 53, 57, 10, 48, 48, 48, 48, 50, 10, 48, 48, 48, 48, 48, 48, 48, 48, 10, 48, 48, 48, 48, 48, 10, 48, 48, 48, 48, 48, 48, 48, 50, 10, 48, 48, 48, 48, 48, 10, 48, 48, 48, 48, 48, 56, 53, 50, 10, 48, 48, 48, 48, 49, 10, 48, 48, 48, 49, 10, 48, 54, 53, 48, 10, 74, 45, 53, 48, 49, 48, 52, …]
+point_of_sale.assets.min.js:5621 S100
+00000000000242115
+00000059
+00002
+00000000
+00000
+00000002
+00000
+00000852
+00001
+0001
+0650
+J-501046522
+Z7C7018138
+141821
+310326
+
+point_of_sale.assets.min.js:5621 Numero de factura:  00000059
+point_of_sale.assets.min.js:5621 Finalizado
+write_s2 @ point_of_sale.assets.min.js:5621
+await in write_s2
+write @ point_of_sale.assets.min.js:5612
+await in write
+actionPrint @ point_of_sale.assets.min.js:5630
+await in actionPrint
+doPrinting @ point_of_sale.assets.min.js:5567
+hdlr2 @ VM174:25
+mainEventHandler @ web.assets_common.min.js:1999
+listener @ web.assets_common.min.js:1175
+point_of_sale.assets.min.js:5614 Antes de cerrar el puerto
+point_of_sale.assets.min.js:5614 Puerto cerrado
+

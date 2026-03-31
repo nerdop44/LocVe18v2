@@ -11,10 +11,10 @@ Este skill preserva el conocimiento crítico adquirido durante la estabilizació
 
 ### 1. Estructura de Trama (Padding)
 Las impresoras HKA modernas (etiquetadas como NG o con firmwares recientes) requieren campos de datos fijos y extendidos.
-- **Comando de Item (!)**:
-  - **Precio**: 16 dígitos (14 enteros + 2 decimales sin punto, ej: `0000000000058728` para 587.28).
-  - **Cantidad**: 17 dígitos (14 enteros + 3 decimales sin punto, ej: `00000000000001000` para 1.000).
 - **Total Data**: 33 dígitos exactos antes de cualquier partición (`|`).
+- **Comandos de Texto (80*)**:
+  - **Caracteres Prohibidos**: El símbolo `$` causa NAK en muchos firmwares. Debe evitarse en etiquetas y montos referenciales.
+  - **Separador Decimal**: Utilizar siempre la coma `,`. Algunos firmwares rechazan el punto `.` en comandos de texto no fiscal.
 - **Consecuencia de error**: La impresora devuelve `NAK` (21) y reporta "Error de Protocolo" o "Inconsistencia de Datos".
 
 ### 2. Configuración de Puerto (Baudrate)
