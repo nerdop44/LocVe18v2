@@ -885,7 +885,11 @@ export const FiscalPrinterMixin = {
     },
 
     setHeader(payload) {
-        const client = this.pos.get_order().partner;
+        const order = this.pos.get_order();
+        const client = order?.get_partner?.() || order?.partner;
+        
+        console.warn("[FISCAL] v146 - DIAGNÓSTICO CLIENTE:", client);
+        console.warn("[FISCAL] v146 - DIAGNÓSTICO ORDEN:", order);
         
         // Pachacutec: v144 - Réplica Exacta v16 (sanitize + mixed case)
         // Se usa sanitize() para mantener la fidelidad absoluta al protocolo v16 (No tiene).
@@ -945,8 +949,9 @@ export const FiscalPrinterMixin = {
 
         // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
         // 4 avances de papel para que el ticket salga del cortador
-        // Pachacutec: v142 - Restauración v16: Comando 81 con prefijo $ y Coma Decimal
-        this.printerCommands.push("81$TOTAL: " + formatAmount(total));
+        // Pachacutec: v146 - Cierre Total con PUNTOS (Fiel a v16)
+        // El NAK en 81$TOTAL era causado por el separador decimal (coma).
+        this.printerCommands.push("81$TOTAL: " + formatTextAmount(total));
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
         this.printerCommands.push("81 ");
