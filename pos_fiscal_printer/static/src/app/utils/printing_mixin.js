@@ -913,27 +913,25 @@ export const FiscalPrinterMixin = {
             
             // Si el RIF es numérico, intentamos un RPC call para obtener el dato real del servidor
             if (!pVat && !fVat && rawVat && /^\d+$/.test(rawVat)) {
-                console.warn("[FISCAL] v153 - RIF Numérico detectado. Ejecutando RPC Fallback...");
+                console.warn("[FISCAL] v155 - RIF Numérico detectado. Ejecutando RPC con campos v18...");
                 try {
-                    // Odoo 18 usa orm.call o environment services orm.read
-                    const res = await this.pos.env.services.orm.call('res.partner', 'read', [[client.id], ['full_vat', 'prefix_vat', 'l10n_ve_rif_prefix', 'vat']]);
+                    const res = await this.pos.env.services.orm.call('res.partner', 'read', [[client.id], ['prefix_vat', 'vat']]);
                     if (res && res.length > 0) {
                         const srv = res[0];
-                        fVat = srv.full_vat || "";
-                        pVat = srv.prefix_vat || srv.l10n_ve_rif_prefix || "";
-                        console.warn(`[FISCAL] v153 - RPC Éxito: full_vat=${fVat}, prefix=${pVat}`);
+                        pVat = srv.prefix_vat || "";
+                        rawVat = srv.vat || rawVat;
+                        console.warn(`[FISCAL] v155 - RPC Éxito: prefix=${pVat}, vat=${rawVat}`);
                     }
                 } catch (e) {
-                    console.error("[FISCAL] v153 - RPC Fallback Falló (Syntax Fix):", e);
+                    console.error("[FISCAL] v155 - RPC Fallback Falló:", e);
                 }
             }
 
-            vat = fVat || (pVat + rawVat) || rawVat || "No tiene";
+            vat = (pVat + rawVat) || rawVat || "No tiene";
             
-            // Pachacutec: v153 - Fallback ÚLTIMO RECURSO si el servidor/loader falló
-            // Si es numérico de 7-10 dígitos, asumimos V para que la factura NO aborte.
+            // Pachacutec: v155 - Failsafe mejorado
             if (vat && /^\d{7,10}$/.test(vat)) {
-                console.warn("[FISCAL] v153 - ÚLTIMO RECURSO: Inyectando letra V a RIF numérico.");
+                console.warn("[FISCAL] v155 - ÚLTIMO RECURSO: Inyectando letra V a RIF numérico.");
                 vat = "V" + vat;
             }
             name = client.name || "CLIENTE GENERAL";
@@ -951,8 +949,8 @@ export const FiscalPrinterMixin = {
 
         console.warn(`[FISCAL] v153 - ENVIANDO CABECERA RIF FINAL: ${cleanVat}`);
         
-        this.printerCommands.push(`iR${cleanVat}`);
-        this.printerCommands.push(`iS${cleanName}`);
+        this.printerCommands.push(`iR*${cleanVat}`);
+        this.printerCommands.push(`iS*${cleanName}`);
         this.printerCommands.push(`i00TELEFONO: ${cleanPhone}`);
         this.printerCommands.push(`i01DIRECCION: ${cleanAddr}`);
         this.printerCommands.push(`i02EMAIL:    ${cleanEmail}`);
