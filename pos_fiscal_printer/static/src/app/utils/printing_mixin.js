@@ -56,8 +56,9 @@ export function toBytes(command) {
     const ETX = 3;
     const STX = 2;
 
-    // Pachacutec: v134 - LRC Pure Z1F (Excluir STX siempre)
-    // El log de éxito v16 confirma que el LRC es [DATA ^ ETX] sin el STX(2).
+    // Pachacutec: v148 - LRC Pure v16 (MANDATORIO: Excluir STX)
+    // El LRC se calcula como (DATA XOR ETX) sin incluir el STX(2).
+    // Esto es crítico para que la impresora acepte (ACK) la cabecera.
     let lrc = 0; 
     for (const byte of dataBytes) {
         lrc ^= byte;
@@ -888,11 +889,18 @@ export const FiscalPrinterMixin = {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        console.warn("[FISCAL] v147 - LLAVES CLIENTE:", client ? Object.keys(client) : "NULL");
-        console.warn("[FISCAL] v147 - CLIENTE ENTERO (Proxy):", client);
+        console.warn("[FISCAL] v148 - LLAVES CLIENTE:", client ? Object.keys(client) : "NULL");
+        console.warn("[FISCAL] v148 - CLIENTE DATA:", client);
         
-        // Pachacutec: v147 - Fidelidad v16: Intentar vat si full_vat falta en el Proxy
-        const vat = client?.full_vat || client?.vat || "No tiene";
+        // Pachacutec: v148 - RIF Dinámico Sin Hardcode
+        // 1. Intentamos full_vat (computado backend).
+        // 2. Si falla, concatenamos prefijo + vat originales.
+        const rif_prefijo = client?.prefix_vat || "";
+        const rif_base = client?.vat || "";
+        const vat = client?.full_vat || (rif_prefijo + rif_base) || "No tiene";
+        
+        console.warn(`[FISCAL] v148 - RIF DETECTADO: prefix(${rif_prefijo}) + vat(${rif_base}) -> final(${vat})`);
+        
         const cleanVat = sanitize(vat).substring(0, 20);
         
         const cleanName = sanitize(client?.name || "CLIENTE GENERAL").substring(0, 30);
