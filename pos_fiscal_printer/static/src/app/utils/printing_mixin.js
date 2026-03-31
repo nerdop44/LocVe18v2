@@ -151,11 +151,9 @@ export const FiscalPrinterMixin = {
 
     async escribe_leer(command, is_linea, is_retry = false) {
         if (!this.port) return false;
-        var comando_cod = toBytes(command);
-        console.log("Escribiendo comando: ");
-        console.log(command)
-        console.log("Comando codificado: ");
-        console.log(comando_cod);
+        console.warn(`[FISCAL] v151 - ESCRIBIENDO: ${command}`);
+        const comando_cod = toBytes(command);
+        console.warn(`[FISCAL] v151 - HEX:`, Array.from(comando_cod).map(b => b.toString(16).padStart(2, '0')).join(' '));
 
         this.writer = this.port.writable.getWriter();
         var signals_to_send = { dataTerminalReady: true };
@@ -879,7 +877,7 @@ export const FiscalPrinterMixin = {
                 break;
             case "fiscal":
                 this.read_s2 = true;
-                this.printFiscal();
+                await this.printFiscal();
                 break;
             case "notaCredito":
                 this.read_s2 = true;
@@ -895,11 +893,11 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    setHeader(payload) {
+    async setHeader(payload) {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        console.warn("[FISCAL] v150 - AUDITORIA PROFUNDA CLIENTE:", client ? Object.keys(client) : "NULL");
+        console.warn("[FISCAL] v151 - AUDITORIA PROFUNDA CLIENTE:", client ? Object.keys(client) : "NULL");
         
         let vat = "V00000000";
         let name = "CONTADO";
@@ -908,25 +906,28 @@ export const FiscalPrinterMixin = {
         let email = "N/A";
 
         if (client) {
-            // v150: Extraer todos los campos posibles de identificación venezolana
-            const pVat = client.prefix_vat || client.l10n_ve_rif_prefix || "";
-            const fVat = client.full_vat || "";
-            const rawVat = client.vat || "";
-            console.log(`RIF Audit: prefix_vat=${client.prefix_vat}, l10n_ve_rif_prefix=${client.l10n_ve_rif_prefix}, full_vat=${client.full_vat}, vat=${client.vat}`);
+            // v151: Fallback Inteligente via RPC si el Proxy local falla
+            let pVat = client.prefix_vat || client.l10n_ve_rif_prefix || "";
+            let fVat = client.full_vat || "";
+            let rawVat = client.vat || "";
             
-            // Pachacutec: v150 - RIF Dinámico con Fallback Inteligente
-            vat = fVat || (pVat + rawVat) || rawVat || "No tiene";
-            
-            // Si sigue siendo solo números y NO es "No tiene", algo anda mal con el loader.
-            if (vat !== "No tiene" && /^\d+$/.test(vat)) {
-                 console.error("[FISCAL] v150 - RIF NUMERICO SIN LETRA. La impresora dará NAK.");
-                 // Auditamos si existe algúna propiedad que contenga 'vat' o 'rif'
-                 for (let key in client) {
-                     if (key.includes('vat') || key.includes('rif')) {
-                         console.log(`  Campo sospechoso: ${key} = ${client[key]}`);
-                     }
-                 }
+            // Si el RIF es numérico, intentamos un RPC read para obtener el dato real del servidor
+            if (!pVat && !fVat && rawVat && /^\d+$/.test(rawVat)) {
+                console.warn("[FISCAL] v151 - RIF Numérico detectado. Ejecutando RPC Fallback...");
+                try {
+                    const res = await this.pos.orm.silent.read('res.partner', [client.id], ['full_vat', 'prefix_vat', 'l10n_ve_rif_prefix', 'vat']);
+                    if (res && res.length > 0) {
+                        const srv = res[0];
+                        fVat = srv.full_vat || "";
+                        pVat = srv.prefix_vat || srv.l10n_ve_rif_prefix || "";
+                        console.warn(`[FISCAL] v151 - RPC Éxito: full_vat=${fVat}, prefix=${pVat}`);
+                    }
+                } catch (e) {
+                    console.error("[FISCAL] v151 - RPC Fallback Falló:", e);
+                }
             }
+
+            vat = fVat || (pVat + rawVat) || rawVat || "No tiene";
             name = client.name || "CLIENTE GENERAL";
             addr = client.street || "SIN DIRECCION";
             phone = client.phone || "0000";
@@ -940,7 +941,7 @@ export const FiscalPrinterMixin = {
         const cleanEmail = sanitize(email).substring(0, 30);
         const cleanRef = sanitize(order.name || "").substring(0, 30);
 
-        console.warn(`[FISCAL] v150 - ENVIANDO CABECERA RIF: ${cleanVat}`);
+        console.warn(`[FISCAL] v151 - ENVIANDO CABECERA RIF FINAL: ${cleanVat}`);
         
         this.printerCommands.push(`iR*${cleanVat}`);
         this.printerCommands.push(`iS*${cleanName}`);
@@ -997,8 +998,8 @@ export const FiscalPrinterMixin = {
         console.warn("[FISCAL] setTotal - Comandos finales v138 con Corte inyectado.");
     },
 
-    printFiscal() {
-        this.setHeader();
+    async printFiscal() {
+        await this.setHeader();
         this.setLines("GF");
         this.setTotal();
     },

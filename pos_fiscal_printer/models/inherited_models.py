@@ -126,10 +126,10 @@ class PosSession(models.Model):
     @api.model
     def _get_res_partner_loader_params(self):
         result = super()._get_res_partner_loader_params()
-        # Pachacutec: v150 - Redundancia Agresiva para Localización Venezolana
+        # Pachacutec: v151 - Redundancia Agresiva para Localización Venezolana
         fields_to_add = [
             'company_type', 'vat', 'prefix_vat', 'full_vat', 
-            'l10n_ve_rif_prefix', 'l10n_latam_identification_type_id'
+            'l10n_ve_rif_prefix', 'l10n_latam_identification_type_id', 'l10n_ve_vat_type'
         ]
         if result and 'search_params' in result:
             for f in fields_to_add:
