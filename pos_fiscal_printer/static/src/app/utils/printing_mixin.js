@@ -881,14 +881,17 @@ export const FiscalPrinterMixin = {
         const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
         const cleanEmail = cleanText(client?.email || "N/A").substring(0, 30);
         
-        // Pachacutec: v156 - Cabecera Compatible Gen 1 (PnP PF300)
-        // Sustituye iR* e iS* que no existen en Gen 1. Usa i00 a i03.
-        this.printerCommands.push(`i00NOMBRE: ${cleanName}`);
-        this.printerCommands.push(`i01CI/RIF: ${cleanVat}`);
-        this.printerCommands.push(`i02DIR:    ${cleanAddr}`);
-        this.printerCommands.push(`i03REF:    ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
+        // Pachacutec: v158 - Restauración Fidelidad v16 (Source of Truth)
+        // Se anteponen iR* (Rif) e iS* (Nombre) antes de los descriptivos i00-i03.
+        this.printerCommands.push(`iR*${cleanVat}`);
+        this.printerCommands.push(`iS*${cleanName}`);
+
+        this.printerCommands.push(`i00Telefono:  ${cleanPhone}`);
+        this.printerCommands.push(`i01Direccion: ${cleanAddr}`);
+        this.printerCommands.push(`i02Email:     ${cleanEmail}`);
+        this.printerCommands.push(`i03Ref:       ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
         
-        console.warn("[FISCAL] v156 - Cabecera Gen1 enviada con full_vat:", cleanVat);
+        console.warn("[FISCAL] v158 - Cabecera HKA-NG (RIF/Name) inyectada:", {cleanVat, cleanName});
     },
 
     setTotal() {
@@ -913,16 +916,10 @@ export const FiscalPrinterMixin = {
             this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2)}`);
         }
 
-        // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
+        // Pachacutec: v158 - Secuencia Determinística Éxito v16 (3 -> 101 -> 199)
+        // En v16, el comando 199 es el cierre mandatorio incluso sin IGTF.
         this.printerCommands.push("101");
-
-        const has_divisas = paymentsInDivisas.length > 0;
-        const use_igtf_closing = aplicar_igtf && has_divisas;
-
-        if (use_igtf_closing) {
-            console.warn("[FISCAL] setTotal - Enviando cierre extra 199 (IGTF)");
-            this.printerCommands.push("199");
-        }
+        this.printerCommands.push("199");
 
         // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
         // 4 avances de papel para que el ticket salga del cortador
@@ -1050,7 +1047,8 @@ export const FiscalPrinterMixin = {
                 if (code_clean) {
                     command += `|${code_clean.substring(0, 10)}|`;
                 } else {
-                    command += `|`; // Empty pipe for no code to maintain partition
+                    // Pachacutec: v158 - Doble tubería para campo vacío (NG Standard)
+                    command += `||`; 
                 }
                 
                 command += cleanText(line.product_id?.display_name || line.product_name || "Producto").substring(0, 30);
