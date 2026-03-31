@@ -32,6 +32,11 @@ export function formatAmount(amount, fixed = 2) {
     return (amount || 0).toFixed(fixed).replace(".", ",");
 }
 
+// Pachacutec: v144 - Formato de Texto (Solo Puntos) para Comentarios 80*
+export function formatTextAmount(amount, fixed = 2) {
+    return (amount || 0).toFixed(fixed);
+}
+
 // Pachacutec: v66 - Restauración Estricta XOR v16 (1 solo byte de Checksum)
 // Pachacutec: v73 - Restauración XOR Binario (1 solo byte)
 // Requisito final HKA: 1 solo byte binario para el checksum.
@@ -295,10 +300,10 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
-                    // Pachacutec: v143 - Blindaje Universal a NAK en Cabeceras (i*)
-                    // Permite que la factura continúe aunque falle el RIF, Nombre o Metadatos.
-                    if (command.substring(0, 1) === "i") {
-                        console.warn("[FISCAL] v143 - Comando de cabecera falló (NAK), continuando factura...", command);
+                    // Pachacutec: v144 - Blindaje Total en Líneas No-Contables (i* y 80*)
+                    // Permite que la factura continúe aunque falle el RIF, Nombre o Comentarios.
+                    if (command.startsWith("i") || command.startsWith("80")) {
+                        console.warn("[FISCAL] v144 - Comando opcional falló (NAK), continuando factura...", command);
                         cantidad_comandos--; 
                         continue;
                     }
@@ -872,20 +877,18 @@ export const FiscalPrinterMixin = {
         }
     },
 
-    // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
-    // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
         const client = this.pos.get_order().partner;
         
-        // Pachacutec: v143 - Homologación RIF v16 (full_vat + "No tiene")
-        // Se usa cleanText para permitir espacios y evitar el NAK del RIF "0".
+        // Pachacutec: v144 - Réplica Exacta v16 (sanitize + mixed case)
+        // Se usa sanitize() para mantener la fidelidad absoluta al protocolo v16 (No tiene).
         const vat = client?.full_vat || "No tiene";
-        const cleanVat = cleanText(vat).substring(0, 20);
+        const cleanVat = sanitize(vat).substring(0, 20);
         
-        const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
-        const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
-        const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
-        const cleanEmail = cleanText(client?.email || "N/A").substring(0, 30);
+        const cleanName = sanitize(client?.name || "CLIENTE GENERAL").substring(0, 30);
+        const cleanAddr = sanitize(client?.street || "SIN DIRECCION").substring(0, 30);
+        const cleanPhone = sanitize(client?.phone || "0000").substring(0, 30);
+        const cleanEmail = sanitize(client?.email || "N/A").substring(0, 30);
         
         this.printerCommands.push(`iR*${cleanVat}`);
         this.printerCommands.push(`iS*${cleanName}`);
@@ -906,9 +909,9 @@ export const FiscalPrinterMixin = {
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const rate = this.pos.config.show_currency_rate || 1;
         
-        // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
+        // Pachacutec: v144 - Moneda Dual (v16 alignment: PUNTOS en comentarios)
         const total = this.order.get_total_with_tax() || 0;
-        const totalUSD = formatAmount(total / rate);
+        const totalUSD = formatTextAmount(total / rate);
         this.printerCommands.push(`80*${cleanText("TOTAL REF USD: USD " + totalUSD)}`);
 
         // Pachacutec: v138 - Detalle IGTF (3%)
@@ -917,9 +920,9 @@ export const FiscalPrinterMixin = {
         if (aplicar_igtf && paymentsInDivisas.length > 0) {
             const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
             totalIGTF = sumDivisas * 0.03;
-            // Pachacutec: v142 - Sanitización Anti-NAK (Sin %) y Coma Decimal
-            this.printerCommands.push(`80*${cleanText("BASE IGTF 3 PORC:  BS " + formatAmount(sumDivisas))}`);
-            this.printerCommands.push(`80*${cleanText("MONTO IGTF:    BS " + formatAmount(totalIGTF))}`);
+            // Pachacutec: v144 - Detalle IGTF (PUNTOS en comentarios)
+            this.printerCommands.push(`80*${cleanText("BASE IGTF 3 PORC:  BS " + formatTextAmount(sumDivisas))}`);
+            this.printerCommands.push(`80*${cleanText("MONTO IGTF:    BS " + formatTextAmount(totalIGTF))}`);
         }
 
         // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
