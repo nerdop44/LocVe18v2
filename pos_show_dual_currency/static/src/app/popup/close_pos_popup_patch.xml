@@ -9,11 +9,11 @@
         </xpath>
 
         <!-- Total Orders in USD -->
-        <xpath expr="//div[hasclass('total-orders')]//span[hasclass('amount')]" position="after">
+        <xpath expr="//div[hasclass('total-orders')]" position="inside">
             <t t-if="trm != 0">
-                <span class="currency-ref-total" style="color: #6c757d; font-size: 0.9em; margin-left: 5px;">
+                <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em;">
                     (<t t-esc="pos.format_currency_ref(ordersDetails.amount / trm)"/>)
-                </span>
+                </div>
             </t>
         </xpath>
 
@@ -53,8 +53,8 @@
             />
         </xpath>
         
-        <!-- Multi-currency columns in payment methods (Legacy style but adapted) -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//table//tbody//tr//td[@t-esc='pos.format_currency(pm.amount)']" position="inside">
+        <!-- Multi-currency columns in payment methods (Stuctural XPath: column 2 of the table) -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]//table//tr[@t-foreach='otherPaymentMethods']//td[2]" position="inside">
             <t t-if="trm != 0">
                 <div class="usd-amount" style="font-size: 0.8em; color: #6c757d;">
                     <t t-esc="pos.format_currency_ref(pm.amount / trm)"/>
