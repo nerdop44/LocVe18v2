@@ -44,7 +44,7 @@
         </xpath>
 
         <!-- Money Details Popup Instance (v18 compatible component) -->
-        <xpath expr="//div[hasclass('popup')]" position="after">
+        <xpath expr="//div[hasclass('payment-methods-overview')]" position="after">
             <MoneyDetailsPopupUSD
                 t-if="state.displayMoneyDetailsPopupUSD"
                 manualInputCashCountUSD="manualInputCashCountUSD"
