@@ -27,6 +27,13 @@ export function cleanText(string) {
     }
 }
 
+// Pachacutec: v111 - Función Sanitize v16 Truth (Absolute Fidelity)
+// Solo reemplaza acentos. No remueve caracteres de protocolo (|!*).
+export function sanitize(string) {
+    if (!string) return "";
+    return string.replace(EXPRESSION, (char) => CHAR_MAP[char]);
+}
+
 // Pachacutec: v142 - Homologación v16: Separador decimal (coma)
 export function formatAmount(amount, fixed = 2) {
     return (amount || 0).toFixed(fixed).replace(".", ",");
