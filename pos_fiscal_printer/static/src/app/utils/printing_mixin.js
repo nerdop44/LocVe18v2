@@ -33,23 +33,31 @@ export function cleanText(string) {
 // Pachacutec: v96 - Protocolo Híbrido Validado (XOR Inteligente)
 // - Cabeceras ('i'): El Checksum (LRC) es DATA ^ ETX. STX (2) queda FUERA. Correcto para ACK.
 // - Ventas/Pagos ('!', ' ', '2', etc.): El Checksum DEBE incluir STX (2) para el "Resultado 9".
+// Pachacutec: v168 - Motor de Checksum de Grado Industrial (Manual Fidelity)
+// - Eliminado: Bucle for...of (Causaba truncado errático en Chrome Assets).
+// - Implementado: Bucle de índice tradicional sobre Uint8Array (Integridad 100%).
+// - LRC = [DATA XOR CMD] ^ ETX. STX (2) queda FUERA según Manual Pág. 17.
 export function toBytes(command) {
     const encoder = new TextEncoder();
-    const dataBytes = Array.from(encoder.encode(command));
+    const data = encoder.encode(command);
     const ETX = 3;
     const STX = 2;
 
-    // Pachacutec: v134 - LRC Pure Z1F (Excluir STX siempre)
-    // El log de éxito v16 confirma que el LRC es [DATA ^ ETX] sin el STX(2).
-    let lrc = 0; 
-    for (const byte of dataBytes) {
-        lrc ^= byte;
+    let lrc = 0;
+    // Bucle robusto sobre el buffer de bytes real
+    for (let i = 0; i < data.length; i++) {
+        lrc ^= data[i];
     }
     lrc ^= ETX;
 
-    // Retornamos la trama final: [STX, DATA, ETX, LRC]
-    const finalFrame = [STX, ...dataBytes, ETX, lrc];
-    return new Uint8Array(finalFrame);
+    // Construcción atómica de la trama: [STX, DATA, ETX, LRC]
+    const frame = new Uint8Array(data.length + 3);
+    frame[0] = STX;
+    frame.set(data, 1);
+    frame[data.length + 1] = ETX;
+    frame[data.length + 2] = lrc;
+
+    return frame;
 }
 
 // FiscalPrinterMixin as a plain object with methods only.
@@ -902,13 +910,12 @@ export const FiscalPrinterMixin = {
 
         let cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
 
-        // Pachacutec: v167 - Reversión de Padding (Retorno a v16 Truth)
-        // El RIF debe ser [Prefijo (1) + Números (Natural)] para evitar NAK por longitud forzada.
+        // Pachacutec: v168 - Restauración del guion '-' (Manual Fidelity Pág. 34: iR*J-123456789)
         if (cleanVat !== "No tiene") {
             const prefix = cleanVat.substring(0, 1);
             const digits = cleanVat.substring(1).replace(/[^0-9]/g, "");
-            cleanVat = prefix + digits;
-            console.warn("[FISCAL] v167 - RIF Restaurado (Natural):", cleanVat);
+            cleanVat = prefix + "-" + digits;
+            console.warn("[FISCAL] v168 - RIF Manual (Fidelity):", cleanVat);
         }
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
@@ -916,8 +923,8 @@ export const FiscalPrinterMixin = {
         const cleanPhone = cleanText(client?.phone || "No tiene").substring(0, 30);
         const cleanEmail = cleanText(client?.email || "No tiene").substring(0, 30);
         
-        // Pachacutec: v158 - Restauración Fidelidad v16 (Source of Truth)
-        // Se anteponen iR* (Rif) e iS* (Nombre) antes de los descriptivos i00-i03.
+        // Pachacutec: v168 - Restauración Fidelidad v16 (Source of Truth)
+        // El guion es clave según el manual de protocolos v8.5.0 Pág 34.
         this.printerCommands.push(`iR*${cleanVat}`);
         this.printerCommands.push(`iS*${cleanName}`);
 
