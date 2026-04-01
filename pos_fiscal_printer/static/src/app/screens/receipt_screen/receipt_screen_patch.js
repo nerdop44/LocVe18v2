@@ -68,7 +68,7 @@ const patchConfig = {
 
         // Pachacutec: v180 - Fallback ultra-robusto
         // Consideramos éxito si CUALQUIERA de las referencias tiene la marca de impresión.
-        constisImpresa = (order && (order.impresa || order.num_factura)) || 
+        const isImpresa = (order && (order.impresa || order.num_factura)) || 
                          (currentOrder && (currentOrder.impresa || currentOrder.num_factura));
 
         if (isImpresa) {
