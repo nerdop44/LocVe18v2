@@ -1,6 +1,6 @@
 /** @odoo-module */
 
-import { PaymentMethod } from "@point_of_sale/app/models/pos_payment_method";
+import { PaymentMethod } from "@point_of_sale/app/models/payment_method";
 import { patch } from "@web/core/utils/patch";
 
 patch(PaymentMethod.prototype, {

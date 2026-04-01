@@ -18,14 +18,7 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_fiscal_printer/static/src/scss/**/*',
-            # 'pos_fiscal_printer/static/src/js/AbstractReceiptScreen.js',
-            # 'pos_fiscal_printer/static/src/js/NotaCreditoPopUp.js',
-            # 'pos_fiscal_printer/static/src/js/PrintingMixin.js',
-            # 'pos_fiscal_printer/static/src/js/ReporteZPopUp.js',
-            # 'pos_fiscal_printer/static/src/js/ReprintingPopUp.js',
-            # 'pos_fiscal_printer/static/src/js/PartnerDetailsEdit.js',
-            # 'pos_fiscal_printer/static/src/xml/**/*',
-            'pos_fiscal_printer/static/src/app/models/pos_payment.js',
+            'pos_fiscal_printer/static/src/app/popup/nota_credito_popup.js',
             'pos_fiscal_printer/static/src/app/models/pos_payment_method.js',
             'pos_fiscal_printer/static/src/app/utils/printing_mixin.js',
             'pos_fiscal_printer/static/lib/js/**/*',
