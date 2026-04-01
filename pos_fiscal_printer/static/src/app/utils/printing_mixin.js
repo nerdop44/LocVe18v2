@@ -259,7 +259,10 @@ export const FiscalPrinterMixin = {
                     leer = false;
                 } finally {
                     if (this.reader) {
-                        try { await this.reader.releaseLock(); } catch (e) { }
+                        try { 
+                            await this.reader.cancel();
+                            await this.reader.releaseLock(); 
+                        } catch (e) { }
                         this.reader = false;
                     }
                 }
@@ -587,15 +590,7 @@ export const FiscalPrinterMixin = {
             if (!result) return;
             await this.write();
         } finally {
-            if (this.port) {
-                try {
-                    await this.port.close();
-                    console.log("[FISCAL] v133 - Puerto cerrado exitosamente (Libre).");
-                    this.port = false;
-                } catch (e) {
-                    console.warn("[FISCAL] Error al cerrar puerto:", e);
-                }
-            }
+            await this.closePort();
             this.printing_lock = false;
         }
     },
