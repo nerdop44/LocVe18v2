@@ -889,6 +889,9 @@ export const FiscalPrinterMixin = {
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
         // Pachacutec: v173 - Simplificación v16 con Blindaje de Prefijo
+        const order = this.pos.get_order();
+        const client = order?.get_partner?.() || order?.partner;
+        
         // v16 envía el vat tal cual: iR*V12345678 (Sin guion, sin padding)
         let vat = client?.vat || "No tiene";
         if (client?.prefix_vat && client?.vat) {
