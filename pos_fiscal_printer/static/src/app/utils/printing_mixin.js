@@ -922,12 +922,11 @@ export const FiscalPrinterMixin = {
 
     setTotal() {
         console.warn("[FISCAL] setTotal - Inicio");
-        this.printerCommands.push("3"); // Subtotal
-
+        
         const aplicar_igtf = this.pos.config.aplicar_igtf;
         const rate = this.pos.config.show_currency_rate || 1;
         
-        // Pachacutec: v159 - Estabilización de Texto (Anti-NAK: Sin $, Con Comas)
+        // Pachacutec: v159/v175 - Metadatos ANTES del Subtotal (Anti-NAK 21)
         const total = this.order.get_total_with_tax() || 0;
         const totalUSD = (total / rate).toFixed(2).replace(".", ",");
         this.printerCommands.push(`80*TOTAL REF USD:    ${totalUSD}`);
@@ -942,8 +941,10 @@ export const FiscalPrinterMixin = {
             this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2).replace(".", ",")}`);
         }
 
-        // Pachacutec: v158 - Secuencia Determinística Éxito v16 (3 -> 101 -> 199)
-        // En v16, el comando 199 es el cierre mandatorio incluso sin IGTF.
+        // AHORA SÍ: Comando 3 (Subtotal) -> Bloquea a Estado de Pago
+        this.printerCommands.push("3"); 
+
+        // Pachacutec: v158 - Secuencia Determinística Éxito v16 (101 -> 199)
         this.printerCommands.push("101");
         this.printerCommands.push("199");
 
