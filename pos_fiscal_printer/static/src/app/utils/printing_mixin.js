@@ -466,6 +466,15 @@ export const FiscalPrinterMixin = {
                     console.error("Error en lectura write_s2:", error);
                 } finally {
                     leer = false;
+                    if (this.reader) {
+                        try {
+                            await this.reader.cancel();
+                            await this.reader.releaseLock();
+                        } catch (e) {
+                            console.warn("[FISCAL] Error al liberar reader en write_s2:", e);
+                        }
+                        this.reader = false;
+                    }
                 }
             }
 
@@ -1096,8 +1105,20 @@ export const FiscalPrinterMixin = {
     async closePort() {
         if (this.port) {
             try {
+                // Pachacutec: v178 - Liberación defensiva de streams antes de cerrar
+                if (this.reader) {
+                    try { 
+                        await this.reader.cancel(); 
+                        await this.reader.releaseLock();
+                    } catch (e) {}
+                    this.reader = false;
+                }
+                if (this.writer) {
+                    try { await this.writer.releaseLock(); } catch (e) {}
+                    this.writer = false;
+                }
                 await this.port.close();
-                console.log("[FISCAL] Puerto cerrado manualmente.");
+                console.log("[FISCAL] Puerto cerrado exitosamente.");
             } catch (e) {
                 console.warn("[FISCAL] Error al cerrar puerto:", e);
             } finally {
