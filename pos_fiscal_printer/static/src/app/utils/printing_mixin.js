@@ -1,6 +1,7 @@
 /** @odoo-module */
 import { _t } from "@web/core/l10n/translation";
 import { NotaCreditoPopUp } from "@pos_fiscal_printer/app/popup/nota_credito_popup";
+import { DataHelper } from "./data_helper";
 
 const encoder = new TextEncoder();
 const CHAR_MAP = {
@@ -910,21 +911,11 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        // Pachacutec: v173 - Simplificación v16 con Blindaje de Prefijo
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        // v16 envía el vat tal cual: iR*V12345678 (Sin guion, sin padding)
-        let vat = client?.vat || "No tiene";
-        if (client?.prefix_vat && client?.vat) {
-            vat = (client.prefix_vat + client.vat).toUpperCase();
-        }
-        
-        // v173: Inyectar 'V' si el RIF es puramente numérico (Anti-NAK 21)
-        if (vat !== "No tiene" && !/[A-Z]/.test(vat)) {
-            console.warn("[FISCAL] v173 - Inyectando 'V' al RIF por ausencia de letra.");
-            vat = "V" + vat;
-        }
+        // Pachacutec: v194 - Recuperación vía DataHelper (Blindaje de Prefijo)
+        const vat = DataHelper.getFullVat(this.pos, client);
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
         const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
@@ -960,14 +951,11 @@ export const FiscalPrinterMixin = {
             positivePayments.forEach((payment, index) => {
                 const isLast = (index === positivePayments.length - 1);
                 
-                // Diagnóstico v191: Auditoría de Data Cruda (RAW RPC)
+                // Diagnóstico v194: Recuperación Ultra-Segura vía DataHelper
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
-                const pm = this.pos.models['pos.payment.method'].get(pmId);
-                const rawDataList = this.pos.data?.["pos.payment.method"] || [];
-                const rawPM = rawDataList.find(rp => rp.id === pmId);
+                const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
                 
-                let code = (pm?.x_printer_code || (rawPM ? rawPM.x_printer_code : undefined) || "01").padStart(2, "0");
-                console.log(`[FISCAL] v191 - Pago ${index + 1}: Método=${pm?.name}, Código=${code} (Modelo=${pm?.x_printer_code}, Raw=${rawPM?.x_printer_code}), Monto=${payment.amount}`);
+                console.log(`[FISCAL] v194 - Pago ${index + 1}: Código=${code}, Monto=${payment.amount}`);
                 
                 if (isLast && positivePayments.length === 1) {
                     // Pago único: Comando 1 (Cierre Total)
