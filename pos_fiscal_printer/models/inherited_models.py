@@ -97,16 +97,19 @@ class PosSession(models.Model):
         ])
         return result
 
-    def _get_pos_payment_method_loader_params(self):
-        return self._loader_params_pos_payment_method()
-
     def _loader_params_pos_payment_method(self):
-        result = super()._get_pos_payment_method_loader_params() if hasattr(super(), '_get_pos_payment_method_loader_params') else super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].extend([
-            "x_printer_code",
-            "x_igtf_percentage",
-            "x_is_foreign_exchange",
-        ])
+        result = super()._loader_params_pos_payment_method()
+        fields = result['search_params']['fields']
+        for field in ["x_printer_code", "x_igtf_percentage", "x_is_foreign_exchange"]:
+            if field not in fields:
+                fields.append(field)
+        _logger.info("[FISCAL] v190 - Campos cargados para pos.payment.method: %s", fields)
+        return result
+
+    def _get_pos_ui_models_to_load(self):
+        result = super()._get_pos_ui_models_to_load()
+        if 'pos.payment.method' not in result:
+            result.append('pos.payment.method')
         return result
 
     def _get_account_tax_loader_params(self):
