@@ -19,15 +19,16 @@ class PosSession(models.Model):
 
     def _get_igtf_fallback_account(self, type='income'):
         """
-        Pachacutec: v185 - PUENTE DE EMERGENCIA
-        Busca una cuenta compatible para evitar el crash de 'account_id' is NULL.
+        Pachacutec: v187 - PUENTE DE EMERGENCIA ODOO 18
+        Eliminamos company_id explícito del dominio para evitar ValueError.
+        Odoo aplicará el filtro de compañía automáticamente por contexto.
         """
         account_type = 'income' if type == 'income' else 'asset_current'
-        domain = [('company_id', '=', self.company_id.id), ('account_type', '=', account_type)]
+        domain = [('account_type', '=', account_type)]
         fallback = self.env['account.account'].search(domain, limit=1)
         if not fallback:
-            # Búsqueda desesperada: cualquier cuenta de la compañía
-            fallback = self.env['account.account'].search([('company_id', '=', self.company_id.id)], limit=1)
+            # Búsqueda desesperada: cualquier cuenta disponible
+            fallback = self.env['account.account'].search([], limit=1)
         return fallback
 
     def _prepare_payment_line_vals(self, payment):
