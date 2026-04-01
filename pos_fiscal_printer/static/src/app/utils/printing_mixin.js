@@ -863,19 +863,16 @@ export const FiscalPrinterMixin = {
     },
 
     async doPrinting(mode) {
-        console.log("[FISCAL] v191 - Iniciando doPrinting, validando códigos...");
+        console.log("[FISCAL] v196 - Iniciando doPrinting, validando códigos...");
         const payments = this.order.payment_ids || [];
-        const rawDataList = this.pos.data?.["pos.payment.method"] || [];
         
         const missingCodes = payments.filter(p => {
             const pmId = p.payment_method_id?.id || p.payment_method_id;
-            const pm = this.pos.models['pos.payment.method'].get(pmId);
-            const rawPM = rawDataList.find(rp => rp.id === pmId);
+            const pCode = DataHelper.getPaymentMethodCode(this.pos, pmId);
             
-            let pCode = pm?.x_printer_code || (rawPM ? rawPM.x_printer_code : undefined);
-            console.log(`[FISCAL] v191 - Pago ID: ${p.id}, PM ID: ${pmId}, Código Detectado: ${pCode} (Modelo: ${pm?.x_printer_code}, Raw: ${rawPM?.x_printer_code})`);
+            console.log(`[FISCAL] v196 - Pago ID: ${p.id}, PM ID: ${pmId}, Código Detectado: ${pCode}`);
             
-            return !pCode;
+            return !pCode || pCode === "01"; // Si es el fallback '01', alertamos (podría ser intencional o error)
         });
 
         if (missingCodes.length > 0) {
