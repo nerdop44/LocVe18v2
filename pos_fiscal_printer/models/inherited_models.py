@@ -84,11 +84,9 @@ class PosSession(models.Model):
         ])
         return result
 
-    @api.model
     def _get_res_company_loader_params(self):
         return self._loader_params_res_company()
 
-    @api.model
     def _loader_params_res_company(self):
         result = super()._get_res_company_loader_params() if hasattr(super(), '_get_res_company_loader_params') else super()._loader_params_res_company()
         result['search_params']['fields'].extend([
@@ -99,11 +97,9 @@ class PosSession(models.Model):
         ])
         return result
 
-    @api.model
     def _get_pos_payment_method_loader_params(self):
         return self._loader_params_pos_payment_method()
 
-    @api.model
     def _loader_params_pos_payment_method(self):
         result = super()._get_pos_payment_method_loader_params() if hasattr(super(), '_get_pos_payment_method_loader_params') else super()._loader_params_pos_payment_method()
         result['search_params']['fields'].extend([
@@ -113,17 +109,14 @@ class PosSession(models.Model):
         ])
         return result
 
-    @api.model
     def _get_account_tax_loader_params(self):
         return self._loader_params_account_tax()
 
-    @api.model
     def _loader_params_account_tax(self):
         result = super()._get_account_tax_loader_params() if hasattr(super(), '_get_account_tax_loader_params') else super()._loader_params_account_tax()
         result['search_params']['fields'].extend(['x_tipo_alicuota', 'amount'])
         return result
 
-    @api.model
     def _loader_params_res_partner(self):
         result = super()._loader_params_res_partner() if hasattr(super(), '_loader_params_res_partner') else {}
         # Pachacutec: v164 - Inyección Exhaustiva (RIF + Prefijos)
@@ -136,7 +129,6 @@ class PosSession(models.Model):
                     result['search_params']['fields'].append(f)
         return result
 
-    @api.model
     def _get_res_partner_loader_params(self):
         result = super()._get_res_partner_loader_params()
         # Pachacutec: v164 - Redundancia Segura

@@ -862,8 +862,17 @@ export const FiscalPrinterMixin = {
     },
 
     async doPrinting(mode) {
-        if (!(this.order.payment_ids.every((p) => Boolean(p.payment_method_id?.x_printer_code)))) {
-            console.warn("Algunos métodos de pago no tienen código de impresora, se usará '01' por defecto.");
+        console.log("[FISCAL] v189 - Iniciando doPrinting, validando códigos...");
+        const payments = this.order.payment_ids || [];
+        const missingCodes = payments.filter(p => {
+            const pmId = p.payment_method_id?.id || p.payment_method_id;
+            const pm = this.pos.models['pos.payment.method'].get(pmId);
+            console.log(`[FISCAL] Pago ID: ${p.id}, PM ID: ${pmId}, Código: ${pm?.x_printer_code}`);
+            return !pm?.x_printer_code;
+        });
+
+        if (missingCodes.length > 0) {
+            console.warn("Algunos métodos de pago no tienen código de impresora en el modelo, se usará '01' por defecto.");
         }
         if (this.order.impresa) {
             this.env.services.notification.add(_t("Documento impreso en máquina fiscal"), { type: "danger" });
@@ -944,7 +953,13 @@ export const FiscalPrinterMixin = {
         } else {
             positivePayments.forEach((payment, index) => {
                 const isLast = (index === positivePayments.length - 1);
-                const code = (payment.payment_method_id?.x_printer_code || "01").padStart(2, "0");
+                
+                // Lookup robusto para x_printer_code
+                const pmId = payment.payment_method_id?.id || payment.payment_method_id;
+                const pm = this.pos.models['pos.payment.method'].get(pmId);
+                const code = (pm?.x_printer_code || "01").padStart(2, "0");
+                
+                console.log(`[FISCAL] v189 - Procesando pago ${index + 1}: Método=${pm?.name}, Código=${code}, Monto=${payment.amount}`);
                 
                 if (isLast && positivePayments.length === 1) {
                     // Pago único: Comando 1 (Cierre Total)
