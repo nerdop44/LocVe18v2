@@ -40,8 +40,21 @@ class PosSession(models.Model):
         if not res.get('account_id'):
             fallback = self._get_igtf_fallback_account(type='asset_current')
             if fallback:
-                _logger.warning("[IGTF] v185 - Usando cuenta de EMERGENCIA (%s) para pago %s", fallback.code, payment.payment_method_id.name)
+                _logger.warning("[IGTF] v185/v186 - Usando cuenta de EMERGENCIA (%s) para pago %s", fallback.code, payment.payment_method_id.name)
                 res['account_id'] = fallback.id
+        return res
+
+    def _get_receivable_account(self, payment_method):
+        """
+        Pachacutec: v186 - ASEGURAR CUENTA POR COBRAR
+        Captura el caso donde el método de pago (ZELLE) no tiene cuenta y Odoo 18 retorna False.
+        """
+        res = super()._get_receivable_account(payment_method)
+        if not res:
+            fallback = self._get_igtf_fallback_account(type='asset_current')
+            if fallback:
+                _logger.warning("[IGTF] v186 - Usando cuenta de EMERGENCIA (%s) para cobro de %s", fallback.code, payment_method.name)
+                return fallback
         return res
 
     def _accumulate_amounts(self, data):
