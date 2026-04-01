@@ -930,14 +930,7 @@ export const FiscalPrinterMixin = {
         this.printerCommands.push("101");
         this.printerCommands.push("199");
 
-        // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
-        // 4 avances de papel para que el ticket salga del cortador
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-
-        console.warn("[FISCAL] setTotal - Comandos finales v138 con Corte inyectado.");
+        console.warn("[FISCAL] setTotal - Cierre Fiscal v16 Finalizado.");
     },
 
     printFiscal() {
