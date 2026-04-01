@@ -910,12 +910,14 @@ export const FiscalPrinterMixin = {
 
         let cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
 
-        // Pachacutec: v168 - Restauración del guion '-' (Manual Fidelity Pág. 34: iR*J-123456789)
+        // v169: Homologación a 11 caracteres (NG Fidelity Pág. 32-34)
         if (cleanVat !== "No tiene") {
             const prefix = cleanVat.substring(0, 1);
-            const digits = cleanVat.substring(1).replace(/[^0-9]/g, "");
-            cleanVat = prefix + "-" + digits;
-            console.warn("[FISCAL] v168 - RIF Manual (Fidelity):", cleanVat);
+            const body = cleanVat.substring(1).replace(/[^0-9]/g, "");
+            // Forzamos 9 dígitos en el cuerpo para que [P + - + 9D] = 11 caracteres.
+            const paddedBody = body.padStart(9, "0");
+            cleanVat = prefix + "-" + paddedBody;
+            console.warn("[FISCAL] v169 - RIF NG (11 chars):", cleanVat);
         }
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
