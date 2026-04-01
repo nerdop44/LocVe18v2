@@ -18,7 +18,6 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_igtf_tax/static/src/scss/**/*',
-            'pos_igtf_tax/static/src/xml/**/*',
             'pos_igtf_tax/static/src/app/**/*.js',
         ],
     },
