@@ -483,16 +483,24 @@ export const FiscalPrinterMixin = {
 
             // Pachacutec: v37 - Persistencia garantizada del estado 'impresa'
             if (this.order.num_factura) {
-                console.warn("[FISCAL] Marcando orden como impresa permanentemente.");
+                console.log("[FISCAL] v180 - Marcando orden ante todas las referencias disponibles.");
+                
+                // Pachacutec: v180 - Asignación directa y robusta
                 this.order.impresa = true;
                 
+                // Fallback: Si props.order es diferente, actualizarlo también
+                if (this.props?.order && this.props.order !== this.order) {
+                    this.props.order.impresa = true;
+                    this.props.order.num_factura = this.order.num_factura;
+                }
+
                 await this.orm.call(
                     'pos.order',
                     'set_num_factura',
                     [this.order.id, this.order.name, this.order.num_factura]
                 );
             } else {
-                console.error("[FISCAL] Imposible marcar como impresa: número de factura no recibido.");
+                console.error("[FISCAL] v180 - Imposible marcar como impresa: número de factura no extraído.");
             }
 
         }
