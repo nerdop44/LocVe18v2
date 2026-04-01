@@ -109,11 +109,9 @@ const patchConfig = {
                 const result = await this.setPort();
                 if (!result) return;
                 
-                // Mismo flujo de write_Z pero para X
-                this.writer = this.port.writable.getWriter();
+                // Mismo flujo de write_Z pero para X (v182 - No manual writer lock)
                 this.printerCommands = ["I0X"]; 
                 const command = this.printerCommands[0];
-                if (this.writer) { await this.writer.releaseLock(); this.writer = false; }
                 
                 await this.escribe_leer(command, false);
                 // No esperamos lectura extendida para Reporte X usualmente

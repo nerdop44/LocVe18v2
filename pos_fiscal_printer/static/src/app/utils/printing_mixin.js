@@ -511,32 +511,28 @@ export const FiscalPrinterMixin = {
 
     async write_Z() {
         this.read_Z = true;
-        this.writer = this.port.writable.getWriter();
         const TIME = this.pos.config.x_fiscal_commands_time || 750;
         
-        // Pachacutec: v36 - REPORTE Z DINÁMICO (Compatible con v16 pero sin fecha fija)
-        // Usamos I0Z para cierre diario (Z Report) que es lo que el 99% de las veces se quiere
+        // Pachacutec: v182 - REPORTE Z DINÁMICO (Sin manejo manual de writer para evitar TypeError)
         this.printerCommands = ["I0Z"]; 
         const command = this.printerCommands[0];
         
-        // Pachacutec: v37 - VALIDACIÓN DE REPORTE (Usando escribe_leer para detectar errores)
-        if (this.writer) { await this.writer.releaseLock(); this.writer = false; }
-        
         const success = await this.escribe_leer(command, false);
         if (!success) {
-            console.error("[FISCAL] Error al solicitar Reporte Z.");
+            console.error("[FISCAL] v182 - Error al solicitar Reporte Z.");
             this.read_Z = false;
             return;
         }
 
         window.clearTimeout(this.timeout);
         this.printerCommands = [];
-        this.writer.releaseLock();
-        this.writer = false;
+        
+        // Espera de seguridad para el firmware durante el proceso de impresión física del Z
         await new Promise(
             (res) => setTimeout(() => res(), 12000)
         );
-        console.log("Leyendo U4z02002230200223", this.port.readable)
+        
+        console.log("Leyendo respuesta extendida del Z Report...");
         this.reader = false;
         if (this.port.readable) {
             this.reader = this.port.readable.getReader();
@@ -547,17 +543,16 @@ export const FiscalPrinterMixin = {
                 while (this.read_Z) {
                     const { value, done } = await this.reader.read();
                     if (done) {
-                        console.log("Done");
+                        console.log("Lectura finalizada.");
                         this.read_Z = false;
-                        this.reader.releaseLock();
-                        this.reader = false;
-                        this.read_Z = false;
+                        if (this.reader) {
+                            this.reader.releaseLock();
+                            this.reader = false;
+                        }
                         break;
                     }
-                    console.log(value);
                     var string = new TextDecoder().decode(value);
                     console.log(string);
-                    console.log('Desglozando U4z02002230200223');
                     const myArray = string.split('\n');
                     console.log(myArray);
                     // Break loop after receiving data to prevent hanging
@@ -933,16 +928,50 @@ export const FiscalPrinterMixin = {
     },
 
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio v16 Simple");
+        console.log("[FISCAL] v182 - setTotal Dinámico (Restauración Paridad v16)");
         
         // AHORA SÍ: Comando 3 (Subtotal) -> Bloquea a Estado de Pago
         this.printerCommands.push("3"); 
 
-        // Pachacutec: v158 - Secuencia Determinística Éxito v16 (101 -> 199)
-        this.printerCommands.push("101");
-        this.printerCommands.push("199");
+        // Pachacutec: v182 - Lógica de Pagos Dinámicos
+        // Iteramos sobre payment_ids (Odoo 18)
+        const payments = this.order.payment_ids || [];
+        const positivePayments = payments.filter(p => (p.amount || 0) > 0);
 
-        console.warn("[FISCAL] setTotal - Cierre Fiscal v16 Finalizado.");
+        if (positivePayments.length === 0) {
+            console.warn("[FISCAL] v182 - No se hallaron pagos positivos, usando fallback 101");
+            this.printerCommands.push("101");
+        } else {
+            positivePayments.forEach((payment, index) => {
+                const isLast = (index === positivePayments.length - 1);
+                const code = (payment.payment_method_id?.x_printer_code || "01").padStart(2, "0");
+                
+                if (isLast && positivePayments.length === 1) {
+                    // Pago único: Comando 1 (Cierre Total)
+                    this.printerCommands.push("1" + code);
+                } else {
+                    // Pagos parciales o último de varios: Comando 2 (Pago Parcial con Monto)
+                    let amountStr = String(Math.round(Math.abs(payment.amount || 0) * 100));
+                    // Flag 21 decide si 10 o 15 dígitos
+                    const padding = (this.pos.config.flag_21 === '30') ? 15 : 10;
+                    amountStr = amountStr.padStart(padding, "0");
+                    
+                    this.printerCommands.push("2" + code + amountStr);
+                    
+                    // Si es el último de varios, debemos cerrar con un comando 1 genérico o volver a enviar el código
+                    if (isLast) {
+                        this.printerCommands.push("1" + code);
+                    }
+                }
+            });
+        }
+
+        // Comando 199 para finalizar factura fiscal si no se ha enviado (Safe Closing)
+        if (!this.printerCommands.includes("199")) {
+            this.printerCommands.push("199");
+        }
+
+        console.log("[FISCAL] v182 - Cierre Fiscal Dinámico Finalizado.");
     },
 
     printFiscal() {
