@@ -68,7 +68,12 @@ const patchConfig = {
             console.log("closeSession sin reporte Z");
         } else {
             console.log("closeSession con reporte Z");
-            await this.orm.call("pos.session", "set_z_report", [this.pos.pos_session.id, this.state.zReport]);
+            const sessionId = this.pos.session?.id || this.pos.pos_session?.id;
+            if (sessionId) {
+                await this.orm.call("pos.session", "set_z_report", [sessionId, this.state.zReport]);
+            } else {
+                console.error("[FISCAL] v183 - No se pudo hallar la ID de la sesión para persistir el reporte Z.");
+            }
         }
         return super.closeSession();
     },
