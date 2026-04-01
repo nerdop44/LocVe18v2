@@ -217,9 +217,7 @@ export const FiscalPrinterMixin = {
                             await this.reader.releaseLock();
                             this.reader = false;
                             return responseData; // Devolvemos la trama completa
-                        }
-
-                        if (value[0] == 6) {
+                        } else if (value[0] == 6) {
                             console.log("Comando aceptado (ACK)");
                             leer = false;
                             await this.reader.releaseLock();
@@ -231,17 +229,19 @@ export const FiscalPrinterMixin = {
                             await this.reader.releaseLock();
                             this.reader = false;
                             
-                            // Protocolo de Desbloqueo v16: Comando 7
-                            const writer = this.port.writable.getWriter();
+                            // Protocolo de Desbloqueo v16: IDÉNTICO
+                            await new Promise((res) => setTimeout(() => res(), 100));
+                            this.writer = this.port.writable.getWriter();
                             const unlockCmd = toBytes("7");
                             await new Promise(res => setTimeout(async () => {
-                                await writer.write(unlockCmd);
+                                await this.writer.write(unlockCmd);
                                 res();
                             }, 150));
-                            await writer.releaseLock();
+                            await this.writer.releaseLock();
+                            this.writer = false;
                             
-                            this.printing = false; // Abortar secuencia
-                            return false; 
+                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL
+                            return true; // Retorna true para que el bucle write() termine su ciclo pero this.printing sea false
                         }
                     } else {
                         console.log("No hay datos...");
@@ -888,14 +888,17 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        const order = this.pos.get_order();
-        const client = order?.get_partner?.() || order?.partner;
-        
-        // Pachacutec: v172 - Simplificación v16 (Fidelidad total)
+        // Pachacutec: v173 - Simplificación v16 con Blindaje de Prefijo
         // v16 envía el vat tal cual: iR*V12345678 (Sin guion, sin padding)
         let vat = client?.vat || "No tiene";
         if (client?.prefix_vat && client?.vat) {
             vat = (client.prefix_vat + client.vat).toUpperCase();
+        }
+        
+        // v173: Inyectar 'V' si el RIF es puramente numérico (Anti-NAK 21)
+        if (vat !== "No tiene" && !/[A-Z]/.test(vat)) {
+            console.warn("[FISCAL] v173 - Inyectando 'V' al RIF por ausencia de letra.");
+            vat = "V" + vat;
         }
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
