@@ -17,6 +17,33 @@ class PosSession(models.Model):
         ])
         return result
 
+    def _get_igtf_fallback_account(self, type='income'):
+        """
+        Pachacutec: v185 - PUENTE DE EMERGENCIA
+        Busca una cuenta compatible para evitar el crash de 'account_id' is NULL.
+        """
+        account_type = 'income' if type == 'income' else 'asset_current'
+        domain = [('company_id', '=', self.company_id.id), ('account_type', '=', account_type)]
+        fallback = self.env['account.account'].search(domain, limit=1)
+        if not fallback:
+            # Búsqueda desesperada: cualquier cuenta de la compañía
+            fallback = self.env['account.account'].search([('company_id', '=', self.company_id.id)], limit=1)
+        return fallback
+
+    def _prepare_payment_line_vals(self, payment):
+        """
+        Pachacutec: v185 - ASEGURAR CUENTA EN PAGO (ZELLE Fix)
+        Si el método de pago no tiene cuenta, Odoo 18 intenta insertar NULL.
+        Aquí forzamos una cuenta válida para evitar el error de base de datos.
+        """
+        res = super()._prepare_payment_line_vals(payment)
+        if not res.get('account_id'):
+            fallback = self._get_igtf_fallback_account(type='asset_current')
+            if fallback:
+                _logger.warning("[IGTF] v185 - Usando cuenta de EMERGENCIA (%s) para pago %s", fallback.code, payment.payment_method_id.name)
+                res['account_id'] = fallback.id
+        return res
+
     def _accumulate_amounts(self, data):
         """
         Override para agregar el monto IGTF de las órdenes POS al diccionario 'sales'.
@@ -39,7 +66,11 @@ class PosSession(models.Model):
             or product_accounts.get('income')
         )
         if not igtf_account:
-            _logger.warning("[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos (ni directa ni por categoría).", igtf_product.name)
+            _logger.warning("[IGTF] v185 - Producto IGTF '%s' no tiene cuenta. Buscando EMERGENCIA...", igtf_product.name)
+            igtf_account = self._get_igtf_fallback_account(type='income')
+            
+        if not igtf_account:
+            _logger.error("[IGTF] v185 - NO SE HALLÓ NINGUNA CUENTA DE INGRESOS PARA EL CIERRE.")
             return data
 
         sales = data.get('sales')
