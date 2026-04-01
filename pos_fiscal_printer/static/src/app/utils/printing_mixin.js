@@ -225,20 +225,22 @@ export const FiscalPrinterMixin = {
                             await this.reader.releaseLock();
                             this.reader = false;
                             return true;
-                        } else if (value[0] == 21) {
-                            console.error("[FISCAL] Impresora devolvió NAK.");
-                            // Pachacutec: v161 - Reintento automático de primer comando (Solo iR*)
-                            // El log de éxito v16 muestra que a veces el primer iR* da NAK y el segundo ACK.
-                            if (!is_retry && command.startsWith("iR*")) {
-                                console.warn("[FISCAL] v161 - Detectado NAK en comando inicial. Reintentando (Wake-up v16)...");
-                                leer = false;
-                                if (this.reader) await this.reader.releaseLock();
-                                this.reader = false;
-                                return await this.escribe_leer(command, is_linea, true);
-                            }
+                        } else {
+                            console.error("[FISCAL] Comando no reconocido o NAK (", value[0], "). Enviando comando 7 (Anulación) v16...");
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
+                            
+                            // Protocolo de Desbloqueo v16: Comando 7
+                            const writer = this.port.writable.getWriter();
+                            const unlockCmd = toBytes("7");
+                            await new Promise(res => setTimeout(async () => {
+                                await writer.write(unlockCmd);
+                                res();
+                            }, 150));
+                            await writer.releaseLock();
+                            
+                            this.printing = false; // Abortar secuencia
                             return false; 
                         }
                     } else {
@@ -374,7 +376,7 @@ export const FiscalPrinterMixin = {
             }
 
         }
-        console.log("Factura finalizada, puerto permanece abierto.");
+        console.log("Factura finalizada.");
     },
 
     async write_s2() {
@@ -886,38 +888,14 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        // Pachacutec: v164 - Blindaje Total (full_vat + Fallback Deducción)
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
-        if (client) {
-            console.warn("[FISCAL] v164 - DEBUG PARTNER Odoo 18:", client);
-            try {
-                console.warn("[FISCAL] v164 - KEYS DISPONIBLES:", Object.keys(client));
-            } catch(e) {}
-        }
-
-        // Prioridad: full_vat > prefix_vat + vat > vat
-        let rawVat = client?.full_vat || (client?.prefix_vat || "") + (client?.vat || "");
-        
-        // Pachacutec: v164 - DEDUCCIÓN INTELIGENTE (Provisional para avanzar)
-        // FIXME: No asumir 'V' permanentemente. Resolver inyección de campos VE en Odoo 18 Server.
-        // Si no hay letras (V, J, G, E, P) y el RIF tiene < 9 dígitos, asumimos 'V' para evitar NAK.
-        if (rawVat && !/[VvJjGgEePp]/.test(rawVat)) {
-            console.warn("[FISCAL] v167 - DEDUCCIÓN: No se halló prefijo. Asumiendo 'V'.");
-            rawVat = "V" + rawVat;
-        }
-
-        let cleanVat = rawVat.replace(/[^0-9VvJjGgEePp]/g, "").toUpperCase() || "No tiene";
-
-        // v169: Homologación a 11 caracteres (NG Fidelity Pág. 32-34)
-        if (cleanVat !== "No tiene") {
-            const prefix = cleanVat.substring(0, 1);
-            const body = cleanVat.substring(1).replace(/[^0-9]/g, "");
-            // Forzamos 9 dígitos en el cuerpo para que [P + - + 9D] = 11 caracteres.
-            const paddedBody = body.padStart(9, "0");
-            cleanVat = prefix + "-" + paddedBody;
-            console.warn("[FISCAL] v169 - RIF NG (11 chars):", cleanVat);
+        // Pachacutec: v172 - Simplificación v16 (Fidelidad total)
+        // v16 envía el vat tal cual: iR*V12345678 (Sin guion, sin padding)
+        let vat = client?.vat || "No tiene";
+        if (client?.prefix_vat && client?.vat) {
+            vat = (client.prefix_vat + client.vat).toUpperCase();
         }
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
@@ -925,17 +903,15 @@ export const FiscalPrinterMixin = {
         const cleanPhone = cleanText(client?.phone || "No tiene").substring(0, 30);
         const cleanEmail = cleanText(client?.email || "No tiene").substring(0, 30);
         
-        // Pachacutec: v168 - Restauración Fidelidad v16 (Source of Truth)
-        // El guion es clave según el manual de protocolos v8.5.0 Pág 34.
-        this.printerCommands.push(`iR*${cleanVat}`);
+        this.printerCommands.push(`iR*${vat}`);
         this.printerCommands.push(`iS*${cleanName}`);
 
         this.printerCommands.push(`i00Telefono:  ${cleanPhone}`);
         this.printerCommands.push(`i01Direccion: ${cleanAddr}`);
         this.printerCommands.push(`i02Email:     ${cleanEmail}`);
-        this.printerCommands.push(`i03Ref:       ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
+        this.printerCommands.push(`i03Ref:       ${cleanText(order.name || "").substring(0, 30)}`);
         
-        console.warn("[FISCAL] v163 - Cabecera enviada (Rif/Prefix):", {cleanVat, cleanName});
+        console.warn("[FISCAL] v172 - Cabecera v16 Simplicity:", {vat, cleanName});
     },
 
     setTotal() {
