@@ -1,6 +1,6 @@
 {
     'name': '[LOCVE] Venezuela: POS fiscal printer',
-    'version': '18.0.1.8.9',
+    'version': '18.0.1.9.0',
     'category': 'LocVe [Localization]',
     'summary': 'Fiscal printing using serial ports',
     'author': 'Remake Ing Nerdo Pulido',
@@ -18,15 +18,17 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_fiscal_printer/static/src/scss/**/*',
+            'pos_fiscal_printer/static/src/app/popup/nota_credito_popup.xml',
             'pos_fiscal_printer/static/src/app/popup/nota_credito_popup.js',
+            'pos_fiscal_printer/static/src/app/popup/close_pos_popup_patch.xml',
+            'pos_fiscal_printer/static/src/app/popup/close_pos_popup_patch.js',
             'pos_fiscal_printer/static/src/app/utils/data_helper.js',
             'pos_fiscal_printer/static/src/app/utils/printing_mixin.js',
+            'pos_fiscal_printer/static/src/app/screens/receipt_screen/receipt_screen_patch.xml',
+            'pos_fiscal_printer/static/src/app/screens/receipt_screen/receipt_screen_patch.js',
             'pos_fiscal_printer/static/lib/js/**/*',
             'pos_fiscal_printer/static/lib/css/**/*',
         ],
-        # 'web.assets_backend': [
-        #     'pos_fiscal_printer/static/src/js/GetZBackends.js',
-        # ],
     },
     'license': 'LGPL-3',
     'installable': True,
