@@ -862,13 +862,19 @@ export const FiscalPrinterMixin = {
     },
 
     async doPrinting(mode) {
-        console.log("[FISCAL] v189 - Iniciando doPrinting, validando códigos...");
+        console.log("[FISCAL] v191 - Iniciando doPrinting, validando códigos...");
         const payments = this.order.payment_ids || [];
+        const rawDataList = this.pos.data?.["pos.payment.method"] || [];
+        
         const missingCodes = payments.filter(p => {
             const pmId = p.payment_method_id?.id || p.payment_method_id;
             const pm = this.pos.models['pos.payment.method'].get(pmId);
-            console.log(`[FISCAL] Pago ID: ${p.id}, PM ID: ${pmId}, Código: ${pm?.x_printer_code}`);
-            return !pm?.x_printer_code;
+            const rawPM = rawDataList.find(rp => rp.id === pmId);
+            
+            let pCode = pm?.x_printer_code || (rawPM ? rawPM.x_printer_code : undefined);
+            console.log(`[FISCAL] v191 - Pago ID: ${p.id}, PM ID: ${pmId}, Código Detectado: ${pCode} (Modelo: ${pm?.x_printer_code}, Raw: ${rawPM?.x_printer_code})`);
+            
+            return !pCode;
         });
 
         if (missingCodes.length > 0) {
@@ -954,12 +960,14 @@ export const FiscalPrinterMixin = {
             positivePayments.forEach((payment, index) => {
                 const isLast = (index === positivePayments.length - 1);
                 
-                // Lookup robusto para x_printer_code
+                // Diagnóstico v191: Auditoría de Data Cruda (RAW RPC)
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
                 const pm = this.pos.models['pos.payment.method'].get(pmId);
-                const code = (pm?.x_printer_code || "01").padStart(2, "0");
+                const rawDataList = this.pos.data?.["pos.payment.method"] || [];
+                const rawPM = rawDataList.find(rp => rp.id === pmId);
                 
-                console.log(`[FISCAL] v189 - Procesando pago ${index + 1}: Método=${pm?.name}, Código=${code}, Monto=${payment.amount}`);
+                let code = (pm?.x_printer_code || (rawPM ? rawPM.x_printer_code : undefined) || "01").padStart(2, "0");
+                console.log(`[FISCAL] v191 - Pago ${index + 1}: Método=${pm?.name}, Código=${code} (Modelo=${pm?.x_printer_code}, Raw=${rawPM?.x_printer_code}), Monto=${payment.amount}`);
                 
                 if (isLast && positivePayments.length === 1) {
                     // Pago único: Comando 1 (Cierre Total)

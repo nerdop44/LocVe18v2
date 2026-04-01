@@ -99,11 +99,11 @@ class PosSession(models.Model):
 
     def _loader_params_pos_payment_method(self):
         result = super()._loader_params_pos_payment_method()
-        fields = result['search_params']['fields']
+        fields = result.get('search_params', {}).get('fields', [])
         for field in ["x_printer_code", "x_igtf_percentage", "x_is_foreign_exchange"]:
             if field not in fields:
                 fields.append(field)
-        _logger.info("[FISCAL] v190 - Campos cargados para pos.payment.method: %s", fields)
+        _logger.info("[FISCAL] v191 - Loader Params Finales: %s", fields)
         return result
 
     def _get_pos_ui_models_to_load(self):
