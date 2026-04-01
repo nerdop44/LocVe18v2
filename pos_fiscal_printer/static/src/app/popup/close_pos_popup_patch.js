@@ -64,17 +64,28 @@ const patchConfig = {
     },
 
     async closeSession() {
-        if (!this.state || this.state.zReport === "" || !this.state.zReport) {
-            console.log("closeSession sin reporte Z");
-        } else {
-            console.log("closeSession con reporte Z");
-            const sessionId = this.pos.session?.id || this.pos.pos_session?.id;
-            if (sessionId) {
+        console.log("[FISCAL] v184 - Iniciando cierre de sesión.");
+        try {
+            // Pachacutec: v184 - Búsqueda progresiva y no-bloqueante del ID de sesión
+            const pos = this.pos || this.props?.pos || this.env?.pos;
+            const session = pos?.session || pos?.pos_session || this.props?.session;
+            const sessionId = session?.id;
+
+            if (this.state?.zReport && sessionId) {
+                console.log("[FISCAL] v184 - Persistiendo reporte Z para sesión:", sessionId);
                 await this.orm.call("pos.session", "set_z_report", [sessionId, this.state.zReport]);
             } else {
-                console.error("[FISCAL] v183 - No se pudo hallar la ID de la sesión para persistir el reporte Z.");
+                console.warn("[FISCAL] v184 - Reporte Z no persistido (Estado vacío o Sesión no hallada).");
             }
+        } catch (e) {
+            console.error("[FISCAL] v184 - Error al persistir reporte Z (Ignorado para permitir cierre):", e);
         }
+
+        // Pachacutec: v184 - Fallback de compatibilidad para el core de Odoo en caso de que use 'pos_session'
+        if (this.pos && !this.pos.pos_session && this.pos.session) {
+            this.pos.pos_session = this.pos.session;
+        }
+
         return super.closeSession();
     },
 
