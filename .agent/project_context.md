@@ -41,3 +41,11 @@ Asegurar la estabilidad y despliegue de la localización venezolana optimizada p
   - Se estandarizó la inyección de campos mediante `_load_pos_data_fields`.
   - Se mejoró la resiliencia del frontend devolviendo `{}` ante fallos del servidor.
   - Estado: POS Estabilizado bajo estándares nativos de Odoo 18. 
+- [2026-04-08 17:00]: CORRECCIÓN DE EMERGENCIA (v197.3 - SIGNATURE FIX).
+  - Se eliminó el decorador `@api.model` de `_load_pos_data` en todos los módulos afectados.
+  - Resolución del error \"takes 1 positional argument but 2 were given\" al tratar el método como instancia.
+  - Sincronización completa (Triple Sync) realizada.
+- [2026-04-08 17:10]: ESTABILIZACIÓN DEFINITIVA (v197.4 - UNIVERSAL SIGNATURE).
+  - Se implementó la firma universal `(self, *args, **kwargs)` en `_load_pos_data` para absorber argumentos inesperados de Odoo 18.
+  - Refactorización de `pos_store.js` para manejo de errores más informativo, evitando el colapso silencioso.
+  - Sincronización global en `LocVe18v2` y `AnimalC`.

@@ -72,15 +72,15 @@ class PosSession(models.Model):
         if message:
             self.message_post(body=message)
 
-    def _load_pos_data(self):
-        result = super()._load_pos_data()
+    def _load_pos_data(self, *args, **kwargs):
+        result = super()._load_pos_data(*args, **kwargs)
         
         # Injected data for dual currency display
         company_currency_id = self.company_id.currency_id.id
         currency_id = company_currency_id
         
-        # Priority: 1. Config "Show Currency" (if different from company)
-        #           2. Company "Currency Dif" (if different from company)
+        # Priority: 1. Config \"Show Currency\" (if different from company)
+        #           2. Company \"Currency Dif\" (if different from company)
         #           3. Fallback to any other active currency? (Not implemented to avoid randomness)
         
         target_currency = self.ref_me_currency_id if self.ref_me_currency_id else self.config_id.show_currency
@@ -102,35 +102,35 @@ class PosSession(models.Model):
              
              # Case 1: No dual currency selected yet (currency_id is False or None)
              if not currency_id:
-                  should_force_vef = True
+                 should_force_vef = True
              
              # Case 2: Selected dual currency is explicitly USD
              elif currency_id:
-                  curr = self.env['res.currency'].browse(currency_id)
-                  if curr.name == 'USD':
-                      # Only force switch to VEF if Company is ALSO USD (avoid USD-USD)
-                      # If Company is VEF, then USD is a valid dual currency.
-                      comp_curr = self.company_id.currency_id
-                      if comp_curr.id == currency_id:
-                          should_force_vef = True
-            
+                 curr = self.env['res.currency'].browse(currency_id)
+                 if curr.name == 'USD':
+                     # Only force switch to VEF if Company is ALSO USD (avoid USD-USD)
+                     # If Company is VEF, then USD is a valid dual currency.
+                     comp_curr = self.company_id.currency_id
+                     if comp_curr.id == currency_id:
+                         should_force_vef = True
+             
              # Case 3: Selected matches Company, and Company is USD
              if not should_force_vef and currency_id == company_currency_id:
-                  comp_curr = self.company_id.currency_id
-                  if comp_curr.name == 'USD':
-                      should_force_vef = True
-            
+                 comp_curr = self.company_id.currency_id
+                 if comp_curr.name == 'USD':
+                     should_force_vef = True
+             
              if should_force_vef:
-                  currency_id = vef_currency.id
+                 currency_id = vef_currency.id
 
         # Fallback: If we match company currency (e.g. Company=VEF), try to fallback to USD
         # BUT ONLY if we didn't just force it!
         if currency_id == company_currency_id and not should_force_vef:
              if vef_currency and company_currency_id == vef_currency.id:
-                  # Company is VEF. Dual is VEF. We likely want USD.
-                  usd_currency = self.env['res.currency'].search([('name', '=', 'USD'), ('active', '=', True)], limit=1)
-                  if usd_currency:
-                      currency_id = usd_currency.id
+                 # Company is VEF. Dual is VEF. We likely want USD.
+                 usd_currency = self.env['res.currency'].search([('name', '=', 'USD'), ('active', '=', True)], limit=1)
+                 if usd_currency:
+                     currency_id = usd_currency.id
         
         currency_fields = ['id', 'name', 'symbol', 'position', 'rounding', 'rate', 'decimal_places']
         currency_ref = self.env['res.currency'].search_read([('id', '=', currency_id)], currency_fields)
@@ -144,7 +144,7 @@ class PosSession(models.Model):
                 if not isinstance(rate_tasa, (int, float)):
                      rate_tasa = float(rate_tasa)
             except Exception as e:
-                _logger.error("Error getting TRM: %s", e)
+                _logger.error(\"Error getting TRM: %s\", e)
                 # Fallback to currency rate if TRM fails
                 rate_tasa = currency_ref[0].get('rate', 1.0)
             
@@ -156,7 +156,7 @@ class PosSession(models.Model):
             # 50 * Rate = 1. => Rate = 1/50 = 0.02
             if currency_ref[0]['name'] == 'USD' and self.company_id.currency_id.name != 'USD':
                  if rate_tasa and rate_tasa != 0:
-                      rate_tasa = 1.0 / rate_tasa
+                     rate_tasa = 1.0 / rate_tasa
             
             currency_ref[0]['rate'] = rate_tasa  # Inject the (possibly inverted) rate
             
@@ -179,7 +179,7 @@ class PosSession(models.Model):
         sign = 1 if _type == 'in' else -1
         sessions = self.filtered('me_ref_cash_journal_id')
         if not sessions:
-            raise UserError(_("There is no cash payment method for this PoS Session"))
+            raise UserError(_(\"There is no cash payment method for this PoS Session\"))
 
         self.env['account.bank.statement.line'].create([
             {
@@ -193,7 +193,7 @@ class PosSession(models.Model):
             for session in sessions
         ])
 
-        message_content = [f"Cash {extras['translatedType']}", f'- Amount: {extras["formattedAmount"]}']
+        message_content = [f\"Cash {extras['translatedType']}\", f'- Amount: {extras[\"formattedAmount\"]}']
         if reason:
             message_content.append(f'- Reason: {reason}')
         self.message_post(body='<br/>\n'.join(message_content))
@@ -213,7 +213,7 @@ class PosSession(models.Model):
         closing_control_data = super(PosSession, self).get_closing_control_data()
         self.ensure_one()
         orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
-        payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != "pay_later")
+        payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != \"pay_later\")
         cash_payment_method_ref_ids = self.payment_method_ids.filtered(
             lambda pm: pm.type == 'cash' and pm.currency_id == self.ref_me_currency_id)
         default_cash_payment_ref_method_id = cash_payment_method_ref_ids[0] if cash_payment_method_ref_ids else None
@@ -290,7 +290,7 @@ class PosSession(models.Model):
     def post_closing_cash_details_ref(self, counted_cash):
         if not self.me_ref_cash_journal_id:
             pass
-            #raise UserError(_("There is no Ref cash register in this session."))
+            #raise UserError(_(\"There is no Ref cash register in this session.\"))
         self.cash_register_balance_end_real_mn_ref = counted_cash
         return {'successful': True}
 
@@ -311,7 +311,7 @@ class PosSession(models.Model):
                         _('Please go on the %s journal and define a Loss Account. This account will be used to record cash difference.',
                           self.me_ref_cash_journal_id.name))
 
-                st_line_vals['payment_ref'] = _("Cash difference observed during the counting (Loss)")
+                st_line_vals['payment_ref'] = _(\"Cash difference observed during the counting (Loss)\")
                 st_line_vals['counterpart_account_id'] = self.me_ref_cash_journal_id.loss_account_id.id
             else:
                 # self.cash_register_difference  > 0.0
@@ -320,7 +320,7 @@ class PosSession(models.Model):
                         _('Please go on the %s journal and define a Profit Account. This account will be used to record cash difference.',
                           self.cash_journal_id.name))
 
-                st_line_vals['payment_ref'] = _("Cash difference observed during the counting (Profit)")
+                st_line_vals['payment_ref'] = _(\"Cash difference observed during the counting (Profit)\")
                 st_line_vals['counterpart_account_id'] = self.me_ref_cash_journal_id.profit_account_id.id
 
             self.env['account.bank.statement.line'].create(st_line_vals)
@@ -354,13 +354,13 @@ class PosSession(models.Model):
                 session.cash_register_balance_end_ref = 0.0
                 session.cash_register_difference_ref = 0.0
     def _validate_session(self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None):
-        """
+        \"\"\"
         Pachacutec v58: Override de _validate_session para corregir el descuadre IGTF.
         El IGTF se cobra en los pagos (recibibles) pero su crédito de ventas no siempre
         se genera correctamente, causando 'The entry is not balanced'.
         Llamamos _fix_igtf_imbalance_in_session_move() DESPUÉS de _create_account_move
         y ANTES del _check_balanced.
-        """
+        \"\"\"
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         self.ensure_one()
         data = {}
@@ -410,8 +410,8 @@ class PosSession(models.Model):
             edited_orders = self.get_session_orders().filtered(lambda o: o.is_edited)
             if len(edited_orders) > 0:
                 body = _(
-                    "Edited order(s) during the session:%s",
-                    Markup("<br/><ul>%s</ul>") % Markup().join(Markup("<li>%s</li>") % order._get_html_link() for order in edited_orders)
+                    \"Edited order(s) during the session:%s\",
+                    Markup(\"<br/><ul>%s</ul>\") % Markup().join(Markup(\"<li>%s</li>\") % order._get_html_link() for order in edited_orders)
                 )
                 self.message_post(body=body)
 
@@ -448,10 +448,10 @@ class PosSession(models.Model):
     def _cannot_close_session_ref(self, bank_payment_method_diffs=None):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         if any(order.state == 'draft' for order in self.order_ids):
-            return {'successful': False, 'message': _("You cannot close the POS when orders are still in draft"),
+            return {'successful': False, 'message': _(\"You cannot close the POS when orders are still in draft\"),
                     'redirect': False}
         if self.state == 'closed':
-            return {'successful': False, 'message': _("This session is already closed."), 'redirect': True}
+            return {'successful': False, 'message': _(\"This session is already closed.\"), 'redirect': True}
         if bank_payment_method_diffs:
             no_loss_account = self.env['account.journal']
             no_profit_account = self.env['account.journal']
@@ -465,10 +465,10 @@ class PosSession(models.Model):
                     no_profit_account |= journal
             message = ''
             if no_loss_account:
-                message += _("Need loss account for the following journals to post the lost amount: %s\n",
+                message += _(\"Need loss account for the following journals to post the lost amount: %s\n\",
                              ', '.join(no_loss_account.mapped('name')))
             if no_profit_account:
-                message += _("Need profit account for the following journals to post the gained amount: %s",
+                message += _(\"Need profit account for the following journals to post the gained amount: %s\",
                              ', '.join(no_profit_account.mapped('name')))
             if message:
                 return {'successful': False, 'message': message, 'redirect': False}
@@ -478,7 +478,7 @@ class PosSession(models.Model):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         for session in self:
             if any(order.state == 'draft' for order in session.order_ids):
-                raise UserError(_("You cannot close the POS when orders are still in draft"))
+                raise UserError(_(\"You cannot close the POS when orders are still in draft\"))
             if session.state == 'closed':
                 raise UserError(_('This session is already closed.'))
             session.write({'state': 'closing_control', 'stop_at': fields.Datetime.now()})
@@ -530,9 +530,8 @@ class PosSession(models.Model):
                     raise e
 
             # === Pachacutec v57: Corrección del descuadre IGTF ===
-            # El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su
-            # línea de crédito de ventas no siempre se genera correctamente en
-            # _create_non_reconciliable_move_lines.
+            # El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su línea de crédito
+            # a veces no se genera correctamente en _create_non_reconciliable_move_lines.
             # Detectamos el descuadre y lo compensamos con una línea de crédito directa.
             self._fix_igtf_imbalance_in_session_move()
 
@@ -554,7 +553,7 @@ class PosSession(models.Model):
         return True
 
     def _fix_igtf_imbalance_in_session_move(self):
-        """
+        \"\"\"
         Pachacutec v57: Detecta y corrige el descuadre IGTF en el move de sesión POS.
 
         El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su
@@ -566,7 +565,7 @@ class PosSession(models.Model):
         2. Si hay un descuadre positivo (más débitos que créditos):
            a. Verifica si coincide con el total IGTF de las órdenes cerradas
            b. Si sí, agrega una línea de crédito en la cuenta de ingresos IGTF
-        """
+        \"\"\"
         move = self.move_id
         if not move:
             return
@@ -594,20 +593,20 @@ class PosSession(models.Model):
         diff_vs_igtf = abs(current_balance - total_igtf_rounded)
         tolerance = max(0.05, total_igtf_rounded * 0.01)
         if diff_vs_igtf > tolerance:
-            _logger.warning("[IGTF] Descuadre (%.2f) no coincide con IGTF total (%.2f). No se aplica corrección automática.",
+            _logger.warning(\"[IGTF] Descuadre (%.2f) no coincide con IGTF total (%.2f). No se aplica corrección automática.\",
                 current_balance, total_igtf_rounded)
             return
 
         # Obtener cuenta de ingresos del producto IGTF
         igtf_product = self.config_id.x_igtf_product_id
         if not igtf_product:
-            _logger.warning("[IGTF] No hay producto IGTF configurado en el POS. No se puede corregir el descuadre.")
+            _logger.warning(\"[IGTF] No hay producto IGTF configurado en el POS. No se puede corregir el descuadre.\")
             return
 
         product_accounts = igtf_product._get_product_accounts()
         igtf_account = igtf_product.property_account_income_id or product_accounts.get('income')
         if not igtf_account:
-            _logger.warning("[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos. No se puede corregir el descuadre.", igtf_product.name)
+            _logger.warning(\"[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos. No se puede corregir el descuadre.\", igtf_product.name)
             return
 
         # Crear la línea de crédito IGTF directamente en el move de sesión
@@ -640,157 +639,6 @@ class PosSession(models.Model):
         ]
 
     def _get_pos_ui_product_product(self, params):
-        """ Asegura que los campos maestros de USD se carguen en el modelo del POS. """
+        \"\"\" Asegura que los campos maestros de USD se carguen en el modelo del POS. \"\"\"
         # Pachacutec: v197.2 - Unificamos con el cargador estándar de Odoo 18
-        return super()._get_pos_ui_product_product(params)
-
-    def _loader_params_pos_session(self):
-        search_params = super(PosSession, self)._loader_params_pos_session()
-        fields = search_params['search_params']['fields']
-        fields.append('cash_register_balance_start_mn_ref')
-        return search_params
-
-    @api.model
-    def _loader_params_product_product(self):
-        result = super()._loader_params_product_product()
-        result['search_params']['fields'].extend(['list_price_usd', 'standard_price_usd', 'lst_price'])
-        return result
-
-    # Pachacutec: Compatibilidad definitiva para Odoo 18
-    def _get_product_product_loader_params(self):
-        result = super()._get_product_product_loader_params()
-        result['search_params']['fields'].extend(['list_price_usd', 'standard_price_usd', 'lst_price'])
-        return result
-
-    # Pachacutec: Compatibilidad explícita para Odoo 18
-    def _get_pos_ui_product_product(self, params):
-        """ Asegura que los campos maestros de USD se carguen en el modelo del POS. """
-        result = super()._get_pos_ui_product_product(params)
-        return result
-
-    def action_pos_session_open(self):
-        for session in self.filtered(lambda session: session.state == 'opening_control'):
-            if session.config_id.cash_control and not session.rescue:
-                last_session = self.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
-                                           limit=1)
-                session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref  # defaults to 0 if lastsession is empty
-        return super(PosSession, self).action_pos_session_open()
-
-
-    @api.depends('config_id')
-    def _tax_today(self):
-        for rec in self:
-            rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
-
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].append('currency_id')
-        return result
-
-    def _create_cash_statement_lines_and_cash_move_lines(self, data):
-        # Create the split and combine cash statement lines and account move lines.
-        MoveLine = data.get('MoveLine')
-        split_receivables_cash = data.get('split_receivables_cash')
-        combine_receivables_cash = data.get('combine_receivables_cash')
-
-        # handle split cash payments
-        split_cash_statement_line_vals = []
-        split_cash_receivable_vals = []
-        for payment, amounts in split_receivables_cash.items():
-            journal_id = payment.payment_method_id.journal_id.id
-            amount = float_round(amounts['amount'] if (payment.payment_method_id.currency_id == self.company_id.currency_id or not payment.payment_method_id.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
-            split_cash_statement_line_vals.append(
-                self._get_split_statement_line_vals(
-                    journal_id,
-                    amount,
-                    payment
-                )
-            )
-            split_cash_receivable_vals.append(
-                self._get_split_receivable_vals(
-                    payment,
-                    amount,
-                    amount_converted
-                )
-            )
-        # handle combine cash payments
-        combine_cash_statement_line_vals = []
-        combine_cash_receivable_vals = []
-        for payment_method, amounts in combine_receivables_cash.items():
-            if not float_is_zero(amounts['amount'], precision_rounding=self.currency_id.rounding):
-                amount = float_round(amounts['amount'] if (payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-                amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
-                combine_cash_statement_line_vals.append(
-                    self._get_combine_statement_line_vals(
-                        payment_method.journal_id.id,
-                        amount,
-                        payment_method
-                    )
-                )
-                combine_cash_receivable_vals.append(
-                    self._get_combine_receivable_vals(
-                        payment_method,
-                        amount,
-                        amount_converted
-                    )
-                )
-
-        # create the statement lines and account move lines
-        BankStatementLine = self.env['account.bank.statement.line']
-        split_cash_statement_lines = BankStatementLine.create(split_cash_statement_line_vals).mapped(
-            'move_id.line_ids').filtered(lambda line: line.account_id.account_type == 'asset_receivable')
-        combine_cash_statement_lines = BankStatementLine.create(combine_cash_statement_line_vals).mapped(
-            'move_id.line_ids').filtered(lambda line: line.account_id.account_type == 'asset_receivable')
-        split_cash_receivable_lines = MoveLine.create(split_cash_receivable_vals)
-        combine_cash_receivable_lines = MoveLine.create(combine_cash_receivable_vals)
-
-        data.update(
-            {'split_cash_statement_lines': split_cash_statement_lines,
-             'combine_cash_statement_lines': combine_cash_statement_lines,
-             'split_cash_receivable_lines': split_cash_receivable_lines,
-             'combine_cash_receivable_lines': combine_cash_receivable_lines
-             })
-        return data
-
-
-    def _create_bank_payment_moves(self, data):
-        combine_receivables_bank = data.get('combine_receivables_bank')
-        split_receivables_bank = data.get('split_receivables_bank')
-        bank_payment_method_diffs = data.get('bank_payment_method_diffs')
-        MoveLine = data.get('MoveLine')
-        payment_method_to_receivable_lines = {}
-        payment_to_receivable_lines = {}
-        for payment_method, amounts in combine_receivables_bank.items():
-            amount = float_round(amounts['amount'] if (
-                        payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else \
-            amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            amount_converted = float_round(amounts['amount_converted'] if (
-                        payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else \
-                amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            combine_receivable_line = MoveLine.create(self._get_combine_receivable_vals(payment_method, amount, amount_converted))
-            amounts['amount'] = amount
-            amounts['amount_converted'] = amount_converted
-            payment_receivable_line = self._create_combine_account_payment(payment_method, amounts, diff_amount=bank_payment_method_diffs.get(payment_method.id) or 0)
-            payment_method_to_receivable_lines[payment_method] = combine_receivable_line | payment_receivable_line
-
-        for payment, amounts in split_receivables_bank.items():
-            amount = float_round(amounts['amount'] if (
-                    payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
-                amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            amount_converted = float_round(amounts['amount_converted'] if (
-                    payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
-                amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            split_receivable_line = MoveLine.create(self._get_split_receivable_vals(payment, amount, amount_converted))
-            amounts['amount'] = amount
-            amounts['amount_converted'] = amount_converted
-            payment_receivable_line = self._create_split_account_payment(payment, amounts)
-            payment_to_receivable_lines[payment] = split_receivable_line | payment_receivable_line
-
-        for bank_payment_method in self.payment_method_ids.filtered(lambda pm: pm.type == 'bank' and pm.split_transactions):
-            self._create_diff_account_move_for_split_payment_method(bank_payment_method, bank_payment_method_diffs.get(bank_payment_method.id) or 0)
-
-        data['payment_method_to_receivable_lines'] = payment_method_to_receivable_lines
-        data['payment_to_receivable_lines'] = payment_to_receivable_lines
-        data['online_payment_to_receivable_lines'] = {}
-        return data
+        pass
