@@ -1,141 +1,75 @@
 /** @odoo-module */
 
-import { patch } from "@web/core/utils/patch";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
-import { PosData } from "@point_of_sale/app/models/data_service";
-// import { formatMonetary } from "@web/views/fields/formatters"; // Possible missing module in some asset bundles
+import { patch } from "@web/core/utils/patch";
 
-// Patch PosData to intercept the load_data result
-patch(PosData.prototype, {
-    async loadInitialData() {
-        const response = await super.loadInitialData(...arguments);
-        
-        // Pachacutec: v197.1 - Robustez ante respuestas nulas
-        if (!response) {
-            console.warn(">>>>>>>> PosData Patched: loadInitialData: El servidor devolvió una respuesta vacía.");
-            return response;
-        }
-
-        // Inject hr_salesmen into the data service for reactivity in Odoo 18
-        if (response.hr_salesmen) {
-            this.hr_salesmen = response.hr_salesmen;
-        } else if (response["pos.config"] && response["pos.config"].data && response["pos.config"].data[0].hr_salesmen) {
-            this.hr_salesmen = response["pos.config"].data[0].hr_salesmen;
-        }
-
-        if (response && response.res_currency_ref) {
-            console.log(">>>>>>>> Intercepted res_currency_ref in PosData Root:", response.res_currency_ref);
-        } else if (response && response["pos.session"]) {
-            const sessionModel = response["pos.session"];
-            const res_currency_ref = sessionModel.res_currency_ref || (sessionModel.data && sessionModel.data[0] ? sessionModel.data[0].res_currency_ref : null);
-            if (res_currency_ref) {
-                console.log(">>>>>>>> Intercepted res_currency_ref in PosData (Session lvl):", res_currency_ref);
-            } else {
-                console.warn(">>>>>>>> res_currency_ref NOT found in RPC response for pos.session", sessionModel);
-            }
-        }
-
-        return response;
-    }
-});
-
-// Patch PosStore to use the intercepted data
 patch(PosStore.prototype, {
-    get res_currency_ref() {
-        return this.get_currency_ref();
-    },
-
-    get_currency_ref() {
-        // 1. Try accessing from PosData if available (this.data is commonly the data service in Odoo 18 PosStore)
-        if (this.data && this.data.res_currency_ref) {
-            return this.data.res_currency_ref;
-        }
-
-        // 2. Try accessing from this.session (if loaded as a property)
-        if (this.session && this.session.res_currency_ref) {
-            return this.session.res_currency_ref;
-        }
-
-        // 3. Try finding it in the loaded models if they are accessible
-        if (this.models && this.models['pos.session']) {
-            const sessionModel = this.models['pos.session'];
-            if (sessionModel.res_currency_ref) return sessionModel.res_currency_ref;
-
-            const sessionData = sessionModel.data || sessionModel;
-            if (Array.isArray(sessionData) && sessionData.length > 0) {
-                const sess = sessionData.find(s => s.id === this.session?.id) || sessionData[0];
-                if (sess && sess.res_currency_ref) return sess.res_currency_ref;
+    async loadInitialData() {
+        try {
+            // Pachacutec: v197.2 - Auditoría Profunda.
+            // Protegemos contra respuestas vacías del servidor que causan un colapso total (TypeError)
+            // de la inicialización de Odoo 18.
+            const result = await super.loadInitialData();
+            
+            if (!result || typeof result !== 'object') {
+                console.warn(">>>>>>>> PosData Patched: loadInitialData: El servidor devolvió una respuesta vacía. Aplicando guarda de seguridad.");
+                return {}; 
             }
+            
+            return result;
+        } catch (error) {
+            console.error(">>>>>>>> PosData Patched: Error crítico en loadInitialData:", error);
+            // Ante un error de red o de lógica, devolvemos un objeto vacío para permitir
+            // que el POS intente cargar con nulos en lugar de morir por un TypeError indefinido.
+            return {};
         }
-
-        return null;
     },
 
     format_currency_ref(value) {
-        try {
-            const currency = this.get_currency_ref() || {
-                symbol: this.config?.show_currency_symbol || "$",
-                position: this.config?.show_currency_position || "after",
-                rounding: 0.01,
-                decimal_places: 2,
-                id: 999999 // Fallback ID
-            };
-            const amount = typeof value === 'number' ? value : parseFloat(value) || 0;
-            const symbol = String(currency.symbol || "");
-            const position = String(currency.position || "after");
-            const decimals = parseInt(currency.decimal_places) || 2;
+        // Obtenemos la moneda de referencia inyectada desde el backend
+        const currency_ref = this.res_currency_ref;
+        if (!currency_ref) return value;
 
-            // Pachacutec: Professional Venezuelan Formatting (Dots for thousands, comma for decimals)
-            const parts = amount.toFixed(decimals).split('.');
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-            const formatted_val = parts.join(',');
+        const decimals = currency_ref.decimal_places || 2;
+        const symbol = currency_ref.symbol || '';
+        const position = currency_ref.position || 'after';
 
-            return (position === 'before' ? symbol + ' ' : '') +
-                formatted_val +
-                (position === 'after' ? ' ' + symbol : '');
-        } catch (e) {
-            console.warn("Manual formatting in format_currency_ref failed:", e);
-            const fallback_amount = typeof value === 'number' ? value : parseFloat(value) || 0;
-            return fallback_amount.toFixed(2);
-        }
+        // Formateo profesional: puntos para miles, comas para decimales
+        const parts = value.toFixed(decimals).split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        const formatted_val = parts.join(',');
+
+        return position === 'before' ? `${symbol} ${formatted_val}` : `${formatted_val} ${symbol}`;
     },
 
-    getAmountInRefCurrency(amount, fromMainCurrency = false) {
-        if (!amount && amount !== 0) return "";
-        let rate = 1.0;
-        let active_currency_ref = this.res_currency_ref;
+    getAmountInRefCurrency(base_amount, apply_inverse = false) {
+        /**
+         * Pachacutec: v197.2
+         * Convierte montos a la moneda de referencia (USD o Bs según configuración).
+         */
+        const config = this.config;
+        if (!config || !config.show_currency_rate) return this.format_currency_ref(base_amount);
 
-        // Reconstruct res_currency_ref from config if missing
-        if (!active_currency_ref && this.config) {
-            active_currency_ref = {
-                symbol: this.config.show_currency_symbol || "$",
-                position: this.config.show_currency_position || "after",
-                rounding: 0.01,
-                decimal_places: 2,
-                rate: this.config.show_currency_rate || 1.0,
-            };
+        const rate = config.show_currency_rate;
+        const ref_symbol = config.show_currency_symbol;
+        
+        // Logical Fallback: If rate is 1 and symbols match, no conversion needed.
+        if (rate === 1 && ref_symbol === (this.currency ? this.currency.symbol : '')) {
+            return this.format_currency_ref(base_amount);
         }
-
-        if (active_currency_ref && active_currency_ref.rate) {
-            rate = active_currency_ref.rate;
-        } else {
-            rate = this.config.show_currency_rate;
-        }
-
-        if (typeof rate !== 'number') {
-            rate = parseFloat(rate);
-        }
-        if (isNaN(rate) || rate === 0) rate = 1;
 
         let final_val = 0;
-        const ref_symbol = active_currency_ref ? active_currency_ref.symbol : (this.config.show_currency_symbol || '$');
-
-        // NEW LOGIC (Pachacutec): 
-        // If fromMainCurrency is true, amount is in VEF (Bs.F). 
-        // We must divide by rate to get USD (Base).
-        let base_amount = amount;
-        if (fromMainCurrency) {
-            base_amount = amount / rate;
+        
+        // --- USD -> Bs Conversion Logic ---
+        // If the shop is in USD (Base) and we want to show Bs (Reference)
+        // Rate from backend is usually 1 USD = X Bs.
+        if (apply_inverse) {
+             // We want to go from Bs (Base) to USD (Reference)
+             // Backend usually provides rate as X (where 1 USD = X Bs) but we already inverted it in backend for USD dual currency.
+             // If base_amount is Bs and rate is Bs/USD, we divide.
+             final_val = base_amount * rate;
+        } else {
+             final_val = base_amount * rate;
         }
 
         // Now process like usual with base_amount (USD)

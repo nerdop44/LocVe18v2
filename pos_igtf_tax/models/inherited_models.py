@@ -1,21 +1,13 @@
-
-from odoo import models, fields, api
-from odoo.exceptions import ValidationError
-from odoo.tools import float_round
 import logging
+from odoo import api, fields, models, _
+from odoo.exceptions import ValidationError
+from odoo.tools import float_is_zero, float_round
 
 _logger = logging.getLogger(__name__)
 
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].extend([
-            "x_igtf_percentage",
-            "x_is_foreign_exchange",
-        ])
-        return result
 
     def _get_igtf_fallback_account(self, type='income'):
         """
