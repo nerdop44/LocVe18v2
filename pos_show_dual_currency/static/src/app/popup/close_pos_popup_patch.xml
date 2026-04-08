@@ -9,39 +9,42 @@
         </xpath>
 
         <!-- Total Orders in USD -->
-        <xpath expr="//div[hasclass('total-orders')]//span[hasclass('amount')]" position="after">
+        <xpath expr="//div[hasclass('total-orders')]" position="inside">
             <t t-if="trm != 0">
-                <span class="currency-ref-total" style="color: #6c757d; font-size: 0.9em; margin-left: 5px;">
-                    (<t t-esc="pos.format_currency_ref(ordersDetails.amount / trm)"/>)
-                </span>
+                <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em;">
+                    (<t t-esc="pos.format_currency_ref(props.orders_details.amount / trm)"/>)
+                </div>
             </t>
         </xpath>
 
         <!-- Cash Overview headers / body modifications -->
         <!-- Injecting USD counted cash row -->
-        <xpath expr="//tbody[hasclass('cash-overview')]" position="before">
-            <tbody class="cash-overview-usd">
-                <tr class="cash-row-usd">
-                    <td><t t-esc="defaultCashDetails.default_cash_details_ref.name"/></td>
-                    <td class="text-end">
-                        <span style="color: #008784;" t-esc="pos.format_currency_ref(defaultCashDetails.default_cash_details_ref.amount)"/>
-                    </td>
-                    <td class="flex text-end" t-on-input="() => this.handleInputChangeUSD(defaultCashDetails.default_cash_details_ref.id)">
-                        <input class="pos-input" type="number" step="0.01"
-                               t-model.number="state.payments_usd[defaultCashDetails.default_cash_details_ref.id].counted"/>
-                        <div class="button icon" t-on-click="openDetailsPopupUSD">
-                            <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
-                        </div>
-                    </td>
-                    <td class="text-end" t-att-class="{'warning': state.payments_usd[defaultCashDetails.default_cash_details_ref.id].difference}">
-                        <t t-esc="pos.format_currency_ref(state.payments_usd[defaultCashDetails.default_cash_details_ref.id].difference)"/>
-                    </td>
-                </tr>
-            </tbody>
+        <xpath expr="//div[hasclass('payment-methods-overview')]" position="before">
+            <div class="cash-overview-usd-container mb-3" style="border: 1px solid #dee2e6; border-radius: 4px; padding: 10px;">
+                <h4 style="color: #008784; border-bottom: 1px solid #eee; padding-bottom: 5px;">Resumen USD</h4>
+                <div class="cash-row-usd d-flex justify-content-between align-items-center">
+                    <div><t t-esc="props.default_cash_details.default_cash_details_ref.name"/></div>
+                    <div class="text-end font-weight-bold">
+                        Total Sistema: <span style="color: #008784;" t-esc="pos.format_currency_ref(props.default_cash_details.default_cash_details_ref.amount)"/>
+                    </div>
+                </div>
+                <div class="input-group mt-2">
+                    <span class="input-group-text">Contado USD</span>
+                    <input class="form-control" type="number" step="0.01"
+                           t-model.number="state.payments_usd[props.default_cash_details.default_cash_details_ref.id].counted"
+                           t-on-input="() => this.handleInputChangeUSD(props.default_cash_details.default_cash_details_ref.id)"/>
+                    <button class="btn btn-outline-secondary" t-on-click="openDetailsPopupUSD">
+                        <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
+                    </button>
+                </div>
+                <div class="mt-2 text-end" t-att-class="{'text-danger': state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference}">
+                    Diferencia: <t t-esc="pos.format_currency_ref(state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference)"/>
+                </div>
+            </div>
         </xpath>
 
         <!-- Money Details Popup Instance (v18 compatible component) -->
-        <xpath expr="//div[hasclass('popup')]" position="after">
+        <xpath expr="//div[hasclass('payment-methods-overview')]" position="after">
             <MoneyDetailsPopupUSD
                 t-if="state.displayMoneyDetailsPopupUSD"
                 manualInputCashCountUSD="manualInputCashCountUSD"
@@ -50,13 +53,11 @@
             />
         </xpath>
         
-        <!-- Multi-currency columns in payment methods (Legacy style but adapted) -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//table//tbody//tr//td[@t-esc='pos.format_currency(pm.amount)']" position="inside">
-            <t t-if="trm != 0">
-                <div class="usd-amount" style="font-size: 0.8em; color: #6c757d;">
-                    <t t-esc="pos.format_currency_ref(pm.amount / trm)"/>
-                </div>
-            </t>
+        <!-- Multi-currency columns in payment methods (Stuctural XPath: added after amount span) -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('fs-3')]/span[2]" position="after">
+            <span t-if="trm != 0" class="usd-amount ms-2 text-muted" style="font-size: 0.8em;">
+                (<t t-esc="pos.format_currency_ref(pm.amount / trm)"/>)
+            </span>
         </xpath>
     </t>
 </templates>

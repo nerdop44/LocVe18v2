@@ -64,12 +64,28 @@ const patchConfig = {
     },
 
     async closeSession() {
-        if (!this.state || this.state.zReport === "" || !this.state.zReport) {
-            console.log("closeSession sin reporte Z");
-        } else {
-            console.log("closeSession con reporte Z");
-            await this.orm.call("pos.session", "set_z_report", [this.pos.pos_session.id, this.state.zReport]);
+        console.log("[FISCAL] v184 - Iniciando cierre de sesión.");
+        try {
+            // Pachacutec: v184 - Búsqueda progresiva y no-bloqueante del ID de sesión
+            const pos = this.pos || this.props?.pos || this.env?.pos;
+            const session = pos?.session || pos?.pos_session || this.props?.session;
+            const sessionId = session?.id;
+
+            if (this.state?.zReport && sessionId) {
+                console.log("[FISCAL] v184 - Persistiendo reporte Z para sesión:", sessionId);
+                await this.orm.call("pos.session", "set_z_report", [sessionId, this.state.zReport]);
+            } else {
+                console.warn("[FISCAL] v184 - Reporte Z no persistido (Estado vacío o Sesión no hallada).");
+            }
+        } catch (e) {
+            console.error("[FISCAL] v184 - Error al persistir reporte Z (Ignorado para permitir cierre):", e);
         }
+
+        // Pachacutec: v184 - Fallback de compatibilidad para el core de Odoo en caso de que use 'pos_session'
+        if (this.pos && !this.pos.pos_session && this.pos.session) {
+            this.pos.pos_session = this.pos.session;
+        }
+
         return super.closeSession();
     },
 
@@ -77,10 +93,22 @@ const patchConfig = {
         if (this.pos.config.connection_type === "api") {
             this.printZViaApi();
         } else {
-            this.printerCommands = [];
-            this.read_Z = false; // Reset flag
-            this.printerCommands.push("I0Z");
-            await this.actionPrint();
+            if (this.printing_lock) {
+                console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+                return;
+            }
+            this.printing_lock = true;
+            try {
+                const result = await this.setPort();
+                if (!result) return;
+                await this.write_Z();
+            } finally {
+                if (this.port) {
+                    try { await this.port.close(); } catch(e){}
+                    this.port = false;
+                }
+                this.printing_lock = false;
+            }
         }
     },
 
@@ -88,10 +116,62 @@ const patchConfig = {
         if (this.pos.config.connection_type === "api") {
             this.printXViaApi();
         } else {
-            this.printerCommands = [];
-            this.read_Z = false; // Reset flag
-            this.printerCommands.push("I0X");
-            await this.actionPrint();
+            if (this.printing_lock) {
+                console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+                return;
+            }
+            this.printing_lock = true;
+            try {
+                const result = await this.setPort();
+                if (!result) return;
+                
+                // Mismo flujo de write_Z pero para X (v182 - No manual writer lock)
+                this.printerCommands = ["I0X"]; 
+                const command = this.printerCommands[0];
+                
+                await this.escribe_leer(command, false);
+                // No esperamos lectura extendida para Reporte X usualmente
+            } finally {
+                if (this.port) {
+                    try { await this.port.close(); } catch(e){}
+                    this.port = false;
+                }
+                this.printing_lock = false;
+            }
+        }
+    },
+
+    async checkPrinterStatusCmd() {
+        if (this.printing_lock) {
+            console.warn("[FISCAL] Bloqueo de concurrencia activo.");
+            return;
+        }
+        this.printing_lock = true;
+        try {
+            const result = await this.setPort();
+            if (!result) {
+                Swal.fire('Error', 'No se pudo abrir puerto.', 'error');
+                return;
+            }
+            const status_bytes = await this.fetchStatusDiagnosis();
+            if (status_bytes) {
+                const ascii_resp = Array.from(status_bytes).map(b => (b >= 32 && b <= 126) ? String.fromCharCode(b) : `[${b}]`).join("");
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Estado de Impresora (S1)',
+                    html: `<pre>Hex/Bruto:\n${ascii_resp}</pre>`
+                });
+            } else {
+                Swal.fire('Estado', 'Sin respuesta de S1 o NAK', 'warning');
+            }
+        } catch (e) {
+            Swal.fire('Error S1', e.message, 'error');
+        } finally {
+            if (this.port) {
+                try { await this.port.close(); } catch(e){}
+                this.port = false;
+            }
+            this.printing_lock = false;
         }
     }
 };
@@ -103,7 +183,7 @@ const mixinMethods = [
     'printViaApi', 'printZViaApi', 'printXViaApi',
     'write', 'write_s2', 'write_Z', 'escribe_leer',
     'setHeader', 'setLines', 'setTotal',
-    'printFiscal', 'printNoFiscal',
+    'printFiscal', 'printNoFiscal', 'fetchStatusDiagnosis',
     // 'showPopup' is NOT in mixin, we implemented it above.
 ];
 

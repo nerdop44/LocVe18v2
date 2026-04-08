@@ -23,7 +23,7 @@ class PosOrder(models.Model):
     def _compute_margin_ref(self):
         for order in self:
             if order.session_rate != 0:
-                order.margin_ref = order.margin / order.session_rate
+                order.margin_ref = order.margin * order.session_rate
 
             else:
                 order.margin = 0
@@ -32,11 +32,11 @@ class PosOrder(models.Model):
     def _compute_amount_all_ref(self):
         for order in self:
             if order.session_rate != 0:
-                order.amount_paid_ref = order.amount_paid / order.session_rate
-                order.amount_return_ref = order.amount_return / order.session_rate
-                order.amount_tax_ref = order.amount_tax / order.session_rate
-                order.amount_total_ref = order.amount_total / order.session_rate
-                order.sum_amount_total_ref = order.amount_total / order.session_rate
+                order.amount_paid_ref = order.amount_paid * order.session_rate
+                order.amount_return_ref = order.amount_return * order.session_rate
+                order.amount_tax_ref = order.amount_tax * order.session_rate
+                order.amount_total_ref = order.amount_total * order.session_rate
+                order.sum_amount_total_ref = order.amount_total * order.session_rate
             else:
                 order.amount_paid_ref = 0
                 order.amount_return_ref = 0
