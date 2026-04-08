@@ -1,28 +1,64 @@
 /** @odoo-module */
 
-import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { patch } from "@web/core/utils/patch";
+import { PosStore } from "@point_of_sale/app/store/pos_store";
+import { PosData } from "@point_of_sale/app/models/data_service";
+// import { formatMonetary } from "@web/views/fields/formatters"; // Possible missing module in some asset bundles
 
-patch(PosStore.prototype, {
+// Patch PosData to intercept the load_data result
+patch(PosData.prototype, {
     async loadInitialData() {
         try {
-            // Pachacutec: v197.2 - Auditoría Profunda.
-            // Protegemos contra respuestas vacías del servidor que causan un colapso total (TypeError)
-            // de la inicialización de Odoo 18.
-            const result = await super.loadInitialData();
+            // Pachacutec: v197.3 - Refuerzo de Resiliencia.
+            const response = await super.loadInitialData(...arguments);
             
-            if (!result || typeof result !== 'object') {
-                console.warn(">>>>>>>> PosData Patched: loadInitialData: El servidor devolvió una respuesta vacía. Aplicando guarda de seguridad.");
-                return {}; 
+            if (!response || typeof response !== 'object') {
+                console.warn(">>>>>>>> PosData Patched (v197.3): El servidor devolvió una respuesta nula o inválida. Aplicando objeto vacío de emergencia.");
+                return {};
+            }
+
+            // Inject hr_salesmen into the data service for reactivity in Odoo 18
+            if (response.hr_salesmen) {
+                this.hr_salesmen = response.hr_salesmen;
+            } else if (response["pos.config"] && response["pos.config"].data && response["pos.config"].data[0].hr_salesmen) {
+                this.hr_salesmen = response["pos.config"].data[0].hr_salesmen;
+            }
+
+            if (response && response.res_currency_ref) {
+                console.log(">>>>>>>> Intercepted res_currency_ref in PosData Root:", response.res_currency_ref);
+            } else if (response && response["pos.session"]) {
+                const sessionModel = response["pos.session"];
+                const res_currency_ref = sessionModel.res_currency_ref || (sessionModel.data && sessionModel.data[0] ? sessionModel.data[0].res_currency_ref : null);
+                if (res_currency_ref) {
+                    console.log(">>>>>>>> Intercepted res_currency_ref in PosData (Session lvl):", res_currency_ref);
+                }
             }
             
-            return result;
+            return response;
         } catch (error) {
-            console.error(">>>>>>>> PosData Patched: Error crítico en loadInitialData:", error);
-            // Ante un error de red o de lógica, devolvemos un objeto vacío para permitir
-            // que el POS intente cargar con nulos en lugar de morir por un TypeError indefinido.
+            console.error(">>>>>>>> PosData Patched (v197.3): Error crítico capturado en loadInitialData.", error);
             return {};
         }
+    },
+});
+
+// Patch PosStore to use the intercepted data
+patch(PosStore.prototype, {
+    get res_currency_ref() {
+        return this.get_currency_ref();
+    },
+
+    get_currency_ref() {
+        // 1. Try accessing from PosData if available (this.data is commonly the data service in Odoo 18 PosStore)
+        if (this.data && this.data.res_currency_ref) {
+            return this.data.res_currency_ref;
+        }
+
+        // 2. Fallback to session data if DataService interceptor is still loading or using old structure
+        if (this.models && this.models["pos.session"] && this.models["pos.session"].data && this.models["pos.session"].data[0]) {
+            return this.models["pos.session"].data[0].res_currency_ref;
+        }
+        return null;
     },
 
     format_currency_ref(value) {

@@ -72,7 +72,6 @@ class PosSession(models.Model):
         if message:
             self.message_post(body=message)
 
-    @api.model
     def _load_pos_data(self):
         result = super()._load_pos_data()
         
@@ -531,8 +530,9 @@ class PosSession(models.Model):
                     raise e
 
             # === Pachacutec v57: Corrección del descuadre IGTF ===
-            # El IGTF se cobra en los pagos (recibibles) pero su línea de crédito
-            # a veces no se genera correctamente en _create_non_reconciliable_move_lines.
+            # El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su
+            # línea de crédito de ventas no siempre se genera correctamente en
+            # _create_non_reconciliable_move_lines.
             # Detectamos el descuadre y lo compensamos con una línea de crédito directa.
             self._fix_igtf_imbalance_in_session_move()
 
