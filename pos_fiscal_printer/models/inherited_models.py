@@ -1,13 +1,15 @@
+import logging
 from datetime import datetime
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
+_logger = logging.getLogger(__name__)
+
 class PosOrder(models.Model):
     _inherit = "pos.order"
 
     z_report = fields.Char("Reporte Z", related="session_id.x_pos_z_report_number", store=True)
-
     num_factura = fields.Char("Num. Factura Fiscal", store=True)
     impresa = fields.Boolean("Impresa Fiscal", default=False)
 
@@ -35,20 +37,15 @@ class PosSession(models.Model):
     _inherit = "pos.session"
 
     x_pos_z_report_number = fields.Char("Número Reporte Z")
-
-    #campo el reporte z desde pos.report.z
     pos_report_z_id = fields.Many2one("pos.report.z", "Reporte Z")
 
     def set_z_report(self, number):
-        #buscar si existe un reporte z en pos.report.z con el mismo número
         z_report = self.env['pos.report.z'].sudo().search([('number','=',number)])
         if z_report:
-            #agregar la sesión al campo pos_session_ids many2many
             z_report.write({"pos_session_ids": [(4, self.id)]})
             z_report._onchange_pos_session_ids()
             self.sudo().write({"x_pos_z_report_number": number, 'pos_report_z_id': z_report.id})
         else:
-            #crear un reporte z con el número
             z_report = self.env['pos.report.z'].sudo().create({
                 "number": number,
                 'date': datetime.today(),
@@ -57,6 +54,7 @@ class PosSession(models.Model):
             })
             z_report.sudo()._onchange_pos_session_ids()
             self.sudo().write({"x_pos_z_report_number": number, 'pos_report_z_id': z_report.id})
+            
             activity = {
                 'res_id': z_report.id,
                 'res_model_id': self.env['ir.model'].search([('model', '=', 'pos.report.z')]).id,
@@ -66,72 +64,8 @@ class PosSession(models.Model):
                 'activity_type_id': 4,
                 'date_deadline': datetime.today(),
             }
-
             self.env['mail.activity'].sudo().create(activity)
- 
-    @api.model
-    def _get_pos_config_loader_params(self):
-        return self._loader_params_pos_config()
 
-    @api.model
-    def _loader_params_pos_config(self):
-        result = super()._get_pos_config_loader_params() if hasattr(super(), '_get_pos_config_loader_params') else super()._loader_params_pos_config()
-        result['search_params']['fields'].extend([
-            'x_fiscal_command_parity',
-            'x_fiscal_command_baudrate',
-            'x_fiscal_printer_id',
-            'x_fiscal_printer_code'
-        ])
-        return result
-
-    @api.model
-    def _get_res_company_loader_params(self):
-        return self._loader_params_res_company()
-
-    @api.model
-    def _loader_params_res_company(self):
-        result = super()._get_res_company_loader_params() if hasattr(super(), '_get_res_company_loader_params') else super()._loader_params_res_company()
-        result['search_params']['fields'].extend([
-            'vat',
-            'street',
-            'city',
-            'phone'
-        ])
-        return result
-
-    @api.model
-    def _get_pos_payment_method_loader_params(self):
-        return self._loader_params_pos_payment_method()
-
-    @api.model
-    def _loader_params_pos_payment_method(self):
-        result = super()._get_pos_payment_method_loader_params() if hasattr(super(), '_get_pos_payment_method_loader_params') else super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].extend([
-            "x_printer_code",
-            "x_igtf_percentage",
-            "x_is_foreign_exchange",
-        ])
-        return result
-
-    @api.model
-    def _get_account_tax_loader_params(self):
-        return self._loader_params_account_tax()
-
-    @api.model
-    def _loader_params_account_tax(self):
-        result = super()._get_account_tax_loader_params() if hasattr(super(), '_get_account_tax_loader_params') else super()._loader_params_account_tax()
-        result['search_params']['fields'].extend(['x_tipo_alicuota', 'amount'])
-        return result
-
-    @api.model
-    def _get_res_partner_loader_params(self):
-        return self._loader_params_res_partner()
-
-    @api.model
-    def _loader_params_res_partner(self):
-        result = super()._get_res_partner_loader_params() if hasattr(super(), '_get_res_partner_loader_params') else super()._loader_params_res_partner()
-        result['search_params']['fields'].extend(['company_type', 'prefix_vat', 'full_vat', 'email'])
-        return result
 class AccountTax(models.Model):
     _inherit = "account.tax"
 
@@ -143,14 +77,8 @@ class AccountTax(models.Model):
     ], "Tipo de alícuota", default="general")
 
     @api.model
-    def _get_pos_ui_account_tax(self, params):
-        """ Pachacutec: Odoo 18 Force load x_tipo_alicuota """
-        taxes = super()._get_pos_ui_account_tax(params)
-        # Asegurar que el campo sea visible incluso en proxies reactivos
-        for tax in taxes:
-            if isinstance(tax, dict):
-                tax['x_tipo_alicuota'] = tax.get('x_tipo_alicuota', 'general')
-        return taxes
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['x_tipo_alicuota', 'amount']
 
 class PosConfig(models.Model):
     _inherit = "pos.config"
@@ -164,6 +92,12 @@ class PosConfig(models.Model):
     x_fiscal_command_parity = fields.Selection(related="x_fiscal_printer_id.x_fiscal_command_parity")
     api_url = fields.Char(related="x_fiscal_printer_id.api_url")
 
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + [
+            'x_fiscal_command_parity', 'x_fiscal_command_baudrate', 
+            'x_fiscal_printer_id', 'x_fiscal_printer_code', 'flag_21', 'connection_type'
+        ]
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
@@ -173,52 +107,44 @@ class PosPaymentMethod(models.Model):
     @api.constrains("x_printer_code")
     def _check_x_printer_code(self):
         for rec in self:
-            if len(rec.x_printer_code) != 2:
+            if rec.x_printer_code and len(rec.x_printer_code) != 2:
                 raise ValidationError("El código en la impresora sólo puede tener dos caracteres")
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['x_printer_code']
+
+class ResPartner(models.Model):
+    _inherit = "res.partner"
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v197 - Odoo 18 Loader Migration
+        return super()._load_pos_data_fields(config_id) + [
+            'vat', 'prefix_vat', 'full_vat', 'l10n_ve_vat', 'l10n_ve_vat_prefix',
+            'street', 'city', 'phone', 'mobile', 'email'
+        ]
+
+class ResCompany(models.Model):
+    _inherit = "res.company"
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['vat', 'street', 'city', 'phone']
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
-    pos_x_fiscal_command_baudrate = fields.Integer(
-        "Baudrate",
-        related="pos_config_id.x_fiscal_command_baudrate",
-        store=True,
-        readonly=False,
-        default=9600
-    )
-    pos_x_fiscal_commands_time = fields.Integer(
-        "Tiempo de espera", 
-        related="pos_config_id.x_fiscal_commands_time",
-        store=True,
-        readonly=False,
-    )
-    pos_x_fiscal_printer_id = fields.Many2one(
-        string="Impresora fiscal", 
-        related="pos_config_id.x_fiscal_printer_id",
-        readonly=False,
-        store=True,
-    )
-
-    flag_21 = fields.Selection(string="Flag 21", related="pos_config_id.flag_21",
-        store=True)
-
-    connection_type = fields.Selection(
-        related="pos_config_id.connection_type",
-        store=True
-    )
-
-    api_url = fields.Char(related="pos_config_id.api_url",
-        store=True)
-    pos_x_fiscal_command_parity = fields.Selection(
-        related="pos_config_id.x_fiscal_command_parity",
-        store=True,
-        readonly=False
-    )
-
+    pos_x_fiscal_command_baudrate = fields.Integer(related="pos_config_id.x_fiscal_command_baudrate", readonly=False)
+    pos_x_fiscal_commands_time = fields.Integer(related="pos_config_id.x_fiscal_commands_time", readonly=False)
+    pos_x_fiscal_printer_id = fields.Many2one(related="pos_config_id.x_fiscal_printer_id", readonly=False)
+    flag_21 = fields.Selection(related="pos_config_id.flag_21", readonly=True)
+    connection_type = fields.Selection(related="pos_config_id.connection_type", readonly=True)
+    api_url = fields.Char(related="pos_config_id.api_url")
+    pos_x_fiscal_command_parity = fields.Selection(related="pos_config_id.x_fiscal_command_parity", readonly=False)
 
     @api.constrains("pos_x_fiscal_commands_time")
     def _check_x_fiscal_commands_time(self):
         for rec in self:
             if rec.pos_x_fiscal_commands_time < 0:
                 raise ValidationError(_("El tiempo entre comandos no puede ser cero"))
-

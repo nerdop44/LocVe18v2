@@ -1,6 +1,7 @@
 /** @odoo-module */
 import { _t } from "@web/core/l10n/translation";
 import { NotaCreditoPopUp } from "@pos_fiscal_printer/app/popup/nota_credito_popup";
+import { DataHelper } from "./data_helper";
 
 const encoder = new TextEncoder();
 const CHAR_MAP = {
@@ -33,23 +34,31 @@ export function cleanText(string) {
 // Pachacutec: v96 - Protocolo Híbrido Validado (XOR Inteligente)
 // - Cabeceras ('i'): El Checksum (LRC) es DATA ^ ETX. STX (2) queda FUERA. Correcto para ACK.
 // - Ventas/Pagos ('!', ' ', '2', etc.): El Checksum DEBE incluir STX (2) para el "Resultado 9".
+// Pachacutec: v168 - Motor de Checksum de Grado Industrial (Manual Fidelity)
+// - Eliminado: Bucle for...of (Causaba truncado errático en Chrome Assets).
+// - Implementado: Bucle de índice tradicional sobre Uint8Array (Integridad 100%).
+// - LRC = [DATA XOR CMD] ^ ETX. STX (2) queda FUERA según Manual Pág. 17.
 export function toBytes(command) {
     const encoder = new TextEncoder();
-    const dataBytes = Array.from(encoder.encode(command));
+    const data = encoder.encode(command);
     const ETX = 3;
     const STX = 2;
 
-    // Pachacutec: v134 - LRC Pure Z1F (Excluir STX siempre)
-    // El log de éxito v16 confirma que el LRC es [DATA ^ ETX] sin el STX(2).
-    let lrc = 0; 
-    for (const byte of dataBytes) {
-        lrc ^= byte;
+    let lrc = 0;
+    // Bucle robusto sobre el buffer de bytes real
+    for (let i = 0; i < data.length; i++) {
+        lrc ^= data[i];
     }
     lrc ^= ETX;
 
-    // Retornamos la trama final: [STX, DATA, ETX, LRC]
-    const finalFrame = [STX, ...dataBytes, ETX, lrc];
-    return new Uint8Array(finalFrame);
+    // Construcción atómica de la trama: [STX, DATA, ETX, LRC]
+    const frame = new Uint8Array(data.length + 3);
+    frame[0] = STX;
+    frame.set(data, 1);
+    frame[data.length + 1] = ETX;
+    frame[data.length + 2] = lrc;
+
+    return frame;
 }
 
 // FiscalPrinterMixin as a plain object with methods only.
@@ -209,20 +218,31 @@ export const FiscalPrinterMixin = {
                             await this.reader.releaseLock();
                             this.reader = false;
                             return responseData; // Devolvemos la trama completa
-                        }
-
-                        if (value[0] == 6) {
+                        } else if (value[0] == 6) {
                             console.log("Comando aceptado (ACK)");
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
                             return true;
-                        } else if (value[0] == 21) {
-                            console.error("[FISCAL] Impresora devolvió NAK.");
+                        } else {
+                            console.error("[FISCAL] Comando no reconocido o NAK (", value[0], "). Enviando comando 7 (Anulación) v16...");
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
-                            return false; 
+                            
+                            // Protocolo de Desbloqueo v16: IDÉNTICO
+                            await new Promise((res) => setTimeout(() => res(), 100));
+                            this.writer = this.port.writable.getWriter();
+                            const unlockCmd = toBytes("7");
+                            await new Promise(res => setTimeout(async () => {
+                                await this.writer.write(unlockCmd);
+                                res();
+                            }, 150));
+                            await this.writer.releaseLock();
+                            this.writer = false;
+                            
+                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL
+                            return true; // Retorna true para que el bucle write() termine su ciclo pero this.printing sea false
                         }
                     } else {
                         console.log("No hay datos...");
@@ -240,7 +260,10 @@ export const FiscalPrinterMixin = {
                     leer = false;
                 } finally {
                     if (this.reader) {
-                        try { await this.reader.releaseLock(); } catch (e) { }
+                        try { 
+                            await this.reader.cancel();
+                            await this.reader.releaseLock(); 
+                        } catch (e) { }
                         this.reader = false;
                     }
                 }
@@ -357,7 +380,7 @@ export const FiscalPrinterMixin = {
             }
 
         }
-        console.log("Factura finalizada, puerto permanece abierto.");
+        console.log("Factura finalizada.");
     },
 
     async write_s2() {
@@ -447,21 +470,38 @@ export const FiscalPrinterMixin = {
                     console.error("Error en lectura write_s2:", error);
                 } finally {
                     leer = false;
+                    if (this.reader) {
+                        try {
+                            await this.reader.cancel();
+                            await this.reader.releaseLock();
+                        } catch (e) {
+                            console.warn("[FISCAL] Error al liberar reader en write_s2:", e);
+                        }
+                        this.reader = false;
+                    }
                 }
             }
 
             // Pachacutec: v37 - Persistencia garantizada del estado 'impresa'
             if (this.order.num_factura) {
-                console.warn("[FISCAL] Marcando orden como impresa permanentemente.");
+                console.log("[FISCAL] v180 - Marcando orden ante todas las referencias disponibles.");
+                
+                // Pachacutec: v180 - Asignación directa y robusta
                 this.order.impresa = true;
                 
+                // Fallback: Si props.order es diferente, actualizarlo también
+                if (this.props?.order && this.props.order !== this.order) {
+                    this.props.order.impresa = true;
+                    this.props.order.num_factura = this.order.num_factura;
+                }
+
                 await this.orm.call(
                     'pos.order',
                     'set_num_factura',
                     [this.order.id, this.order.name, this.order.num_factura]
                 );
             } else {
-                console.error("[FISCAL] Imposible marcar como impresa: número de factura no recibido.");
+                console.error("[FISCAL] v180 - Imposible marcar como impresa: número de factura no extraído.");
             }
 
         }
@@ -472,32 +512,28 @@ export const FiscalPrinterMixin = {
 
     async write_Z() {
         this.read_Z = true;
-        this.writer = this.port.writable.getWriter();
         const TIME = this.pos.config.x_fiscal_commands_time || 750;
         
-        // Pachacutec: v36 - REPORTE Z DINÁMICO (Compatible con v16 pero sin fecha fija)
-        // Usamos I0Z para cierre diario (Z Report) que es lo que el 99% de las veces se quiere
+        // Pachacutec: v182 - REPORTE Z DINÁMICO (Sin manejo manual de writer para evitar TypeError)
         this.printerCommands = ["I0Z"]; 
         const command = this.printerCommands[0];
         
-        // Pachacutec: v37 - VALIDACIÓN DE REPORTE (Usando escribe_leer para detectar errores)
-        if (this.writer) { await this.writer.releaseLock(); this.writer = false; }
-        
         const success = await this.escribe_leer(command, false);
         if (!success) {
-            console.error("[FISCAL] Error al solicitar Reporte Z.");
+            console.error("[FISCAL] v182 - Error al solicitar Reporte Z.");
             this.read_Z = false;
             return;
         }
 
         window.clearTimeout(this.timeout);
         this.printerCommands = [];
-        this.writer.releaseLock();
-        this.writer = false;
+        
+        // Espera de seguridad para el firmware durante el proceso de impresión física del Z
         await new Promise(
             (res) => setTimeout(() => res(), 12000)
         );
-        console.log("Leyendo U4z02002230200223", this.port.readable)
+        
+        console.log("Leyendo respuesta extendida del Z Report...");
         this.reader = false;
         if (this.port.readable) {
             this.reader = this.port.readable.getReader();
@@ -508,17 +544,16 @@ export const FiscalPrinterMixin = {
                 while (this.read_Z) {
                     const { value, done } = await this.reader.read();
                     if (done) {
-                        console.log("Done");
+                        console.log("Lectura finalizada.");
                         this.read_Z = false;
-                        this.reader.releaseLock();
-                        this.reader = false;
-                        this.read_Z = false;
+                        if (this.reader) {
+                            this.reader.releaseLock();
+                            this.reader = false;
+                        }
                         break;
                     }
-                    console.log(value);
                     var string = new TextDecoder().decode(value);
                     console.log(string);
-                    console.log('Desglozando U4z02002230200223');
                     const myArray = string.split('\n');
                     console.log(myArray);
                     // Break loop after receiving data to prevent hanging
@@ -559,15 +594,7 @@ export const FiscalPrinterMixin = {
             if (!result) return;
             await this.write();
         } finally {
-            if (this.port) {
-                try {
-                    await this.port.close();
-                    console.log("[FISCAL] v133 - Puerto cerrado exitosamente (Libre).");
-                    this.port = false;
-                } catch (e) {
-                    console.warn("[FISCAL] Error al cerrar puerto:", e);
-                }
-            }
+            await this.closePort();
             this.printing_lock = false;
         }
     },
@@ -836,8 +863,20 @@ export const FiscalPrinterMixin = {
     },
 
     async doPrinting(mode) {
-        if (!(this.order.payment_ids.every((p) => Boolean(p.payment_method_id?.x_printer_code)))) {
-            console.warn("Algunos métodos de pago no tienen código de impresora, se usará '01' por defecto.");
+        console.log("[FISCAL] v196 - Iniciando doPrinting, validando códigos...");
+        const payments = this.order.payment_ids || [];
+        
+        const missingCodes = payments.filter(p => {
+            const pmId = p.payment_method_id?.id || p.payment_method_id;
+            const pCode = DataHelper.getPaymentMethodCode(this.pos, pmId);
+            
+            console.log(`[FISCAL] v196 - Pago ID: ${p.id}, PM ID: ${pmId}, Código Detectado: ${pCode}`);
+            
+            return !pCode || pCode === "01"; // Si es el fallback '01', alertamos (podría ser intencional o error)
+        });
+
+        if (missingCodes.length > 0) {
+            console.warn("Algunos métodos de pago no tienen código de impresora en el modelo, se usará '01' por defecto.");
         }
         if (this.order.impresa) {
             this.env.services.notification.add(_t("Documento impreso en máquina fiscal"), { type: "danger" });
@@ -869,71 +908,78 @@ export const FiscalPrinterMixin = {
     // Pachacutec: v95 - Apertura Total v16 (6 comandos: iR*/iS*/i00-i03)
     // Validado: i03 es el disparador mandatorio en muchos firmwares HKA.
     setHeader(payload) {
-        const client = this.pos.get_order().partner;
+        const order = this.pos.get_order();
+        const client = order?.get_partner?.() || order?.partner;
         
-        // Pachacutec: v138 - Uso de full_vat y limpieza estricta (Anti-NAK)
-        // El RIF para iR* debe contener solo letras y números, sin guiones.
-        const rawVat = client?.full_vat || client?.vat || "0";
-        const cleanVat = rawVat.replace(/[^0-9VvJjGgEe]/g, "").toUpperCase();
+        // Pachacutec: v194 - Recuperación vía DataHelper (Blindaje de Prefijo)
+        const vat = DataHelper.getFullVat(this.pos, client);
         
         const cleanName = cleanText(client?.name || "CLIENTE GENERAL").substring(0, 30);
         const cleanAddr = cleanText(client?.street || "SIN DIRECCION").substring(0, 30);
-        const cleanPhone = cleanText(client?.phone || "0000").substring(0, 30);
-        const cleanEmail = cleanText(client?.email || "N/A").substring(0, 30);
+        const cleanPhone = cleanText(client?.phone || "No tiene").substring(0, 30);
+        const cleanEmail = cleanText(client?.email || "No tiene").substring(0, 30);
         
-        this.printerCommands.push(`iR*${cleanVat}`);
+        this.printerCommands.push(`iR*${vat}`);
         this.printerCommands.push(`iS*${cleanName}`);
+
+        this.printerCommands.push(`i00Telefono:  ${cleanPhone}`);
+        this.printerCommands.push(`i01Direccion: ${cleanAddr}`);
+        this.printerCommands.push(`i02Email:     ${cleanEmail}`);
+        this.printerCommands.push(`i03Ref:       ${cleanText(order.name || "").substring(0, 30)}`);
         
-        // Pachacutec: v138 - Orden Estricto Metadatos v16
-        this.printerCommands.push(`i00TELEFONO: ${cleanPhone}`);
-        this.printerCommands.push(`i01DIRECCION: ${cleanAddr}`);
-        this.printerCommands.push(`i02EMAIL:    ${cleanEmail}`);
-        this.printerCommands.push(`i03REF:      ${cleanText(this.pos.get_order().name || "").substring(0, 30)}`);
-        
-        console.warn("[FISCAL] v138 - Cabecera sincronizada v16 enviada con full_vat:", cleanVat);
+        console.warn("[FISCAL] v172 - Cabecera v16 Simplicity:", {vat, cleanName});
     },
 
     setTotal() {
-        console.warn("[FISCAL] setTotal - Inicio");
-        this.printerCommands.push("3"); // Subtotal
-
-        const aplicar_igtf = this.pos.config.aplicar_igtf;
-        const rate = this.pos.config.show_currency_rate || 1;
+        console.log("[FISCAL] v182 - setTotal Dinámico (Restauración Paridad v16)");
         
-        // Pachacutec: v138 - Moneda Dual Referencial (v16 alignment)
-        const total = this.order.get_total_with_tax() || 0;
-        const totalUSD = (total / rate).toFixed(2);
-        this.printerCommands.push(`80*TOTAL REF USD:  $ ${totalUSD}`);
+        // AHORA SÍ: Comando 3 (Subtotal) -> Bloquea a Estado de Pago
+        this.printerCommands.push("3"); 
 
-        // Pachacutec: v138 - Detalle IGTF (3%)
-        let totalIGTF = 0;
-        const paymentsInDivisas = this.order.payment_ids.filter(p => p.payment_method_id?.x_is_foreign_exchange);
-        if (aplicar_igtf && paymentsInDivisas.length > 0) {
-            const sumDivisas = paymentsInDivisas.reduce((acc, p) => acc + p.amount, 0);
-            totalIGTF = sumDivisas * 0.03;
-            this.printerCommands.push(`80*BASE IGTF 3%:  Bs ${sumDivisas.toFixed(2)}`);
-            this.printerCommands.push(`80*MONTO IGTF:    Bs ${totalIGTF.toFixed(2)}`);
+        // Pachacutec: v182 - Lógica de Pagos Dinámicos
+        // Iteramos sobre payment_ids (Odoo 18)
+        const payments = this.order.payment_ids || [];
+        const positivePayments = payments.filter(p => (p.amount || 0) > 0);
+
+        if (positivePayments.length === 0) {
+            console.warn("[FISCAL] v182 - No se hallaron pagos positivos, usando fallback 101");
+            this.printerCommands.push("101");
+        } else {
+            positivePayments.forEach((payment, index) => {
+                const isLast = (index === positivePayments.length - 1);
+                
+                // Diagnóstico v194: Recuperación Ultra-Segura vía DataHelper
+                const pmId = payment.payment_method_id?.id || payment.payment_method_id;
+                const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
+                
+                console.log(`[FISCAL] v194 - Pago ${index + 1}: Código=${code}, Monto=${payment.amount}`);
+                
+                if (isLast && positivePayments.length === 1) {
+                    // Pago único: Comando 1 (Cierre Total)
+                    this.printerCommands.push("1" + code);
+                } else {
+                    // Pagos parciales o último de varios: Comando 2 (Pago Parcial con Monto)
+                    let amountStr = String(Math.round(Math.abs(payment.amount || 0) * 100));
+                    // Flag 21 decide si 10 o 15 dígitos
+                    const padding = (this.pos.config.flag_21 === '30') ? 15 : 10;
+                    amountStr = amountStr.padStart(padding, "0");
+                    
+                    this.printerCommands.push("2" + code + amountStr);
+                    
+                    // Si es el último de varios, debemos cerrar con un comando 1 genérico o volver a enviar el código
+                    if (isLast) {
+                        this.printerCommands.push("1" + code);
+                    }
+                }
+            });
         }
 
-        // Pachacutec: v133 - Secuencia Determinística Éxito v16 (101 + optional 199)
-        this.printerCommands.push("101");
-
-        const has_divisas = paymentsInDivisas.length > 0;
-        const use_igtf_closing = aplicar_igtf && has_divisas;
-
-        if (use_igtf_closing) {
-            console.warn("[FISCAL] setTotal - Enviando cierre extra 199 (IGTF)");
+        // Comando 199 para finalizar factura fiscal si no se ha enviado (Safe Closing)
+        if (!this.printerCommands.includes("199")) {
             this.printerCommands.push("199");
         }
 
-        // Pachacutec: v138 - Ráfaga de Corte Final (v16 3s Delay logic)
-        // 4 avances de papel para que el ticket salga del cortador
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-        this.printerCommands.push("81 ");
-
-        console.warn("[FISCAL] setTotal - Comandos finales v138 con Corte inyectado.");
+        console.log("[FISCAL] v182 - Cierre Fiscal Dinámico Finalizado.");
     },
 
     printFiscal() {
@@ -1041,22 +1087,24 @@ export const FiscalPrinterMixin = {
                     unitPrice = all_prices.priceWithoutTaxBeforeDiscount / (line.qty || 1);
                 }
 
-                // Pachacutec: v133 - PADDING 33 DÍGITOS (Alineación v16 HKA-NG)
-                // Estructura v16: [Tag][Precio(16)][Qty(17)]|[Cod]|[Nombre]
+                // Pachacutec: v157 - Restauración de Estructura Exacta v16 (Fuente de Verdad)
+                // Basado en el skill hka_fiscal_expert: 16 Precio + 17 Cantidad + Pipes
                 let price = String(Math.round((unitPrice || 0) * 100)).padStart(16, '0').slice(-16);
                 let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(17, '0').slice(-17);
                 
                 let command = tag + price + quantity;
                 
-                // v16 injects default code with pipes if available
-                const product = this.pos.models["product.product"]?.get(line.product_id?.id || line.product_id);
-                if (product?.default_code) {
-                    command += `|${cleanText(product.default_code).substring(0, 10)}|`;
+                const code_clean = cleanText(line.product_id?.default_code || "");
+                if (code_clean) {
+                    command += `|${code_clean.substring(0, 10)}|`;
+                } else {
+                    // Pachacutec: v158 - Doble tubería para campo vacío (NG Standard)
+                    command += `||`; 
                 }
                 
                 command += cleanText(line.product_id?.display_name || line.product_name || "Producto").substring(0, 30);
                 
-                console.warn("[FISCAL] v95 - Línea con Pipes v16:", command);
+                console.warn("[FISCAL] v157 - Línea Ensamblada (HKA-NG):", command);
                 this.printerCommands.push(command);
 
                 if (line.discount > 0) {
@@ -1076,13 +1124,13 @@ export const FiscalPrinterMixin = {
                 const name = cleanText(line.product_id?.display_name || "");
                 const code = line.product_id?.default_code || "";
                 this.printerCommands.push(`80 ${name} [${code}]`);
-                this.printerCommands.push(`80*x${line.qty} ${(line.get_price_with_tax()).toFixed(2)}`);
+                this.printerCommands.push(`80*x${line.qty} ${(line.get_price_with_tax()).toFixed(2).replace(".", ",")}`);
             });
 
         if (this.order.amount_return) {
-            this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2));
+            this.printerCommands.push("80*CAMBIO: " + (this.order.amount_return).toFixed(2).replace(".", ","));
         }
-        this.printerCommands.push("81$TOTAL: " + (this.order.get_total_with_tax()).toFixed(2));
+        this.printerCommands.push("81 TOTAL: " + (this.order.get_total_with_tax()).toFixed(2).replace(".", ","));
     },
 
     async printNotaCredito() {
@@ -1097,8 +1145,20 @@ export const FiscalPrinterMixin = {
     async closePort() {
         if (this.port) {
             try {
+                // Pachacutec: v178 - Liberación defensiva de streams antes de cerrar
+                if (this.reader) {
+                    try { 
+                        await this.reader.cancel(); 
+                        await this.reader.releaseLock();
+                    } catch (e) {}
+                    this.reader = false;
+                }
+                if (this.writer) {
+                    try { await this.writer.releaseLock(); } catch (e) {}
+                    this.writer = false;
+                }
                 await this.port.close();
-                console.log("[FISCAL] Puerto cerrado manualmente.");
+                console.log("[FISCAL] Puerto cerrado exitosamente.");
             } catch (e) {
                 console.warn("[FISCAL] Error al cerrar puerto:", e);
             } finally {

@@ -48,6 +48,17 @@ const patchConfig = {
 
     async orderDone() {
         const order = this.props.order;
+        const currentOrder = this.order; // El getter prioritiza props.order
+        
+        console.log("[FISCAL] v180 - Validando estado para Nueva Orden:", {
+            props_order_id: order?.id,
+            props_order_impresa: order?.impresa,
+            props_order_num: order?.num_factura,
+            current_order_id: currentOrder?.id,
+            current_order_impresa: currentOrder?.impresa,
+            current_order_num: currentOrder?.num_factura
+        });
+
         // Pachacutec: v127 - Cierre de seguridad SIEMPRE al terminar el flujo de recibo
         try {
             await this.closePort();
@@ -55,16 +66,26 @@ const patchConfig = {
             console.warn("[FISCAL] Error no-crítico cerrando puerto en Nueva Orden:", e);
         }
 
-        // Pachacutec: v136 - Fallback robusto para evitar bloqueo de "Nuevo Pedido"
-        // Si tiene num_factura, es que se imprimió con éxito aunque el flag 'impresa' falle.
-        if (order && (order.impresa || order.num_factura)) {
+        // Pachacutec: v180 - Fallback ultra-robusto
+        // Consideramos éxito si CUALQUIERA de las referencias tiene la marca de impresión.
+        const isImpresa = (order && (order.impresa || order.num_factura)) || 
+                         (currentOrder && (currentOrder.impresa || currentOrder.num_factura));
+
+        if (isImpresa) {
+            console.log("[FISCAL] Validación exitosa. Avanzando a Nueva Orden.");
             super.orderDone();
         } else {
+            console.warn("[FISCAL] No se detectó impresión fiscal en la orden actual.");
             this.dialog.add(ConfirmationDialog, {
                 title: _t("Confirmación"),
                 body: _t("Debe imprimir el documento fiscal. ¿Desea continuar sin imprimir?"),
-                confirm: () => super.orderDone(),
-                cancel: () => { },
+                confirm: () => {
+                    console.log("[FISCAL] El usuario eligió avanzar sin imprimir (Confirmado).");
+                    super.orderDone();
+                },
+                cancel: () => { 
+                    console.log("[FISCAL] Cierre cancelado por el usuario para reintentar impresión.");
+                },
             });
         }
     }

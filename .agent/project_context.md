@@ -27,4 +27,9 @@ Asegurar la estabilidad y despliegue de la localización venezolana optimizada p
   - Corrección de prefijos `@odoo-module` en JS de `pos_salesman` para habilitar botón en POS.
   - Refactorización de componentes XML (`pos_show_dual_currency`) para visualización premium de Restante y Vuelto en divisas.
   - Habilitación del cobro automático de IGTF (3%) para pagos en efectivo en divisas.
+- [2026-03-30]: FASE 22: Estabilización POS Fiscal y Sincronización Dual.
+  - v139 (18.0.1.3.7): Implementación de `closePort()` y persistencia del campo `impresa`.
+  - Sincronización exitosa en remotos `origin` (nerdop44) y `animalc` (tbriceno65) en ramas `Prueba` y `produccion`.
+  - Corrección: Se restauró la rama `main` en `animalc` a su estado original (solo README.md) tras push accidental.
+  - Estado: Pendiente de Upgrade de módulo en base de datos de producción por parte del usuario o nuevo agente.
 

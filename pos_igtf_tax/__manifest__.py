@@ -1,6 +1,6 @@
 {
     'name': '[LOCVE] Venezuela: POS IGTF',
-    "version": "18.0.1.0.30",
+    "version": "18.0.1.0.33",
 
 
 
@@ -18,7 +18,6 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_igtf_tax/static/src/scss/**/*',
-            'pos_igtf_tax/static/src/xml/**/*',
             'pos_igtf_tax/static/src/app/**/*.js',
         ],
     },
