@@ -12,28 +12,28 @@ from odoo.osv.expression import AND, OR
 from odoo.service.common import exp_version
 
 class PosSession(models.Model):
-    _inherit = "pos.session"
+    _inherit = \"pos.session\"
 
-    tax_today = fields.Float(string="Tasa Sesión", store=True,
-                             compute="_tax_today",
+    tax_today = fields.Float(string=\"Tasa Sesión\", store=True,
+                             compute=\"_tax_today\",
                              digits=(16, 4))
 
-    ref_me_currency_id = fields.Many2one('res.currency', related='config_id.show_currency', string="Reference Currency",
+    ref_me_currency_id = fields.Many2one('res.currency', related='config_id.show_currency', string=\"Reference Currency\",
                                          store=False)
     cash_register_difference_ref = fields.Monetary(
         compute='_compute_cash_balance_ref',
         string='Ref Before Closing Difference',
         currency_field='ref_me_currency_id',
-        help="Difference between the ref theoretical closing balance and the ref real closing balance.",
+        help=\"Difference between the ref theoretical closing balance and the ref real closing balance.\",
         readonly=True)
 
     cash_register_balance_start_mn_ref = fields.Monetary(
-        string="Reference Starting Balance",
+        string=\"Reference Starting Balance\",
         currency_field='ref_me_currency_id',
         readonly=True)
 
     cash_register_balance_end_real_mn_ref = fields.Monetary(
-        string="Reference Ending Balance",
+        string=\"Reference Ending Balance\",
         currency_field='ref_me_currency_id',
         readonly=True)
     me_ref_cash_journal_id = fields.Many2one('account.journal', compute='_compute_cash_all', string='Ref Cash Journal',
@@ -47,9 +47,9 @@ class PosSession(models.Model):
 
     cash_register_balance_end_ref = fields.Monetary(
         compute='_compute_cash_balance_ref',
-        string="Ref Theoretical Closing Balance",
+        string=\"Ref Theoretical Closing Balance\",
         currency_field='ref_me_currency_id',
-        help="Opening balance summed to all cash transactions.",
+        help=\"Opening balance summed to all cash transactions.\",
         readonly=True)
     cash_real_transaction_ref = fields.Monetary(string='Ref. Transaction', currency_field='ref_me_currency_id',
                                                 readonly=True)
@@ -61,12 +61,12 @@ class PosSession(models.Model):
         self._post_cash_details_message_usd('Opening', difference, notes)
 
     def _post_cash_details_message_usd(self, state, difference, notes):
-        message = ""
+        message = \"\"
         if difference:
-            message = f"{state} difference: " \
-                      f"{self.ref_me_currency_id.symbol + ' ' if self.ref_me_currency_id.position == 'before' else ''}" \
-                      f"{self.ref_me_currency_id.round(difference)} " \
-                      f"{self.ref_me_currency_id.symbol if self.ref_me_currency_id.position == 'after' else ''}<br/>"
+            message = f\"{state} difference: \" \
+                      f\"{self.ref_me_currency_id.symbol + ' ' if self.ref_me_currency_id.position == 'before' else ''}\" \
+                      f\"{self.ref_me_currency_id.round(difference)} \" \
+                      f\"{self.ref_me_currency_id.symbol if self.ref_me_currency_id.position == 'after' else ''}<br/>\"
         if notes:
             message += notes.replace('\n', '<br/>')
         if message:
@@ -79,8 +79,8 @@ class PosSession(models.Model):
         company_currency_id = self.company_id.currency_id.id
         currency_id = company_currency_id
         
-        # Priority: 1. Config \"Show Currency\" (if different from company)
-        #           2. Company \"Currency Dif\" (if different from company)
+        # Priority: 1. Config \\\"Show Currency\\\" (if different from company)
+        #           2. Company \\\"Currency Dif\\\" (if different from company)
         #           3. Fallback to any other active currency? (Not implemented to avoid randomness)
         
         target_currency = self.ref_me_currency_id if self.ref_me_currency_id else self.config_id.show_currency
@@ -144,7 +144,7 @@ class PosSession(models.Model):
                 if not isinstance(rate_tasa, (int, float)):
                      rate_tasa = float(rate_tasa)
             except Exception as e:
-                _logger.error(\"Error getting TRM: %s\", e)
+                _logger.error(\\\"Error getting TRM: %s\\\", e)
                 # Fallback to currency rate if TRM fails
                 rate_tasa = currency_ref[0].get('rate', 1.0)
             
@@ -179,7 +179,7 @@ class PosSession(models.Model):
         sign = 1 if _type == 'in' else -1
         sessions = self.filtered('me_ref_cash_journal_id')
         if not sessions:
-            raise UserError(_(\"There is no cash payment method for this PoS Session\"))
+            raise UserError(_(\\\"There is no cash payment method for this PoS Session\\\"))
 
         self.env['account.bank.statement.line'].create([
             {
@@ -193,7 +193,7 @@ class PosSession(models.Model):
             for session in sessions
         ])
 
-        message_content = [f\"Cash {extras['translatedType']}\", f'- Amount: {extras[\"formattedAmount\"]}']
+        message_content = [f\\\"Cash {extras['translatedType']}\\\", f'- Amount: {extras[\\\"formattedAmount\\\"]}']
         if reason:
             message_content.append(f'- Reason: {reason}')
         self.message_post(body='<br/>\n'.join(message_content))
@@ -213,7 +213,7 @@ class PosSession(models.Model):
         closing_control_data = super(PosSession, self).get_closing_control_data()
         self.ensure_one()
         orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
-        payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != \"pay_later\")
+        payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != \\\"pay_later\\\")
         cash_payment_method_ref_ids = self.payment_method_ids.filtered(
             lambda pm: pm.type == 'cash' and pm.currency_id == self.ref_me_currency_id)
         default_cash_payment_ref_method_id = cash_payment_method_ref_ids[0] if cash_payment_method_ref_ids else None
@@ -290,7 +290,7 @@ class PosSession(models.Model):
     def post_closing_cash_details_ref(self, counted_cash):
         if not self.me_ref_cash_journal_id:
             pass
-            #raise UserError(_(\"There is no Ref cash register in this session.\"))
+            #raise UserError(_(\\\"There is no Ref cash register in this session.\\\"))
         self.cash_register_balance_end_real_mn_ref = counted_cash
         return {'successful': True}
 
@@ -311,7 +311,7 @@ class PosSession(models.Model):
                         _('Please go on the %s journal and define a Loss Account. This account will be used to record cash difference.',
                           self.me_ref_cash_journal_id.name))
 
-                st_line_vals['payment_ref'] = _(\"Cash difference observed during the counting (Loss)\")
+                st_line_vals['payment_ref'] = _(\\\"Cash difference observed during the counting (Loss)\\\")
                 st_line_vals['counterpart_account_id'] = self.me_ref_cash_journal_id.loss_account_id.id
             else:
                 # self.cash_register_difference  > 0.0
@@ -320,7 +320,7 @@ class PosSession(models.Model):
                         _('Please go on the %s journal and define a Profit Account. This account will be used to record cash difference.',
                           self.cash_journal_id.name))
 
-                st_line_vals['payment_ref'] = _(\"Cash difference observed during the counting (Profit)\")
+                st_line_vals['payment_ref'] = _(\\\"Cash difference observed during the counting (Profit)\\\")
                 st_line_vals['counterpart_account_id'] = self.me_ref_cash_journal_id.profit_account_id.id
 
             self.env['account.bank.statement.line'].create(st_line_vals)
@@ -354,13 +354,13 @@ class PosSession(models.Model):
                 session.cash_register_balance_end_ref = 0.0
                 session.cash_register_difference_ref = 0.0
     def _validate_session(self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None):
-        \"\"\"
+        \\\"\\\"\\\"
         Pachacutec v58: Override de _validate_session para corregir el descuadre IGTF.
         El IGTF se cobra en los pagos (recibibles) pero su crédito de ventas no siempre
         se genera correctamente, causando 'The entry is not balanced'.
         Llamamos _fix_igtf_imbalance_in_session_move() DESPUÉS de _create_account_move
         y ANTES del _check_balanced.
-        \"\"\"
+        \\\"\\\"\\\"
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         self.ensure_one()
         data = {}
@@ -410,8 +410,8 @@ class PosSession(models.Model):
             edited_orders = self.get_session_orders().filtered(lambda o: o.is_edited)
             if len(edited_orders) > 0:
                 body = _(
-                    \"Edited order(s) during the session:%s\",
-                    Markup(\"<br/><ul>%s</ul>\") % Markup().join(Markup(\"<li>%s</li>\") % order._get_html_link() for order in edited_orders)
+                    \\\"Edited order(s) during the session:%s\\\",
+                    Markup(\\\"<br/><ul>%s</ul>\\\") % Markup().join(Markup(\\\"<li>%s</li>\\\") % order._get_html_link() for order in edited_orders)
                 )
                 self.message_post(body=body)
 
@@ -420,16 +420,16 @@ class PosSession(models.Model):
         return
 
     def close_session_from_ui_ref(self, bank_payment_method_diff_pairs=None):
-        bank_payment_method_diffs = dict(bank_payment_method_diff_pairs or [])
+        bank_payment_method_diff_pairs = dict(bank_payment_method_diff_pairs or [])
         self.ensure_one()
         # Even if this is called in `post_closing_cash_details`, we need to call this here too for case
         # where cash_control = False
-        check_closing_session = self._cannot_close_session_ref(bank_payment_method_diffs)
+        check_closing_session = self._cannot_close_session_ref(bank_payment_method_diff_pairs)
         if check_closing_session:
             return check_closing_session
 
         validate_result = self.action_pos_session_closing_control_ref(
-            bank_payment_method_diffs=bank_payment_method_diffs)
+            bank_payment_method_diff_pairs=bank_payment_method_diff_pairs)
 
         # If an error is raised, the user will still be redirected to the back end to manually close the session.
         # If the return result is a dict, this means that normally we have a redirection or a wizard => we redirect the user
@@ -448,10 +448,10 @@ class PosSession(models.Model):
     def _cannot_close_session_ref(self, bank_payment_method_diffs=None):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         if any(order.state == 'draft' for order in self.order_ids):
-            return {'successful': False, 'message': _(\"You cannot close the POS when orders are still in draft\"),
+            return {'successful': False, 'message': _(\\\"You cannot close the POS when orders are still in draft\\\"),
                     'redirect': False}
         if self.state == 'closed':
-            return {'successful': False, 'message': _(\"This session is already closed.\"), 'redirect': True}
+            return {'successful': False, 'message': _(\\\"This session is already closed.\\\"), 'redirect': True}
         if bank_payment_method_diffs:
             no_loss_account = self.env['account.journal']
             no_profit_account = self.env['account.journal']
@@ -465,10 +465,10 @@ class PosSession(models.Model):
                     no_profit_account |= journal
             message = ''
             if no_loss_account:
-                message += _(\"Need loss account for the following journals to post the lost amount: %s\n\",
+                message += _(\\\"Need loss account for the following journals to post the lost amount: %s\n\\\",
                              ', '.join(no_loss_account.mapped('name')))
             if no_profit_account:
-                message += _(\"Need profit account for the following journals to post the gained amount: %s\",
+                message += _(\\\"Need profit account for the following journals to post the gained amount: %s\\\",
                              ', '.join(no_profit_account.mapped('name')))
             if message:
                 return {'successful': False, 'message': message, 'redirect': False}
@@ -478,7 +478,7 @@ class PosSession(models.Model):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         for session in self:
             if any(order.state == 'draft' for order in session.order_ids):
-                raise UserError(_(\"You cannot close the POS when orders are still in draft\"))
+                raise UserError(_(\\\"You cannot close the POS when orders are still in draft\\\"))
             if session.state == 'closed':
                 raise UserError(_('This session is already closed.'))
             session.write({'state': 'closing_control', 'stop_at': fields.Datetime.now()})
@@ -553,7 +553,7 @@ class PosSession(models.Model):
         return True
 
     def _fix_igtf_imbalance_in_session_move(self):
-        \"\"\"
+        \\\"\\\"\\\"
         Pachacutec v57: Detecta y corrige el descuadre IGTF en el move de sesión POS.
 
         El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su
@@ -565,7 +565,7 @@ class PosSession(models.Model):
         2. Si hay un descuadre positivo (más débitos que créditos):
            a. Verifica si coincide con el total IGTF de las órdenes cerradas
            b. Si sí, agrega una línea de crédito en la cuenta de ingresos IGTF
-        \"\"\"
+        \\\"\\\"\\\"
         move = self.move_id
         if not move:
             return
@@ -593,20 +593,20 @@ class PosSession(models.Model):
         diff_vs_igtf = abs(current_balance - total_igtf_rounded)
         tolerance = max(0.05, total_igtf_rounded * 0.01)
         if diff_vs_igtf > tolerance:
-            _logger.warning(\"[IGTF] Descuadre (%.2f) no coincide con IGTF total (%.2f). No se aplica corrección automática.\",
+            _logger.warning(\\\"[IGTF] Descuadre (%.2f) no coincide con IGTF total (%.2f). No se aplica corrección automática.\\\",
                 current_balance, total_igtf_rounded)
             return
 
         # Obtener cuenta de ingresos del producto IGTF
         igtf_product = self.config_id.x_igtf_product_id
         if not igtf_product:
-            _logger.warning(\"[IGTF] No hay producto IGTF configurado en el POS. No se puede corregir el descuadre.\")
+            _logger.warning(\\\"[IGTF] No hay producto IGTF configurado en el POS. No se puede corregir el descuadre.\\\")
             return
 
         product_accounts = igtf_product._get_product_accounts()
         igtf_account = igtf_product.property_account_income_id or product_accounts.get('income')
         if not igtf_account:
-            _logger.warning(\"[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos. No se puede corregir el descuadre.\", igtf_product.name)
+            _logger.warning(\\\"[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos. No se puede corregir el descuadre.\\\", igtf_product.name)
             return
 
         # Crear la línea de crédito IGTF directamente en el move de sesión
@@ -638,7 +638,32 @@ class PosSession(models.Model):
             'show_currency_position',
         ]
 
-    def _get_pos_ui_product_product(self, params):
-        \"\"\" Asegura que los campos maestros de USD se carguen en el modelo del POS. \"\"\"
-        # Pachacutec: v197.2 - Unificamos con el cargador estándar de Odoo 18
-        pass
+    def _loader_params_pos_session(self):
+        search_params = super(PosSession, self)._loader_params_pos_session()
+        fields = search_params['search_params']['fields']
+        fields.append('cash_register_balance_start_mn_ref')
+        return search_params
+
+    def _loader_params_product_product(self):
+        result = super()._loader_params_product_product()
+        result['search_params']['fields'].extend(['list_price_usd', 'standard_price_usd', 'lst_price'])
+        return result
+
+    def action_pos_session_open(self):
+        for session in self.filtered(lambda session: session.state == 'opening_control'):
+            if session.config_id.cash_control and not session.rescue:
+                last_session = self.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
+                                           limit=1)
+                session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref  # defaults to 0 if lastsession is empty
+        return super(PosSession, self).action_pos_session_open()
+
+
+    @api.depends('config_id')
+    def _tax_today(self):
+        for rec in self:
+            rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
+
+    def _loader_params_pos_payment_method(self):
+        result = super()._loader_params_pos_payment_method()
+        result['search_params']['fields'].append('currency_id')
+        return result

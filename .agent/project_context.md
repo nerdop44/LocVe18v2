@@ -49,3 +49,7 @@ Asegurar la estabilidad y despliegue de la localización venezolana optimizada p
   - Se implementó la firma universal `(self, *args, **kwargs)` en `_load_pos_data` para absorber argumentos inesperados de Odoo 18.
   - Refactorización de `pos_store.js` para manejo de errores más informativo, evitando el colapso silencioso.
   - Sincronización global en `LocVe18v2` y `AnimalC`.
+- [2026-04-08 17:40]: AUDITORÍA DE ESTABILIDAD (v197.5 - LEGACY CLEANUP).
+  - Eliminación masiva de métodos `_get_pos_ui_*` que causaban Error 500 (Internal Server Error) en Odoo 18.
+  - Consolidación de cargadores en `_loader_params_product_product`.
+  - Sincronización global realizada tras auditoría profunda de 5 módulos POS.

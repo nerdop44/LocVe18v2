@@ -12,13 +12,6 @@ class PosSession(models.Model):
         result['search_params']['fields'].extend(['name', 'id'])
         return result
 
-    def _get_pos_ui_hr_salesmen(self, params):
-        # Filter employees by config salesman_ids
-        return self.env['hr.employee'].search_read(
-            [('id', 'in', self.config_id.salesman_ids.ids)],
-            ['name', 'id']
-        )
-
     @api.model
     def _load_pos_data_fields(self, config_id):
         return super()._load_pos_data_fields(config_id) + ['salesman_ids']
