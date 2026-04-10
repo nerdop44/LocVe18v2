@@ -115,7 +115,7 @@ class ResPartner(models.Model):
     def _load_pos_data_fields(self, config_id):
         # Pachacutec: v197 - Odoo 18 Loader Migration
         return super()._load_pos_data_fields(config_id) + [
-            'vat', 'prefix_vat', 'full_vat', 'l10n_ve_vat', 'l10n_ve_vat_prefix',
+            'vat', 'prefix_vat', 'full_vat',
             'street', 'city', 'phone', 'mobile', 'email'
         ]
 

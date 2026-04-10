@@ -45,7 +45,7 @@ export class DataHelper {
         if (vat.match(/^[A-Z]\d+$/)) return vat;
 
         // Si es numérico puro, le inyectamos el prefijo recuperado del modelo o el crudo
-        const prefix = partner.l10n_ve_vat_prefix || partner.prefix_vat || "V";
+        const prefix = partner.prefix_vat || "V";
         console.log(`[FISCAL] DataHelper - Reconstruyendo RIF con prefijo ${prefix}: ${vat}`);
         return `${prefix}${vat}`;
     }
