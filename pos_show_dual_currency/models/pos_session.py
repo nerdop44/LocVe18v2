@@ -786,41 +786,9 @@ class PosSession(models.Model):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         return self.action_pos_session_close_ref(balancing_account, amount_to_balance, bank_payment_method_diffs)
 
-    @api.model
-    def _loader_params_pos_config(self):
-        result = super()._loader_params_pos_config()
-        result['search_params']['fields'].extend([
-            'show_dual_currency',
-            'show_currency',
-            'show_currency_rate',
-            'show_currency_symbol',
-            'show_currency_position',
-        ])
-        return result
+    # Migración Odoo 18: Se eliminan _loader_params de PosSession y se mueven a sus respectivos modelos al final del archivo.
 
-    def _loader_params_pos_session(self):
-        search_params = super(PosSession, self)._loader_params_pos_session()
-        fields = search_params['search_params']['fields']
-        fields.append('cash_register_balance_start_mn_ref')
-        return search_params
-
-    @api.model
-    def _loader_params_product_product(self):
-        result = super()._loader_params_product_product()
-        result['search_params']['fields'].extend(['list_price_usd', 'standard_price_usd', 'lst_price'])
-        return result
-
-    # Pachacutec: Compatibilidad definitiva para Odoo 18
-    def _get_product_product_loader_params(self):
-        result = super()._get_product_product_loader_params()
-        result['search_params']['fields'].extend(['list_price_usd', 'standard_price_usd', 'lst_price'])
-        return result
-
-    # Pachacutec: Compatibilidad explícita para Odoo 18
-    def _get_pos_ui_product_product(self, params):
-        """ Asegura que los campos maestros de USD se carguen en el modelo del POS. """
-        result = super()._get_pos_ui_product_product(params)
-        return result
+    # Migración Odoo 18: Se eliminan métodos _get_pos_ui obsoletos.
 
     def action_pos_session_open(self):
         for session in self.filtered(lambda session: session.state == 'opening_control'):
@@ -836,10 +804,7 @@ class PosSession(models.Model):
         for rec in self:
             rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
 
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].append('currency_id')
-        return result
+    # Migración Odoo 18: Se elimina _loader_params_pos_payment_method de PosSession.
 
     # def _get_pos_ui_pos_payment_method(self, params):
     #     payment_ids_new = []
@@ -970,4 +935,35 @@ class PosSession(models.Model):
         data['payment_to_receivable_lines'] = payment_to_receivable_lines
         data['online_payment_to_receivable_lines'] = {}
         return data
+
+class PosConfig(models.Model):
+    _inherit = 'pos.config'
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + [
+            'show_dual_currency', 'show_currency', 'show_currency_rate',
+            'show_currency_symbol', 'show_currency_position'
+        ]
+
+class PosSessionModel(models.Model):
+    _inherit = 'pos.session'
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['cash_register_balance_start_mn_ref']
+
+class ProductProduct(models.Model):
+    _inherit = 'product.product'
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['list_price_usd', 'standard_price_usd', 'lst_price']
+
+class PosPaymentMethod(models.Model):
+    _inherit = 'pos.payment.method'
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['currency_id']
 
