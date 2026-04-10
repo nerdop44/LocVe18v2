@@ -176,6 +176,25 @@ class PosSession(models.Model):
         
         return result
 
+    @api.model
+    def _loader_params_pos_config(self):
+        # Odoo 18 Loader Chain Restoration
+        # Aseguramos que use_pricelist esté presente para evitar KeyError en pos_config.py:283
+        result = super()._loader_params_pos_config()
+        fields = result['search_params']['fields']
+        extra_fields = [
+            'show_dual_currency', 'show_currency', 'show_currency_rate',
+            'show_currency_symbol', 'show_currency_position', 'use_pricelist'
+        ]
+        for field in extra_fields:
+            if field not in fields:
+                fields.append(field)
+        return result
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['cash_register_balance_start_mn_ref']
+
     def try_cash_in_out_ref_currency(self, _type, amount, reason, extras, currency_ref):
         sign = 1 if _type == 'in' else -1
         sessions = self.filtered('me_ref_cash_journal_id')
@@ -893,6 +912,11 @@ class PosSession(models.Model):
         return data
 
 
+        data['payment_method_to_receivable_lines'] = payment_method_to_receivable_lines
+        data['payment_to_receivable_lines'] = payment_to_receivable_lines
+        data['online_payment_to_receivable_lines'] = {}
+        return data
+
     def _create_bank_payment_moves(self, data):
         combine_receivables_bank = data.get('combine_receivables_bank')
         split_receivables_bank = data.get('split_receivables_bank')
@@ -935,23 +959,6 @@ class PosSession(models.Model):
         data['payment_to_receivable_lines'] = payment_to_receivable_lines
         data['online_payment_to_receivable_lines'] = {}
         return data
-
-class PosConfig(models.Model):
-    _inherit = 'pos.config'
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + [
-            'show_dual_currency', 'show_currency', 'show_currency_rate',
-            'show_currency_symbol', 'show_currency_position'
-        ]
-
-class PosSessionModel(models.Model):
-    _inherit = 'pos.session'
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + ['cash_register_balance_start_mn_ref']
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
