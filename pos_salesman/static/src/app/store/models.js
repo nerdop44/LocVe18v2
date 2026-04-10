@@ -7,30 +7,47 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 import { PosData } from "@point_of_sale/app/models/data_service";
 
+patch(PosData.prototype, {
+    async loadInitialData() {
+        const response = await super.loadInitialData(...arguments);
+        console.log(">>>>>>>> PosData (Salesman): loadInitialData intercepted. Keys:", Object.keys(response || {}));
+        
+        // Find hr.employee data in the response
+        const employees = response['hr.employee']?.data || [];
+        
+        // Find pos.config to get salesman_ids
+        const config = response['pos.config']?.data?.[0] || {};
+        const allowedIds = config.salesman_ids || [];
+        
+        // Store computed salesmen in a way PosStore can find them later
+        if (allowedIds.length > 0) {
+            this.hr_salesmen = employees.filter(e => allowedIds.includes(e.id));
+        } else {
+            this.hr_salesmen = employees;
+        }
+        
+        console.log(">>>>>>>> PosData (Salesman): Filtered salesmen count:", this.hr_salesmen.length);
+        return response;
+    }
+});
+
 patch(PosStore.prototype, {
     setup() {
         super.setup(...arguments);
-        if (this.salesman_ids === undefined) {
+        // Sync the property from PosData service if available
+        if (this.data && this.data.hr_salesmen) {
+            this.salesman_ids = this.data.hr_salesmen;
+        } else {
             this.salesman_ids = [];
         }
     },
     async processData(loadedData) {
         await super.processData(...arguments);
-        
-        // Odoo 18: Extract from the standard model collection
-        const employeeModel = this.models['hr.employee'];
-        if (employeeModel) {
-            const allEmployees = typeof employeeModel.getAll === 'function' ? employeeModel.getAll() : (employeeModel.data || []);
-            
-            // Filter by IDs in config
-            const allowedIds = this.config.salesman_ids || [];
-            if (allowedIds.length > 0) {
-                this.salesman_ids = allEmployees.filter(e => allowedIds.includes(e.id));
-            } else {
-                this.salesman_ids = allEmployees;
-            }
+        // Double check after processing
+        if (this.data && this.data.hr_salesmen) {
+            this.salesman_ids = this.data.hr_salesmen;
+            console.log(">>>>>>>> PosStore (Salesman): Synced from PosData:", this.salesman_ids.length);
         }
-        console.log(">>>>>>>> Salesmen synchronized from hr.employee:", this.salesman_ids.length);
     },
 });
 
