@@ -122,19 +122,6 @@ class PosSession(models.Model):
         
         return result
 
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        # Shield mechanism to ensure critical fields are always present
-        fields = super()._load_pos_data_fields(config_id)
-        if fields:
-             mandatory = [
-                'use_pricelist', 'show_dual_currency', 'show_currency', 
-                'show_currency_rate', 'show_currency_symbol', 'show_currency_position'
-             ]
-             for f in mandatory:
-                 if f not in fields:
-                     fields.append(f)
-        return fields
 
     def try_cash_in_out_ref_currency(self, _type, amount, reason, extras, currency_ref):
         sign = 1 if _type == 'in' else -1
