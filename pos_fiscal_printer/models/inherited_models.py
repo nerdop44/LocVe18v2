@@ -92,12 +92,6 @@ class PosConfig(models.Model):
     x_fiscal_command_parity = fields.Selection(related="x_fiscal_printer_id.x_fiscal_command_parity")
     api_url = fields.Char(related="x_fiscal_printer_id.api_url")
 
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + [
-            'x_fiscal_command_parity', 'x_fiscal_command_baudrate', 
-            'x_fiscal_printer_id', 'x_fiscal_printer_code', 'flag_21', 'connection_type'
-        ]
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"

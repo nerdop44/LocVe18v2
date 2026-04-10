@@ -1,26 +1,49 @@
-# Part of Odoo. See LICENSE file for full copyright and licensing details.
-
 from odoo import models, api
 
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
     @api.model
-    def _loader_params_pos_config(self):
-        # Odoo 18 Loader Chain Restoration
-        # Aseguramos que use_pricelist esté presente para evitar KeyError en pos_config.py:283
-        result = super()._loader_params_pos_config()
-        fields = result['search_params']['fields']
-        if 'salesman_ids' not in fields:
-            fields.append('salesman_ids')
-        if 'use_pricelist' not in fields:
-            fields.append('use_pricelist')
-        return result
+    def _load_pos_data_models(self, config_id):
+        # Truth of Odoo 18: Add hr.employee to the list of models to load
+        models = super()._load_pos_data_models(config_id)
+        if 'hr.employee' not in models:
+            models.append('hr.employee')
+        return models
+
+    def _load_pos_data(self, data):
+        # Truth of Odoo 18: The response must return data accurately.
+        # We ensure 'hr_salesmen' is populated in the root for backward compat in JS if needed,
+        # although Odoo 18 will load it into data['hr.employee'].
+        response = super()._load_pos_data(data)
+        
+        # Mapping hr.employee to 'hr_salesmen' for JS compatibility
+        if 'hr.employee' in data:
+            response['hr_salesmen'] = data['hr.employee']['data']
+        
+        return response
+
+class PosConfig(models.Model):
+    _inherit = 'pos.config'
 
     @api.model
-    def _loader_params_hr_employee(self):
-        result = super()._loader_params_hr_employee()
-        # Aseguramos que los campos necesarios estén para los vendedores
-        if 'name' not in result['search_params']['fields']:
-            result['search_params']['fields'].append('name')
-        return result
+    def _load_pos_data_fields(self, config_id):
+        """
+        Pachacutec: v18.0.1.0.38 - SHIELD FIX
+        This method is a safeguard. In Odoo 18, if a module overrides this 
+        without calling super() properly (or if super() is empty), Odoo 
+        only loads the specified fields. 
+        We force 'use_pricelist' to avoid the KeyError: 'use_pricelist'.
+        """
+        fields = super()._load_pos_data_fields(config_id)
+        
+        # If fields list is not empty, it means someone is restricting it.
+        # We must ensure 'use_pricelist' is present.
+        if fields and 'use_pricelist' not in fields:
+             fields.append('use_pricelist')
+             
+        # Add our own fields
+        if 'salesman_ids' not in fields and fields:
+            fields.append('salesman_ids')
+            
+        return fields

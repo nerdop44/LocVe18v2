@@ -74,126 +74,67 @@ class PosSession(models.Model):
 
     @api.model
     def _load_pos_data(self, data):
+        # Truth of Odoo 18: Standard data loader injection
         result = super()._load_pos_data(data)
         
-        # Injected data for dual currency display
         company_currency_id = self.company_id.currency_id.id
-        currency_id = company_currency_id
-        
-        # Priority: 1. Config "Show Currency" (if different from company)
-        #           2. Company "Currency Dif" (if different from company)
-        #           3. Fallback to any other active currency? (Not implemented to avoid randomness)
-        
         target_currency = self.ref_me_currency_id if self.ref_me_currency_id else self.config_id.show_currency
+        currency_id = target_currency.id if target_currency else company_currency_id
         
-        if target_currency and target_currency.id != company_currency_id:
-             currency_id = target_currency.id
-        elif self.company_id.currency_id_dif and self.company_id.currency_id_dif.id != company_currency_id:
-             currency_id = self.company_id.currency_id_dif.id
-        
-        # --- ROBUST VEF/Bs SELECTION LOGIC ---
-        # Search for VEF/VES currency by Name OR Symbol
         vef_currency = self.env['res.currency'].search([
             '|', ('name', 'in', ['VES', 'VEF']), ('symbol', 'in', ['Bs', 'Bs.', 'Bs']),
             ('active', '=', True)
         ], limit=1)
 
-        if vef_currency:
-             should_force_vef = False
-             
-             # Case 1: No dual currency selected yet (currency_id is False or None)
-             if not currency_id:
-                 should_force_vef = True
-             
-             # Case 2: Selected dual currency is explicitly USD
-             elif currency_id:
-                 curr = self.env['res.currency'].browse(currency_id)
-                 if curr.name == 'USD':
-                     # Only force switch to VEF if Company is ALSO USD (avoid USD-USD)
-                     # If Company is VEF, then USD is a valid dual currency.
-                     comp_curr = self.company_id.currency_id
-                     if comp_curr.id == currency_id:
-                         should_force_vef = True
-            
-             # Case 3: Selected matches Company, and Company is USD
-             if not should_force_vef and currency_id == company_currency_id:
-                 comp_curr = self.company_id.currency_id
-                 if comp_curr.name == 'USD':
-                     should_force_vef = True
-            
-             if should_force_vef:
-                 currency_id = vef_currency.id
-
-        # Fallback: If we match company currency (e.g. Company=VEF), try to fallback to USD
-        # BUT ONLY if we didn't just force it!
-        if currency_id == company_currency_id and not should_force_vef:
-             if vef_currency and company_currency_id == vef_currency.id:
-                 # Company is VEF. Dual is VEF. We likely want USD.
-                 usd_currency = self.env['res.currency'].search([('name', '=', 'USD'), ('active', '=', True)], limit=1)
-                 if usd_currency:
-                     currency_id = usd_currency.id
+        if vef_currency and currency_id == company_currency_id:
+             if self.company_id.currency_id.name == 'USD':
+                  currency_id = vef_currency.id
+             else:
+                  usd_currency = self.env['res.currency'].search([('name', '=', 'USD'), ('active', '=', True)], limit=1)
+                  if usd_currency:
+                      currency_id = usd_currency.id
         
         currency_fields = ['id', 'name', 'symbol', 'position', 'rounding', 'rate', 'decimal_places']
-        currency_ref = self.env['res.currency'].search_read([('id', '=', currency_id)], currency_fields)
+        currency_ref_data = self.env['res.currency'].search_read([('id', '=', currency_id)], currency_fields)
         
-        if currency_ref:
-            # Fetch the official TRM (Tasa) for the reference currency
-            # Ensure we get a float
-            rate_tasa = 0.0
+        if currency_ref_data:
+            currency_ref = currency_ref_data[0]
             try:
-                rate_tasa = self.env['res.currency'].get_trm_systray()
-                if not isinstance(rate_tasa, (int, float)):
-                     rate_tasa = float(rate_tasa)
-            except Exception as e:
-                _logger.error("Error getting TRM: %s", e)
-                # Fallback to currency rate if TRM fails
-                rate_tasa = currency_ref[0].get('rate', 1.0)
+                rate_tasa = float(self.env['res.currency'].get_trm_systray() or 0.0)
+            except:
+                rate_tasa = currency_ref.get('rate', 1.0)
             
-            # INVERSE RATE LOGIC for VEF -> USD
-            # If we are displaying USD (ID 1) but Company is VEF (ID 2), we need to divide by rate (multiply by inverse)
-            # rate_tasa is usually Bs/USD (e.g. 50).
-            # We want 1 USD = 50 Bs.
-            # If price is 50 Bs. Target is 1 USD.
-            # 50 * Rate = 1. => Rate = 1/50 = 0.02
-            if currency_ref[0]['name'] == 'USD' and self.company_id.currency_id.name != 'USD':
-                 if rate_tasa and rate_tasa != 0:
-                     rate_tasa = 1.0 / rate_tasa
+            if currency_ref['name'] == 'USD' and self.company_id.currency_id.name != 'USD':
+                  if rate_tasa:
+                      rate_tasa = 1.0 / rate_tasa
             
-            currency_ref[0]['rate'] = rate_tasa  # Inject the (possibly inverted) rate
+            currency_ref['rate'] = rate_tasa
             
-            if result:
-                # Odoo 18 Data Dictionary Structure
-                # Safest way to pass custom data without ORM stripping it: Add to root dict
-                # result['res_currency_ref'] = currency_ref[0]
+            if 'pos.session' in result and result['pos.session']['data']:
+                result['pos.session']['data'][0]['res_currency_ref'] = currency_ref
                 
-                if 'pos.session' in result and 'data' in result['pos.session'] and result['pos.session']['data']:
-                    result['pos.session']['data'][0]['res_currency_ref'] = currency_ref[0]
-                    
-                if 'pos.config' in result and 'data' in result['pos.config'] and result['pos.config']['data']:
-                    result['pos.config']['data'][0]['show_currency_rate'] = rate_tasa
-                    result['pos.config']['data'][0]['show_currency_symbol'] = currency_ref[0]['symbol']
-                    result['pos.config']['data'][0]['show_currency_position'] = currency_ref[0]['position']
+            if 'pos.config' in result and result['pos.config']['data']:
+                result['pos.config']['data'][0].update({
+                    'show_currency_rate': rate_tasa,
+                    'show_currency_symbol': currency_ref['symbol'],
+                    'show_currency_position': currency_ref['position'],
+                })
         
-        return result
-
-    @api.model
-    def _loader_params_pos_config(self):
-        # Odoo 18 Loader Chain Restoration
-        # Aseguramos que use_pricelist esté presente para evitar KeyError en pos_config.py:283
-        result = super()._loader_params_pos_config()
-        fields = result['search_params']['fields']
-        extra_fields = [
-            'show_dual_currency', 'show_currency', 'show_currency_rate',
-            'show_currency_symbol', 'show_currency_position', 'use_pricelist'
-        ]
-        for field in extra_fields:
-            if field not in fields:
-                fields.append(field)
         return result
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + ['cash_register_balance_start_mn_ref']
+        # Shield mechanism to ensure critical fields are always present
+        fields = super()._load_pos_data_fields(config_id)
+        if fields:
+             mandatory = [
+                'use_pricelist', 'show_dual_currency', 'show_currency', 
+                'show_currency_rate', 'show_currency_symbol', 'show_currency_position'
+             ]
+             for f in mandatory:
+                 if f not in fields:
+                     fields.append(f)
+        return fields
 
     def try_cash_in_out_ref_currency(self, _type, amount, reason, extras, currency_ref):
         sign = 1 if _type == 'in' else -1
@@ -228,154 +169,6 @@ class PosSession(models.Model):
             if not cash_journal_ref:
                 continue
             session.me_ref_cash_journal_id = cash_journal_ref
-
-    # def get_closing_control_data(self):
-    #     if not self.env.user.has_group('point_of_sale.group_pos_user'):
-    #         raise AccessError(_("You don't have the access rights to get the point of sale closing control data."))
-    #     self.ensure_one()
-    #     orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
-    #     payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != "pay_later")
-    #     pay_later_payments = orders.payment_ids - payments
-    #     cash_payment_method_ids = self.payment_method_ids.filtered(lambda pm: pm.type == 'cash' and (pm.currency_id == self.company_id.currency_id or not pm.currency_id ))
-    #     print(cash_payment_method_ids)
-    #     default_cash_payment_method_id = cash_payment_method_ids[0] if cash_payment_method_ids else None
-    #     total_default_cash_payment_amount = sum(payments.filtered(lambda p: p.payment_method_id == default_cash_payment_method_id).mapped('amount')) if default_cash_payment_method_id else 0
-    #     other_payment_method_ids = self.payment_method_ids - default_cash_payment_method_id if default_cash_payment_method_id else self.payment_method_ids
-    #     cash_in_count = 0
-    #     cash_out_count = 0
-    #     cash_in_out_list = []
-    #     last_session = self.search([('config_id', '=', self.config_id.id), ('id', '!=', self.id)], limit=1)
-    #     for cash_move in self.sudo().statement_line_ids.sorted('create_date'):
-    #         if cash_move.amount > 0:
-    #             cash_in_count += 1
-    #             name = f'Cash in {cash_in_count}'
-    #         else:
-    #             cash_out_count += 1
-    #             name = f'Cash out {cash_out_count}'
-    #         cash_in_out_list.append({
-    #             'name': cash_move.payment_ref if cash_move.payment_ref else name,
-    #             'amount': cash_move.amount
-    #         })
-    #
-    #     closing_control_data = {
-    #         'orders_details': {
-    #             'quantity': len(orders),
-    #             'amount': sum(orders.mapped('amount_total'))
-    #         },
-    #         'payments_amount': sum(payments.mapped('amount')),
-    #         'pay_later_amount': sum(pay_later_payments.mapped('amount')),
-    #         'opening_notes': self.opening_notes,
-    #         'default_cash_details': {
-    #             'name': default_cash_payment_method_id.name,
-    #             'amount': last_session.cash_register_balance_end_real
-    #                       + total_default_cash_payment_amount
-    #                       + sum(self.sudo().statement_line_ids.mapped('amount')),
-    #             'opening': last_session.cash_register_balance_end_real,
-    #             'payment_amount': total_default_cash_payment_amount,
-    #             'moves': cash_in_out_list,
-    #             'id': default_cash_payment_method_id.id
-    #         } if default_cash_payment_method_id else None,
-    #         'other_payment_methods': [{
-    #             'name': pm.name,
-    #             'amount': sum(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm).mapped('amount')),
-    #             'number': len(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm)),
-    #             'id': pm.id,
-    #             'type': pm.type,
-    #         } for pm in other_payment_method_ids],
-    #         'is_manager': self.env.user.has_group("point_of_sale.group_pos_manager"),
-    #         'amount_authorized_diff': self.config_id.amount_authorized_diff if self.config_id.set_maximum_difference else None
-    #     }
-    #
-    #
-    #
-    #
-    #     #closing_control_data = super(PosSession, self).get_closing_control_data()
-    #     #self.ensure_one()
-    #     orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
-    #     payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != "pay_later")
-    #     cash_payment_method_ref_ids = self.payment_method_ids.filtered(
-    #         lambda pm: pm.type == 'cash' and pm.currency_id == self.ref_me_currency_id)
-    #     default_cash_payment_ref_method_id = cash_payment_method_ref_ids[0] if cash_payment_method_ref_ids else None
-    #     print(default_cash_payment_ref_method_id)
-    #     total_default_cash_ref_payment_amount = sum(
-    #         payments.filtered(lambda p: p.payment_method_id == default_cash_payment_ref_method_id).mapped(
-    #             'amount_ref')) if default_cash_payment_ref_method_id else 0
-    #     cash_payment_method_ids = self.payment_method_ids.filtered(
-    #         lambda pm: pm.type == 'cash' and pm.currency_id != self.ref_me_currency_id)
-    #     print(cash_payment_method_ids)
-    #     default_cash_payment_method_id = cash_payment_method_ids[0] if cash_payment_method_ids else None
-    #     other_payment_method_ids = self.payment_method_ids - default_cash_payment_ref_method_id if default_cash_payment_ref_method_id else self.payment_method_ids
-    #     other_payment_method_update_ids = other_payment_method_ids - default_cash_payment_method_id if default_cash_payment_method_id else other_payment_method_ids
-    #     cash_in_count = 0
-    #     cash_out_count = 0
-    #     cash_in_count_ref = 0
-    #     cash_out_count_ref = 0
-    #     cash_in_out_list = []
-    #     cash_in_out_list_ref = []
-    #     last_session = self.search([('config_id', '=', self.config_id.id), ('id', '!=', self.id)], limit=1)
-    #     for cash_move in self.statement_line_ids.sorted('create_date'):
-    #         if cash_move.currency_id == self.ref_me_currency_id:
-    #             if cash_move.amount > 0:
-    #                 cash_in_count_ref += 1
-    #                 name = f'Cash in {cash_in_count_ref}'
-    #             else:
-    #                 cash_out_count_ref += 1
-    #                 name = f'Cash out {cash_out_count_ref}'
-    #             cash_in_out_list_ref.append({
-    #                 'name': cash_move.payment_ref if cash_move.payment_ref else name,
-    #                 'amount': cash_move.amount
-    #             })
-    #         else:
-    #             if cash_move.amount > 0:
-    #                 cash_in_count += 1
-    #                 name = f'Cash in {cash_in_count}'
-    #             else:
-    #                 cash_out_count += 1
-    #                 name = f'Cash out {cash_out_count}'
-    #             cash_in_out_list.append({
-    #                 'name': cash_move.payment_ref if cash_move.payment_ref else name,
-    #                 'amount': cash_move.amount
-    #             })
-    #
-    #     default_cash_details_ref = {
-    #         'name': default_cash_payment_ref_method_id.name,
-    #         'amount': last_session.cash_register_balance_end_real_mn_ref
-    #                   + total_default_cash_ref_payment_amount
-    #                   + sum(
-    #             self.statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped('amount')),
-    #         'opening': last_session.cash_register_balance_end_real_mn_ref,
-    #         'moves': cash_in_out_list_ref,
-    #         'payment_amount': total_default_cash_ref_payment_amount,
-    #         'id': default_cash_payment_ref_method_id.id,
-    #     } if default_cash_payment_ref_method_id else {
-    #         'name': None,
-    #         'amount': last_session.cash_register_balance_end_real_mn_ref
-    #                   + total_default_cash_ref_payment_amount
-    #                   + sum(
-    #             self.statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped('amount')),
-    #         'opening': last_session.cash_register_balance_end_real_mn_ref,
-    #         'moves': cash_in_out_list_ref,
-    #         'payment_amount': total_default_cash_ref_payment_amount,
-    #         'id': None,
-    #     }
-    #     if 'default_cash_details' in closing_control_data:
-    #         if closing_control_data['default_cash_details']:
-    #             closing_control_data['default_cash_details']['amount'] = closing_control_data['default_cash_details'][
-    #                                                                          'amount'] - sum(
-    #                 self.statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped(
-    #                     'amount'))
-    #             closing_control_data['default_cash_details']['default_cash_details_ref'] = default_cash_details_ref
-    #             closing_control_data['default_cash_details']['moves'] = cash_in_out_list
-    #     closing_control_data['other_payment_methods'] = [{
-    #         'name': pm.name,
-    #         'amount': sum(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm).mapped('amount')),
-    #         'number': len(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm)),
-    #         'id': pm.id,
-    #         'type': pm.type,
-    #     } for pm in other_payment_method_update_ids]
-    #     closing_control_data[
-    #         'amount_authorized_diff_ref'] = self.config_id.amount_authorized_diff_ref if self.config_id.set_maximum_difference else None
-    #     return closing_control_data
 
     def get_closing_control_data(self):
         closing_control_data = super(PosSession, self).get_closing_control_data()
@@ -453,21 +246,11 @@ class PosSession(models.Model):
                         'amount'))
                 closing_control_data['default_cash_details']['default_cash_details_ref'] = default_cash_details_ref
                 closing_control_data['default_cash_details']['moves'] = cash_in_out_list
-        # closing_control_data['other_payment_methods'] = [{
-        #     'name': pm.name,
-        #     'amount': sum(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm).mapped('amount')),
-        #     'number': len(orders.payment_ids.filtered(lambda p: p.payment_method_id == pm)),
-        #     'id': pm.id,
-        #     'type': pm.type,
-        # } for pm in other_payment_method_update_ids]
-        # closing_control_data[
-        #     'amount_authorized_diff_ref'] = self.config_id.amount_authorized_diff_ref if self.config_id.set_maximum_difference else None
         return closing_control_data
 
     def post_closing_cash_details_ref(self, counted_cash):
         if not self.me_ref_cash_journal_id:
             pass
-            #raise UserError(_("There is no Ref cash register in this session."))
         self.cash_register_balance_end_real_mn_ref = counted_cash
         return {'successful': True}
 
@@ -491,7 +274,6 @@ class PosSession(models.Model):
                 st_line_vals['payment_ref'] = _("Cash difference observed during the counting (Loss)")
                 st_line_vals['counterpart_account_id'] = self.me_ref_cash_journal_id.loss_account_id.id
             else:
-                # self.cash_register_difference  > 0.0
                 if not self.me_ref_cash_journal_id.profit_account_id:
                     raise UserError(
                         _('Please go on the %s journal and define a Profit Account. This account will be used to record cash difference.',
@@ -522,22 +304,16 @@ class PosSession(models.Model):
                 session.cash_register_total_entry_encoding_ref = sum(
                     session.statement_line_ids.filtered(lambda s: s.currency_id == session.ref_me_currency_id).mapped(
                         'amount')) + (
-                                                                     0.0 if session.state == 'closed' else total_cash_payment
-                                                                 )
+                                                                      0.0 if session.state == 'closed' else total_cash_payment
+                                                                  )
                 session.cash_register_balance_end_ref = last_session.cash_register_balance_end_real_mn_ref + session.cash_register_total_entry_encoding_ref
                 session.cash_register_difference_ref = session.cash_register_balance_end_real_mn_ref - session.cash_register_balance_end_ref
             else:
                 session.cash_register_total_entry_encoding_ref = 0.0
                 session.cash_register_balance_end_ref = 0.0
                 session.cash_register_difference_ref = 0.0
+
     def _validate_session(self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None):
-        """
-        Pachacutec v58: Override de _validate_session para corregir el descuadre IGTF.
-        El IGTF se cobra en los pagos (recibibles) pero su crédito de ventas no siempre
-        se genera correctamente, causando 'The entry is not balanced'.
-        Llamamos _fix_igtf_imbalance_in_session_move() DESPUÉS de _create_account_move
-        y ANTES del _check_balanced.
-        """
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         self.ensure_one()
         data = {}
@@ -560,10 +336,7 @@ class PosSession(models.Model):
                     data = self.sudo().with_company(self.company_id).with_context(check_move_validity=False, skip_invoice_sync=True)._create_account_move(balancing_account, amount_to_balance, bank_payment_method_diffs)
                 else:
                     raise e
-
-            # === Pachacutec v58: Corrección del descuadre IGTF ANTES de _check_balanced ===
             self._fix_igtf_imbalance_in_session_move()
-
             balance = sum(self.move_id.line_ids.mapped('balance'))
             try:
                 with self.move_id._check_balanced({'records': self.move_id.sudo()}):
@@ -571,7 +344,6 @@ class PosSession(models.Model):
             except UserError:
                 self.env.cr.rollback()
                 return self._close_session_action(balance)
-
             self.sudo()._post_statement_difference(cash_difference_before_statements)
             if self.move_id.line_ids:
                 self.move_id.sudo().with_company(self.company_id)._post()
@@ -581,7 +353,6 @@ class PosSession(models.Model):
             self.sudo().with_company(self.company_id)._reconcile_account_move_lines(data)
         else:
             self.sudo()._post_statement_difference(self.cash_register_difference)
-
         if self.config_id.order_edit_tracking:
             from markupsafe import Markup
             edited_orders = self.get_session_orders().filtered(lambda o: o.is_edited)
@@ -591,7 +362,6 @@ class PosSession(models.Model):
                     Markup("<br/><ul>%s</ul>") % Markup().join(Markup("<li>%s</li>") % order._get_html_link() for order in edited_orders)
                 )
                 self.message_post(body=body)
-
         self.picking_ids.move_ids.sudo()._trigger_scheduler()
         self.write({'state': 'closed'})
         return
@@ -599,27 +369,18 @@ class PosSession(models.Model):
     def close_session_from_ui_ref(self, bank_payment_method_diff_pairs=None):
         bank_payment_method_diffs = dict(bank_payment_method_diff_pairs or [])
         self.ensure_one()
-        # Even if this is called in `post_closing_cash_details`, we need to call this here too for case
-        # where cash_control = False
         check_closing_session = self._cannot_close_session_ref(bank_payment_method_diffs)
         if check_closing_session:
             return check_closing_session
-
         validate_result = self.action_pos_session_closing_control_ref(
             bank_payment_method_diffs=bank_payment_method_diffs)
-
-        # If an error is raised, the user will still be redirected to the back end to manually close the session.
-        # If the return result is a dict, this means that normally we have a redirection or a wizard => we redirect the user
         if isinstance(validate_result, dict):
-            # imbalance accounting entry
             return {
                 'successful': False,
                 'message': validate_result.get('name'),
                 'redirect': True
             }
-
         self.message_post(body='Point of Sale Session ended')
-
         return {'successful': True}
 
     def _cannot_close_session_ref(self, bank_payment_method_diffs=None):
@@ -661,9 +422,7 @@ class PosSession(models.Model):
             session.write({'state': 'closing_control', 'stop_at': fields.Datetime.now()})
             if not session.config_id.cash_control:
                 return session.action_pos_session_close_ref(balancing_account, amount_to_balance,
-                                                            bank_payment_method_diffs)
-            # If the session is in rescue, we only compute the payments in the cash register
-            # It is not yet possible to close a rescue session through the front end, see `close_session_from_ui`
+                                                             bank_payment_method_diffs)
             if session.rescue and session.config_id.cash_control:
                 default_cash_payment_method_id = self.payment_method_ids.filtered(
                     lambda pm: pm.type == 'cash' and pm.payment_method_id.currency_id == self.ref_me_currency_id)[0]
@@ -672,18 +431,13 @@ class PosSession(models.Model):
                     orders.payment_ids.filtered(lambda p: p.payment_method_id == default_cash_payment_method_id).mapped(
                         'amount')
                 ) + self.cash_register_balance_start_mn_ref
-
                 session.cash_register_balance_end_real_mn_ref = total_cash
-
             return session.action_pos_session_validate_ref(balancing_account, amount_to_balance,
                                                            bank_payment_method_diffs)
 
     def action_pos_session_close_ref(self, balancing_account=False, amount_to_balance=0,
                                      bank_payment_method_diffs=None):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
-        # Session without cash payment method will not have a cash register.
-        # However, there could be other payment methods, thus, session still
-        # needs to be validated.
         return self._validate_session_ref(balancing_account, amount_to_balance, bank_payment_method_diffs)
 
     def _validate_session_ref(self, balancing_account=False, amount_to_balance=0, bank_payment_method_diffs=None):
@@ -705,13 +459,7 @@ class PosSession(models.Model):
                         balancing_account, amount_to_balance, bank_payment_method_diffs)
                 else:
                     raise e
-
-            # === Pachacutec v57: Corrección del descuadre IGTF ===
-            # El IGTF se cobra en los pagos (recibibles) pero su línea de crédito
-            # a veces no se genera correctamente en _create_non_reconciliable_move_lines.
-            # Detectamos el descuadre y lo compensamos con una línea de crédito directa.
             self._fix_igtf_imbalance_in_session_move()
-
             try:
                 balance = sum(self.move_id.line_ids.mapped('balance'))
                 with self.move_id._check_balanced({'records': self.move_id.sudo()}):
@@ -730,30 +478,12 @@ class PosSession(models.Model):
         return True
 
     def _fix_igtf_imbalance_in_session_move(self):
-        """
-        Pachacutec v57: Detecta y corrige el descuadre IGTF en el move de sesión POS.
-
-        El IGTF se cobra en los pagos (aumenta los recibibles/débitos), pero su
-        línea de crédito de ventas no siempre se genera correctamente en
-        _create_non_reconciliable_move_lines. Esto causa 'The entry is not balanced'.
-
-        Este método:
-        1. Calcula el balance actual del move de sesión
-        2. Si hay un descuadre positivo (más débitos que créditos):
-           a. Verifica si coincide con el total IGTF de las órdenes cerradas
-           b. Si sí, agrega una línea de crédito en la cuenta de ingresos IGTF
-        """
         move = self.move_id
         if not move:
             return
-
         current_balance = sum(move.line_ids.mapped('balance'))
-
-        # Solo actuar si hay un descuadre positivo (más débitos que créditos)
         if float_is_zero(current_balance, precision_rounding=self.currency_id.rounding):
             return
-
-        # Calcular el total IGTF de todas las órdenes cerradas no facturadas
         closed_orders = self._get_closed_orders()
         total_igtf = sum(
             order.x_igtf_amount
@@ -761,32 +491,21 @@ class PosSession(models.Model):
             if not order.is_invoiced and order.x_igtf_amount
         )
         total_igtf_rounded = float_round(total_igtf, precision_rounding=self.currency_id.rounding)
-
-        # El descuadre debe coincidir (o aproximarse) al total IGTF
         if float_is_zero(total_igtf_rounded, precision_rounding=self.currency_id.rounding):
             return
-
-        # Verificar que el descuadre se debe al IGTF (tolerancia del 1% para redondeos)
         diff_vs_igtf = abs(current_balance - total_igtf_rounded)
         tolerance = max(0.05, total_igtf_rounded * 0.01)
         if diff_vs_igtf > tolerance:
             _logger.warning("[IGTF] Descuadre (%.2f) no coincide con IGTF total (%.2f). No se aplica corrección automática.",
                 current_balance, total_igtf_rounded)
             return
-
-        # Obtener cuenta de ingresos del producto IGTF
         igtf_product = self.config_id.x_igtf_product_id
         if not igtf_product:
-            _logger.warning("[IGTF] No hay producto IGTF configurado en el POS. No se puede corregir el descuadre.")
             return
-
         product_accounts = igtf_product._get_product_accounts()
         igtf_account = igtf_product.property_account_income_id or product_accounts.get('income')
         if not igtf_account:
-            _logger.warning("[IGTF] Producto IGTF '%s' no tiene cuenta de ingresos. No se puede corregir el descuadre.", igtf_product.name)
             return
-
-        # Crear la línea de crédito IGTF directamente en el move de sesión
         MoveLine = self.env['account.move.line'].with_context(
             check_move_validity=False, skip_invoice_sync=True)
         MoveLine.create({
@@ -799,102 +518,52 @@ class PosSession(models.Model):
             'currency_id': self.currency_id.id,
         })
 
-
     def action_pos_session_validate_ref(self, balancing_account=False, amount_to_balance=0,
                                         bank_payment_method_diffs=None):
         bank_payment_method_diffs = bank_payment_method_diffs or {}
         return self.action_pos_session_close_ref(balancing_account, amount_to_balance, bank_payment_method_diffs)
-
-    # Migración Odoo 18: Se eliminan _loader_params de PosSession y se mueven a sus respectivos modelos al final del archivo.
-
-    # Migración Odoo 18: Se eliminan métodos _get_pos_ui obsoletos.
 
     def action_pos_session_open(self):
         for session in self.filtered(lambda session: session.state == 'opening_control'):
             if session.config_id.cash_control and not session.rescue:
                 last_session = self.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
                                            limit=1)
-                session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref  # defaults to 0 if lastsession is empty
+                session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref
         return super(PosSession, self).action_pos_session_open()
-
 
     @api.depends('config_id')
     def _tax_today(self):
         for rec in self:
             rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
 
-    # Migración Odoo 18: Se elimina _loader_params_pos_payment_method de PosSession.
-
-    # def _get_pos_ui_pos_payment_method(self, params):
-    #     payment_ids_new = []
-    #     payment_ids = self.env['pos.payment.method'].search_read(**params['search_params'])
-    #     payment_company_currency = []
-    #     for payment in payment_ids:
-    #         if payment.get('currency_id') == self.company_id.currency_id.id or not payment.get('currency_id'):
-    #             payment_company_currency.append(payment)
-    #     payment_ids_new.append(payment_company_currency)
-    #     for payment in payment_ids:
-    #         if payment.get('currency_id') != self.company_id.currency_id.id or payment.get('currency_id'):
-    #             payment_ids_new.append(payment)
-    #     print(payment_ids_new)
-    #     return payment_ids_new
-
     def _create_cash_statement_lines_and_cash_move_lines(self, data):
-        # Create the split and combine cash statement lines and account move lines.
-        # `split_cash_statement_lines` maps `journal` -> split cash statement lines
-        # `combine_cash_statement_lines` maps `journal` -> combine cash statement lines
-        # `split_cash_receivable_lines` maps `journal` -> split cash receivable lines
-        # `combine_cash_receivable_lines` maps `journal` -> combine cash receivable lines
         MoveLine = data.get('MoveLine')
         split_receivables_cash = data.get('split_receivables_cash')
         combine_receivables_cash = data.get('combine_receivables_cash')
-
-        # handle split cash payments
         split_cash_statement_line_vals = []
         split_cash_receivable_vals = []
         for payment, amounts in split_receivables_cash.items():
             journal_id = payment.payment_method_id.journal_id.id
             amount = float_round(amounts['amount'] if (payment.payment_method_id.currency_id == self.company_id.currency_id or not payment.payment_method_id.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            # Pachacutec v55: round amount_converted so _debit_amounts assigns a clean debit/credit value
             amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
             split_cash_statement_line_vals.append(
-                self._get_split_statement_line_vals(
-                    journal_id,
-                    amount,
-                    payment
-                )
+                self._get_split_statement_line_vals(journal_id, amount, payment)
             )
             split_cash_receivable_vals.append(
-                self._get_split_receivable_vals(
-                    payment,
-                    amount,
-                    amount_converted
-                )
+                self._get_split_receivable_vals(payment, amount, amount_converted)
             )
-        # handle combine cash payments
         combine_cash_statement_line_vals = []
         combine_cash_receivable_vals = []
         for payment_method, amounts in combine_receivables_cash.items():
             if not float_is_zero(amounts['amount'], precision_rounding=self.currency_id.rounding):
                 amount = float_round(amounts['amount'] if (payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-                # Pachacutec v55: round amount_converted so _debit_amounts assigns a clean debit/credit value
                 amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
                 combine_cash_statement_line_vals.append(
-                    self._get_combine_statement_line_vals(
-                        payment_method.journal_id.id,
-                        amount,
-                        payment_method
-                    )
+                    self._get_combine_statement_line_vals(payment_method.journal_id.id, amount, payment_method)
                 )
                 combine_cash_receivable_vals.append(
-                    self._get_combine_receivable_vals(
-                        payment_method,
-                        amount,
-                        amount_converted
-                    )
+                    self._get_combine_receivable_vals(payment_method, amount, amount_converted)
                 )
-
-        # create the statement lines and account move lines
         BankStatementLine = self.env['account.bank.statement.line']
         split_cash_statement_lines = BankStatementLine.create(split_cash_statement_line_vals).mapped(
             'move_id.line_ids').filtered(lambda line: line.account_id.account_type == 'asset_receivable')
@@ -902,19 +571,12 @@ class PosSession(models.Model):
             'move_id.line_ids').filtered(lambda line: line.account_id.account_type == 'asset_receivable')
         split_cash_receivable_lines = MoveLine.create(split_cash_receivable_vals)
         combine_cash_receivable_lines = MoveLine.create(combine_cash_receivable_vals)
-
         data.update(
             {'split_cash_statement_lines': split_cash_statement_lines,
              'combine_cash_statement_lines': combine_cash_statement_lines,
              'split_cash_receivable_lines': split_cash_receivable_lines,
              'combine_cash_receivable_lines': combine_cash_receivable_lines
              })
-        return data
-
-
-        data['payment_method_to_receivable_lines'] = payment_method_to_receivable_lines
-        data['payment_to_receivable_lines'] = payment_to_receivable_lines
-        data['online_payment_to_receivable_lines'] = {}
         return data
 
     def _create_bank_payment_moves(self, data):
@@ -931,13 +593,11 @@ class PosSession(models.Model):
             amount_converted = float_round(amounts['amount_converted'] if (
                         payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else \
                 amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            # Pachacutec: Generate the receivable line with the CALCULATED amount to ensure balance
             combine_receivable_line = MoveLine.create(self._get_combine_receivable_vals(payment_method, amount, amount_converted))
             amounts['amount'] = amount
             amounts['amount_converted'] = amount_converted
             payment_receivable_line = self._create_combine_account_payment(payment_method, amounts, diff_amount=bank_payment_method_diffs.get(payment_method.id) or 0)
             payment_method_to_receivable_lines[payment_method] = combine_receivable_line | payment_receivable_line
-
         for payment, amounts in split_receivables_bank.items():
             amount = float_round(amounts['amount'] if (
                     payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
@@ -945,16 +605,13 @@ class PosSession(models.Model):
             amount_converted = float_round(amounts['amount_converted'] if (
                     payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
                 amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
-            # Pachacutec: Generate the receivable line with the CALCULATED amount to ensure balance
             split_receivable_line = MoveLine.create(self._get_split_receivable_vals(payment, amount, amount_converted))
             amounts['amount'] = amount
             amounts['amount_converted'] = amount_converted
             payment_receivable_line = self._create_split_account_payment(payment, amounts)
             payment_to_receivable_lines[payment] = split_receivable_line | payment_receivable_line
-
         for bank_payment_method in self.payment_method_ids.filtered(lambda pm: pm.type == 'bank' and pm.split_transactions):
             self._create_diff_account_move_for_split_payment_method(bank_payment_method, bank_payment_method_diffs.get(bank_payment_method.id) or 0)
-
         data['payment_method_to_receivable_lines'] = payment_method_to_receivable_lines
         data['payment_to_receivable_lines'] = payment_to_receivable_lines
         data['online_payment_to_receivable_lines'] = {}
@@ -962,15 +619,28 @@ class PosSession(models.Model):
 
 class ProductProduct(models.Model):
     _inherit = 'product.product'
-
     @api.model
     def _load_pos_data_fields(self, config_id):
         return super()._load_pos_data_fields(config_id) + ['list_price_usd', 'standard_price_usd', 'lst_price']
 
 class PosPaymentMethod(models.Model):
     _inherit = 'pos.payment.method'
-
     @api.model
     def _load_pos_data_fields(self, config_id):
         return super()._load_pos_data_fields(config_id) + ['currency_id']
 
+class PosConfig(models.Model):
+    _inherit = 'pos.config'
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Shield mechanism to ensure critical fields are always present
+        fields = super()._load_pos_data_fields(config_id)
+        if fields:
+             mandatory = [
+                'use_pricelist', 'show_dual_currency', 'show_currency', 
+                'show_currency_rate', 'show_currency_symbol', 'show_currency_position'
+             ]
+             for f in mandatory:
+                 if f not in fields:
+                     fields.append(f)
+        return fields
