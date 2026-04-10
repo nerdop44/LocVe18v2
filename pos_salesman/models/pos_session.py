@@ -11,17 +11,6 @@ class PosSession(models.Model):
             models.append('hr.employee')
         return models
 
-    def _load_pos_data(self, data):
-        # Truth of Odoo 18: The response must return data accurately.
-        # We ensure 'hr_salesmen' is populated in the root for backward compat in JS if needed,
-        # although Odoo 18 will load it into data['hr.employee'].
-        response = super()._load_pos_data(data)
-        
-        # Mapping hr.employee to 'hr_salesmen' for JS compatibility
-        if 'hr.employee' in data:
-            response['hr_salesmen'] = data['hr.employee']['data']
-        
-        return response
 
 class PosConfig(models.Model):
     _inherit = 'pos.config'

@@ -7,31 +7,30 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
 import { PosData } from "@point_of_sale/app/models/data_service";
 
-patch(PosData.prototype, {
-    async loadInitialData() {
-        const response = await super.loadInitialData(...arguments);
-        if (response && response.hr_salesmen) {
-            this.hr_salesmen = response.hr_salesmen;
-        }
-        return response;
-    }
-});
-
 patch(PosStore.prototype, {
     setup() {
         super.setup(...arguments);
-        // Using reactive to ensure changes are tracked if needed, 
-        // but simple property is usually enough for the store
         if (this.salesman_ids === undefined) {
             this.salesman_ids = [];
         }
     },
     async processData(loadedData) {
         await super.processData(...arguments);
-        // Odoo 18: Data might be in loadedData or already processed in this.data
-        const salesmen = loadedData['hr_salesmen'] || this.data.hr_salesmen || [];
-        this.salesman_ids = salesmen;
-        console.log(">>>>>>>> Salesmen loaded in PosStore:", this.salesman_ids.length);
+        
+        // Odoo 18: Extract from the standard model collection
+        const employeeModel = this.models['hr.employee'];
+        if (employeeModel) {
+            const allEmployees = typeof employeeModel.getAll === 'function' ? employeeModel.getAll() : (employeeModel.data || []);
+            
+            // Filter by IDs in config
+            const allowedIds = this.config.salesman_ids || [];
+            if (allowedIds.length > 0) {
+                this.salesman_ids = allEmployees.filter(e => allowedIds.includes(e.id));
+            } else {
+                this.salesman_ids = allEmployees;
+            }
+        }
+        console.log(">>>>>>>> Salesmen synchronized from hr.employee:", this.salesman_ids.length);
     },
 });
 
