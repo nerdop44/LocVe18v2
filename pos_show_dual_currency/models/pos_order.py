@@ -25,21 +25,19 @@ class PosOrder(models.Model):
                 if pid:
                     product_ids.append(pid)
         
-        if product_ids:
-            # Saneamos productos que participan en la orden
-            misaligned_products = self.env['product.product'].search([
+            # Saneamos productos que participan en la orden (Fase 2 - Reforzado)
+            misaligned_products = self.env['product.product'].sudo().search([
                 ('id', 'in', product_ids),
-            ])
+            ]).filtered(lambda p: p.uom_id.category_id != p.product_tmpl_id.uom_id.category_id)
+            
             for p in misaligned_products:
                 template = p.product_tmpl_id
-                if p.uom_id != template.uom_id:
-                    _logger.warning("[UOM Fix] Realineando variante %s (ID: %s) con template: %s -> %s", 
-                                    p.display_name, p.id, p.uom_id.name, template.uom_id.name)
-                    # Forzamos la UOM del template a la variante
-                    p.write({
-                        'uom_id': template.uom_id.id,
-                        'uom_po_id': template.uom_id.id
-                    })
+                _logger.warning("[UOM Fix] Saneamiento crítico JIT: Variante %s realineada con %s", 
+                                p.display_name, template.uom_id.name)
+                p.write({
+                    'uom_id': template.uom_id.id,
+                    'uom_po_id': template.uom_id.id
+                })
 
         return super().create_from_ui(orders)
 

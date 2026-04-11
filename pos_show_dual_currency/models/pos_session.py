@@ -74,6 +74,18 @@ class PosSession(models.Model):
 
     @api.model
     def _load_pos_data(self, data):
+        # Pachacutec: v18.0.1.0.87 - SANEAMIENTO PREVENTIVO UOM (Migración v16 Fix)
+        # Corregimos variantes cuyas UOM no coinciden con la categoría del template maestro
+        self.env.cr.execute("""
+            UPDATE product_product p
+            SET uom_id = t.uom_id, uom_po_id = t.uom_id
+            FROM product_template t, uom_uom u1, uom_uom u2
+            WHERE p.product_tmpl_id = t.id
+            AND p.uom_id = u1.id
+            AND t.uom_id = u2.id
+            AND u1.category_id != u2.category_id
+        """)
+        
         # Truth of Odoo 18: Standard data loader injection
         result = super()._load_pos_data(data)
         
