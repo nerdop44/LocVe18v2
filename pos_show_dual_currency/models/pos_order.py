@@ -1,9 +1,47 @@
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError
+import logging
 
+_logger = logging.getLogger(__name__)
 
 class PosOrder(models.Model):
     _inherit = "pos.order"
+
+    @api.model_create_multi
+    def create_from_ui(self, orders):
+        """
+        Pachacutec: v18.0.1.0.87 - SANEAMIENTO UOM JIT (Migración v16 Fix)
+        Detecta y corrige productos donde la variante no coincide con el template 
+        en su categoría de UOM, evitando el error de sincronización.
+        """
+        product_ids = []
+        for order in orders:
+            order_data = order.get('data') or order
+            for line in order_data.get('lines', []):
+                # Odoo 18 lines format can vary depending on where it's called
+                # but usually it's [0, 0, {vals}]
+                vals = line[2] if isinstance(line, (list, tuple)) and len(line) > 2 else line
+                pid = vals.get('product_id')
+                if pid:
+                    product_ids.append(pid)
+        
+        if product_ids:
+            # Saneamos productos que participan en la orden
+            misaligned_products = self.env['product.product'].search([
+                ('id', 'in', product_ids),
+            ])
+            for p in misaligned_products:
+                template = p.product_tmpl_id
+                if p.uom_id != template.uom_id:
+                    _logger.warning("[UOM Fix] Realineando variante %s (ID: %s) con template: %s -> %s", 
+                                    p.display_name, p.id, p.uom_id.name, template.uom_id.name)
+                    # Forzamos la UOM del template a la variante
+                    p.write({
+                        'uom_id': template.uom_id.id,
+                        'uom_po_id': template.uom_id.id
+                    })
+
+        return super().create_from_ui(orders)
 
     ref_me_currency_id = fields.Many2one('res.currency', related='session_id.ref_me_currency_id',
                                          string="Reference Currency",

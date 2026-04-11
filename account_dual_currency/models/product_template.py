@@ -48,10 +48,11 @@ class Productos(models.Model):
             tasa = company.currency_id_dif.get_trm_systray() if company.currency_id_dif else 0.0
             price_ex_tax = rec.list_price_usd * tasa if tasa > 0 else 0.0
             
-            # El usuario solicitó que list_price sea list_price_usd * tasa * taxes_id
+            # El usuario solicitó que list_price sea list_price_usd * tasa (Base Imponible)
+            # Pachacutec: v18.0.1.0.87 - Usamos total_excluded para evitar doble IVA en POS
             if rec.taxes_id:
                 res = rec.taxes_id.compute_all(price_ex_tax, quantity=1, product=rec)
-                rec.list_price = res['total_included']
+                rec.list_price = res['total_excluded']
             else:
                 rec.list_price = price_ex_tax
 
