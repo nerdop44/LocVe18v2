@@ -75,19 +75,24 @@ class PosSession(models.Model):
     @api.model
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.87 - SANEAMIENTO PREVENTIVO UOM (Migración v16 Fix)
-        # Corregimos variantes cuyas UOM no coinciden con la categoría del template maestro
-        self.env.cr.execute("""
-            UPDATE product_product p
-            SET uom_id = t.uom_id, uom_po_id = t.uom_id
-            FROM product_template t, uom_uom u1, uom_uom u2
-            WHERE p.product_tmpl_id = t.id
-            AND p.uom_id = u1.id
-            AND t.uom_id = u2.id
-            AND u1.category_id != u2.category_id
-        """)
+        # Reemplazamos SQL directo (que causaba error) por lógica ORM segura.
+        # Solo saneamos si hay discrepancia de categorías entre variante y plantilla.
+        result = super()._load_pos_data(data)
+        
+        # Saneamos productos con discrepancia crítica (kg vs Unidades)
+        # Esto previene el error "Operación no válida" al validar.
+        products_to_fix = self.env['product.product'].sudo().search([]).filtered(
+            lambda p: p.uom_id.category_id != p.product_tmpl_id.uom_id.category_id
+        )
+        if products_to_fix:
+            _logger.warning("[UOM Fix] Saneando %s productos con categorías incompatibles.", len(products_to_fix))
+            for p in products_to_fix:
+                p.write({
+                    'uom_id': p.product_tmpl_id.uom_id.id,
+                    'uom_po_id': p.product_tmpl_id.uom_id.id
+                })
         
         # Truth of Odoo 18: Standard data loader injection
-        result = super()._load_pos_data(data)
         
         company_currency_id = self.company_id.currency_id.id
         target_currency = self.ref_me_currency_id if self.ref_me_currency_id else self.config_id.show_currency
