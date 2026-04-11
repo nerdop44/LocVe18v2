@@ -1,6 +1,7 @@
 /** @odoo-module */
 
 import { ProductProduct } from "@point_of_sale/app/models/product_product";
+import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosPayment } from "@point_of_sale/app/models/pos_payment";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
@@ -47,6 +48,19 @@ patch(DevicesSynchronisation.prototype, {
         } catch (e) {
             console.error("Pachacutec: processDeletedRecords crash suppressed during sync:", e);
             return true;
+        } finally {
+            window.__pachacutec_global_lock = false;
+        }
+    }
+});
+
+patch(PosStore.prototype, {
+    async syncAllOrders() {
+        // Pachacutec: Critical lock during global order synchronization.
+        // Prevents IGTF reactivity during backend data re-injection.
+        window.__pachacutec_global_lock = true;
+        try {
+            return await super.syncAllOrders(...arguments);
         } finally {
             window.__pachacutec_global_lock = false;
         }
@@ -151,6 +165,10 @@ patch(PosOrder.prototype, {
         // Allow assignment from server data
     },
 
+    get isFinalizing() {
+        return this.finalizing || this.finalized || false;
+    },
+
     get igtf_base_bs() {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         return (this.payment_ids || [])
@@ -186,7 +204,7 @@ patch(PosOrder.prototype, {
     },
 
     update(vals, opts) {
-        if (window.__pachacutec_global_lock) {
+        if (window.__pachacutec_global_lock || this.isFinalizing) {
             super.update(vals, opts);
             return;
         }
@@ -222,7 +240,7 @@ patch(PosOrder.prototype, {
     },
 
     refreshIGTF() {
-        if (!this.models || this.finalized || window.__pachacutec_global_lock) return;
+        if (!this.models || this.isFinalizing || window.__pachacutec_global_lock) return;
         
         try {
             this.removeIGTF();
@@ -253,10 +271,11 @@ patch(PosOrder.prototype, {
     },
 
     removeIGTF() {
-        if (window.__pachacutec_global_lock || !this.models) return;
+        if (window.__pachacutec_global_lock || !this.models || this.isFinalizing) return;
         const linesToRemove = (this.lines || []).filter((l) => l && l.x_is_igtf_line);
         for (const line of linesToRemove) {
-            if (line && typeof line.delete === "function") {
+            // Extra hardening: only attempt delete if it's a valid record with the method
+            if (line && typeof line.delete === "function" && typeof line.getIndexMaps === "function") {
                 try {
                     line.delete();
                 } catch (e) {
