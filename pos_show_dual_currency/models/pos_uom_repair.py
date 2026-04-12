@@ -47,35 +47,36 @@ class PosUomRepair(models.AbstractModel):
 
     @api.model
     def _align_variants_uom(self):
-        # Buscamos todas las variantes (product.product)
-        # En Odoo 18, uom_id es delegated, pero si hay datos en la tabla product_product
-        # (residuos de v16), el ORM o el POS pueden leer el valor incorrecto.
-        
-        # Usamos SQL para detectar discrepancias 'reales' en la base de datos que el ORM oculta
-        # o que causan conflicto al validar órdenes.
+        # Odoo 18: uom_id está en product_template por delegación.
+        # Solo intentamos el saneamiento SQL si la columna física existe (residuo de v16).
         self.env.cr.execute("""
-            SELECT p.id 
-            FROM product_product p
-            JOIN product_template t ON p.product_tmpl_id = t.id
-            WHERE p.uom_id IS NOT NULL AND p.uom_id != t.uom_id
+            SELECT count(*) FROM information_schema.columns 
+            WHERE table_name = 'product_product' AND column_name = 'uom_id'
         """)
-        mismatched_ids = [r[0] for r in self.env.cr.fetchall()]
+        column_exists = self.env.cr.fetchone()[0]
         
-        if mismatched_ids:
-            _logger.warning("[UOM Fix] Detectadas %s variantes con discrepancia física de UoM.", len(mismatched_ids))
-            products = self.env['product.product'].browse(mismatched_ids)
-            for p in products:
-                _logger.info("[UOM Fix] Realineando variante %s con plantilla %s", p.display_name, p.product_tmpl_id.uom_id.name)
-                p.write({
-                    'uom_id': p.product_tmpl_id.uom_id.id,
-                    'uom_po_id': p.product_tmpl_id.uom_id.id
-                })
+        if column_exists:
+            _logger.info("[UOM Fix] Detectada columna física uom_id en product_product. Verificando discrepancias...")
+            self.env.cr.execute("""
+                SELECT p.id 
+                FROM product_product p
+                JOIN product_template t ON p.product_tmpl_id = t.id
+                WHERE p.uom_id IS NOT NULL AND p.uom_id != t.uom_id
+            """)
+            mismatched_ids = [r[0] for r in self.env.cr.fetchall()]
+            
+            if mismatched_ids:
+                products = self.env['product.product'].browse(mismatched_ids)
+                for p in products:
+                    p.write({
+                        'uom_id': p.product_tmpl_id.uom_id.id,
+                        'uom_po_id': p.product_tmpl_id.uom_id.id
+                    })
         
-        # Saneamos inconsistencias generales (Venta vs Compra)
+        # Saneamiento estándar vía ORM (Seguro en v18)
         inconsistent_products = self.env['product.template'].search([]).filtered(
             lambda t: t.uom_id.category_id != t.uom_po_id.category_id
         )
         if inconsistent_products:
-            _logger.warning("[UOM Fix] Corrigiendo %s plantillas con UoM de compra incompatible.", len(inconsistent_products))
             for t in inconsistent_products:
                 t.write({'uom_po_id': t.uom_id.id})
