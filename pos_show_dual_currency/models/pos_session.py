@@ -99,7 +99,7 @@ class PosSession(models.Model):
                       currency_id = usd_currency.id
         
         currency_fields = ['id', 'name', 'symbol', 'position', 'rounding', 'rate', 'decimal_places']
-        currency_ref_data = self.env['res.currency'].search_read([('id', '=', currency_id)], currency_fields)
+        currency_ref_data = self.env['res.currency'].sudo().search_read([('id', '=', currency_id)], currency_fields)
         
         if currency_ref_data:
             currency_ref = currency_ref_data[0]

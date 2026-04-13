@@ -16,7 +16,7 @@ class PosConfig(models.Model):
     @api.depends('show_currency')
     def _compute_show_currency_rate(self):
         for config in self:
-            config.show_currency_rate = self.env['res.currency'].get_trm_systray()
+            config.show_currency_rate = self.env['res.currency'].sudo().get_trm_systray()
 
     #show_currency_rate_real = fields.Float(string='Rate', related='show_currency.rate_real')# darrell
 
