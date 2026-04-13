@@ -106,7 +106,13 @@ class PosSession(models.Model):
         
         if currency_ref_data:
             currency_ref = currency_ref_data[0]
-            # Pachacutec: v18.0.1.0.95 - UNIFIED MATH
+            # Pachacutec: v18.0.1.0.96 - EMERGENCY FIX
+            # Recuperamos la tasa del sistema antes de los cálculos
+            try:
+                rate_tasa = float(self.env['res.currency'].sudo().get_trm_systray() or 0.0)
+            except:
+                rate_tasa = currency_ref.get('rate', 1.0)
+
             # Odoo Standard: rate = Target / Base. 
             # Inyectamos rate_ve para uso visual (Humano) y rate para cálculo (Odoo).
             rate_human = rate_tasa if rate_tasa > 1 else (1.0 / rate_tasa if rate_tasa > 0 else 1.0)
