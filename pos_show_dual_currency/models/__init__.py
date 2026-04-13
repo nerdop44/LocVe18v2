@@ -9,4 +9,5 @@ from . import pos_order_line
 from . import pos_uom_repair
 from . import res_currency
 from . import hr_employee
+from . import sale_order_line
 

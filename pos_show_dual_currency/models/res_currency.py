@@ -6,7 +6,15 @@ class ResCurrency(models.Model):
     @api.model
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.94 - SPECIFIC SHIELD
-        # La localización venezolana a veces intenta actualizar tasas durante la lectura.
-        # Elevamos a sudo() específicamente para la moneda para evitar AccessError (write)
-        # sin romper el contexto de la sesión en el POS.
         return super(ResCurrency, self.sudo())._load_pos_data(data)
+
+    def write(self, vals):
+        # Pachacutec: v18.0.1.1.2 - WRITE SHIELD
+        # La localización venezolana a menudo actualiza tasas o metadatos durante la operación.
+        # Intentamos la escritura estándar; si falla por permisos (cajeros), elevamos quirúrgicamente.
+        try:
+            return super().write(vals)
+        except AccessError:
+            if self.env.context.get('pos_session_id') or self.env.context.get('pos_config_id'):
+                return super(ResCurrency, self.sudo()).write(vals)
+            raise
