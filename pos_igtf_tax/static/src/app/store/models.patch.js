@@ -1,53 +1,26 @@
-/** @odoo-module */
-
-import { ProductProduct } from "@point_of_sale/app/models/product_product";
-import { PosStore } from "@point_of_sale/app/store/pos_store";
-import { PosPayment } from "@point_of_sale/app/models/pos_payment";
-import { PosOrder } from "@point_of_sale/app/models/pos_order";
-import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
-import { PosData } from "@point_of_sale/app/models/data_service";
-import DevicesSynchronisation from "@point_of_sale/app/store/devices_synchronisation";
 import { patch } from "@web/core/utils/patch";
-import { roundDecimals } from "@web/core/utils/numbers";
+import { PosOrder, PosOrderline, PosPayment } from "@point_of_sale/app/store/models";
+import { PosStore } from "@point_of_sale/app/store/pos_store";
+import { PosData } from "@point_of_sale/app/models/pos_data";
 
-// Pachacutec: Global lock to prevent IGTF reactivity during order deletion or synchronization.
-// This is critical to ensure synchronous operations don't collide with the reactive model.
-window.__pachacutec_global_lock = false;
+// Pachacutec: v18.0.1.0.43 - REFACTORIZACIÓN PROFESIONAL POR EVENTOS
+// Esta patch elimina el uso de loops reactivos (update) y se enfoca en acciones manuales
+// de pago para estabilizar los totales y la memoria de Odoo 18.
 
-patch(ProductProduct.prototype, {
-    get isIgtfProduct() {
-        const config = this.models?.["pos.config"]?.getFirst();
-        return config?.x_igtf_product_id ? config.x_igtf_product_id[0] === this.id : false;
-    }
-});
-
+// 1. Blindaje de Datos Iniciales
 patch(PosData.prototype, {
-    localDeleteCascade(record, removeFromServer = false) {
-        // Pachacutec: Activate global lock before any cascade cleanup.
+    async localDeleteCascade() {
         window.__pachacutec_global_lock = true;
         try {
-            const result = super.localDeleteCascade(...arguments);
-            return result;
-        } catch (e) {
-            console.error("Pachacutec: localDeleteCascade crash suppressed:", e);
-            return true;
+            return await super.localDeleteCascade(...arguments);
         } finally {
-            // Restore lock only after the entire cascade (and its side effects) finished.
             window.__pachacutec_global_lock = false;
         }
-    }
-});
-
-patch(DevicesSynchronisation.prototype, {
-    processDeletedRecords(deletedRecords) {
-        // Pachacutec: Activate global lock during whole synchronization cleanup.
-        // This prevents IGTF from reacting while multiple records are being purged.
+    },
+    async processDeletedRecords() {
         window.__pachacutec_global_lock = true;
         try {
-            return super.processDeletedRecords(...arguments);
-        } catch (e) {
-            console.error("Pachacutec: processDeletedRecords crash suppressed during sync:", e);
-            return true;
+            return await super.processDeletedRecords(...arguments);
         } finally {
             window.__pachacutec_global_lock = false;
         }
@@ -56,8 +29,6 @@ patch(DevicesSynchronisation.prototype, {
 
 patch(PosStore.prototype, {
     async syncAllOrders() {
-        // Pachacutec: Critical lock during global order synchronization.
-        // Prevents IGTF reactivity during backend data re-injection.
         window.__pachacutec_global_lock = true;
         try {
             return await super.syncAllOrders(...arguments);
@@ -67,41 +38,7 @@ patch(PosStore.prototype, {
     }
 });
 
-patch(PosPayment.prototype, {
-    get isForeignExchange() {
-        return this.payment_method_id?.x_is_foreign_exchange || false;
-    },
-
-    set isForeignExchange(val) {
-        // Allow assignment from server data
-    },
-
-    set_amount(value) {
-        if (window.__pachacutec_global_lock) {
-            super.set_amount(value);
-            return;
-        }
-        const config = this.models?.["pos.config"]?.getFirst();
-        const order = this.pos_order_id;
-        let amount = value;
-
-        if (this.isForeignExchange && order && config) {
-            const due = typeof order.getTotalDue === "function" ? order.getTotalDue() : 0;
-            if (Math.abs(value - due) > 0.01) {
-                amount = value * (config.show_currency_rate || 1.0);
-            }
-        }
-        super.set_amount(amount);
-        if (order && !window.__pachacutec_global_lock && typeof order.refreshIGTF === "function") {
-            try {
-                order.refreshIGTF();
-            } catch (e) {
-                console.warn("Pachacutec: refreshIGTF failed during set_amount", e);
-            }
-        }
-    }
-});
-
+// 2. Blindaje de Productos y Líneas
 patch(PosOrderline.prototype, {
     setup() {
         super.setup(...arguments);
@@ -110,27 +47,28 @@ patch(PosOrderline.prototype, {
             this.x_is_igtf_line = true;
         }
     },
-
-    init_from_JSON(json) {
-        super.init_from_JSON(...arguments);
-        this.x_is_igtf_line = json.x_is_igtf_line;
-    },
-
     export_as_JSON() {
         const result = super.export_as_JSON();
         result.x_is_igtf_line = this.x_is_igtf_line;
         return result;
     },
-
-    export_for_printing() {
-        const json = super.export_for_printing(...arguments);
-        json.x_is_igtf_line = this.x_is_igtf_line;
-        return json;
+    init_from_JSON(json) {
+        super.init_from_JSON(...arguments);
+        this.x_is_igtf_line = json.x_is_igtf_line || false;
     }
 });
 
+// 3. Lógica de Pagos (Identificación por Configuración de Divisas)
+patch(PosPayment.prototype, {
+    get isForeignExchange() {
+        // VERDAD PROFESIONAL: Solo depende del check de configuración en el método de pago
+        return this.payment_method_id?.x_is_foreign_exchange || false;
+    }
+});
+
+// 4. Lógica de Pedido: Gestión de IGTF por Eventos
 patch(PosOrder.prototype, {
-    setup(_attr, options) {
+    setup() {
         super.setup(...arguments);
         this.__refreshing_igtf = false;
     },
@@ -139,11 +77,29 @@ patch(PosOrder.prototype, {
         super.init_from_JSON(...arguments);
     },
 
-    get x_igtf_amount() {
-        if (window.__pachacutec_global_lock || !this.models) return 0;
+    // Blindaje de UI: Prevenir crash de etiquetas de recibo (pos_receipt_label)
+    getDisplayData() {
+        const originalLines = this.lines;
+        // Filtramos preventivamente cualquier objeto que no sea un Record de Odoo válido
+        const validLines = (originalLines || []).filter(l => l && typeof l.getIndexMaps === "function");
         
+        this.lines = validLines;
         try {
-            const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
+            return super.getDisplayData(...arguments);
+        } finally {
+            this.lines = originalLines;
+        }
+    },
+
+    // Getters de Cálculos
+    get x_igtf_amount() {
+        try {
+            const paymentLines = this.payment_ids || [];
+            const total = (this.lines || [])
+                .filter((p) => p && !p.x_is_igtf_line)
+                .reduce((acc, p) => acc + (p.get_price_with_tax() || 0), 0);
+            
+            if (total <= 0) return 0;
 
             const igtf_monto = paymentLines
                 .filter((p) => p.isForeignExchange)
@@ -151,101 +107,27 @@ patch(PosOrder.prototype, {
                     const percentage = payment_method_id?.x_igtf_percentage || 0;
                     return (amount || 0) * (percentage / 100);
                 })
-                .reduce((prev, current) => prev + current, 0);
+                .reduce((acc, amount) => acc + amount, 0);
 
-            const total = (this.lines || [])
-                .filter((p) => p && !p.x_is_igtf_line)
-                .map((p) => typeof p.get_price_with_tax === "function" ? p.get_price_with_tax() : 0)
-                .reduce((prev, current) => prev + current, 0);
-
+            // Cap al 3% del total (o según configuración)
             const max_igtf = total * 0.03;
-
-            let final_igtf = igtf_monto;
-            if (igtf_monto > max_igtf) {
-                final_igtf = max_igtf;
-            }
-
-            return roundDecimals(parseFloat(final_igtf) || 0, 2);
+            return Math.min(igtf_monto, max_igtf);
         } catch (e) {
             return 0;
         }
     },
-    set x_igtf_amount(val) {
-        // Allow assignment from server data
+
+    // EVENTOS DE PAGO: Único disparador del recálculo de IGTF
+    add_paymentline(payment_method) {
+        const res = super.add_paymentline(...arguments);
+        this.refreshIGTF();
+        return res;
     },
 
-    get isFinalizing() {
-        return this.finalizing || this.finalized || false;
-    },
-
-    get igtf_base_bs() {
-        if (window.__pachacutec_global_lock || !this.models) return 0;
-        return (this.payment_ids || [])
-            .filter((p) => p && p.isForeignExchange)
-            .reduce((sum, p) => sum + (p.amount || 0), 0);
-    },
-
-    get igtf_base_divisa() {
-        if (window.__pachacutec_global_lock || !this.models) return 0;
-        const config = this.models["pos.config"]?.getFirst();
-        const rate = config?.show_currency_rate || 1.0;
-        return this.igtf_base_bs / (rate > 0 ? rate : 1.0);
-    },
-
-    get sale_total_without_igtf() {
-        if (window.__pachacutec_global_lock || !this.models) return 0;
-        return (this.lines || [])
-            .filter((p) => p && !p.x_is_igtf_line)
-            .map((p) => typeof p.get_price_with_tax === "function" ? p.get_price_with_tax() : 0)
-            .reduce((prev, current) => prev + current, 0);
-    },
-
-    get total_with_igtf() {
-        return roundDecimals(this.sale_total_without_igtf + this.x_igtf_amount, 2);
-    },
-
-    export_for_printing() {
-        const result = super.export_for_printing(...arguments);
-        result.x_igtf_amount = this.x_igtf_amount;
-        result.total_with_igtf = this.total_with_igtf;
-        result.sale_total_without_igtf = this.sale_total_without_igtf;
-        return result;
-    },
-
-    update(vals, opts) {
-        if (window.__pachacutec_global_lock || this.isFinalizing) {
-            super.update(vals, opts);
-            return;
-        }
-        super.update(vals, opts);
-        if (vals.payment_ids && !window.__pachacutec_global_lock) {
-            try {
-                this.refreshIGTF();
-            } catch (e) {
-                console.warn("Pachacutec: refreshIGTF failed during update", e);
-            }
-        }
-    },
-
-    delete() {
-        // Extra safety: set lock if called directly (though usually it goes to PosData)
-        window.__pachacutec_global_lock = true;
-        try {
-            return super.delete(...arguments);
-        } finally {
-            // Note: we don't unset it here if it was set by localDeleteCascade or sync
-        }
-    },
-
-    remove_paymentline(line) {
-        super.remove_paymentline(line);
-        if (!window.__pachacutec_global_lock) {
-            try {
-                this.refreshIGTF();
-            } catch (e) {
-                console.warn("Pachacutec: refreshIGTF failed during remove_paymentline", e);
-            }
-        }
+    delete_paymentline(line) {
+        const res = super.delete_paymentline(...arguments);
+        this.refreshIGTF();
+        return res;
     },
 
     refreshIGTF() {
@@ -253,28 +135,27 @@ patch(PosOrder.prototype, {
         
         this.__refreshing_igtf = true;
         try {
-            const igtf_monto = this.x_igtf_amount; // Usamos el cálculo real basado en pagos
+            // SANEAMIENTO QUIRÚRGICO: Extirpar objetos "fantasma" que causan getIndexMaps crash
+            this._pachacutec_force_clean_memory();
+
+            const igtf_monto = this.x_igtf_amount;
             const config = this.config;
             const igtfProductPair = config?.x_igtf_product_id;
 
-            // Buscamos si ya existe una línea de IGTF
-            const currentIgtfLine = (this.lines || []).find(l => l && l.x_is_igtf_line);
+            // Buscamos la línea actual
+            const currentIgtfLine = (this.lines || []).find(l => l && l.x_is_igtf_line && typeof l.getIndexMaps === "function");
             
             if (currentIgtfLine) {
-                // ESTRATEGIA DELTA: Si el monto ya es correcto, no tocamos nada para evitar reactivity loops
+                // ESTRATEGIA DELTA: Si es igual, ignorar para evitar oscilaciones de UI
                 if (Math.abs(currentIgtfLine.price_unit - igtf_monto) < 0.01 && igtf_monto > 0) {
                     return;
                 }
-                // Si cambió o es 0, borramos la línea vieja (usando método oficial)
-                if (typeof currentIgtfLine.delete === "function") {
-                    currentIgtfLine.delete();
-                }
+                currentIgtfLine.delete();
             }
 
             if (igtf_monto > 0 && igtfProductPair) {
                 const product = this.models["product.product"]?.get(igtfProductPair[0]);
                 if (product) {
-                    // Creación reactiva nativa de Odoo 18
                     this.models["pos.order_line"].create({
                         order_id: this,
                         product_id: product,
@@ -285,26 +166,36 @@ patch(PosOrder.prototype, {
                 }
             }
         } catch (e) {
-            console.error("Error refreshing IGTF:", e);
+            console.error("Pachacutec IGTF Refill Error:", e);
         } finally {
             this.__refreshing_igtf = false;
         }
     },
 
-    removeIGTF() {
-        if (window.__pachacutec_global_lock || !this.models || this.isFinalizing) return;
-        
-        // BORRADO SEGURO: Solo usamos delete() oficial de Odoo. 
-        // Eliminamos el splice manual que rompe los totales.
-        const linesToRemove = (this.lines || []).filter((l) => l && l.x_is_igtf_line);
-        for (const line of linesToRemove) {
-            if (line && typeof line.delete === "function") {
-                try {
-                    line.delete();
-                } catch (e) {
-                    console.warn("Pachacutec: Error deleting IGTF line", e);
-                }
+    _pachacutec_force_clean_memory() {
+        if (!this.lines) return;
+        const ghostIndices = [];
+        for (let i = 0; i < this.lines.length; i++) {
+            // Un objeto es "fantasma" si no es una instancia de Record de Odoo 18
+            if (this.lines[i] && typeof this.lines[i].getIndexMaps !== "function") {
+                ghostIndices.push(i);
             }
         }
+        if (ghostIndices.length > 0) {
+            console.warn(`Pachacutec: Extirpando ${ghostIndices.length} objetos fantasma de la memoria del pedido.`);
+            for (let i = ghostIndices.length - 1; i >= 0; i--) {
+                this.lines.splice(ghostIndices[i], 1);
+            }
+        }
+    }
+});
+
+// 5. Soporte de Identificación de Producto
+patch(PosStore.prototype, {
+    get isIgtfProduct() {
+        return (product) => {
+            const config = this.config;
+            return config?.x_igtf_product_id ? config.x_igtf_product_id[0] === product.id : false;
+        };
     }
 });
