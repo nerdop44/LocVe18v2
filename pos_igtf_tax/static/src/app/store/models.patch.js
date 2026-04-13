@@ -133,6 +133,32 @@ patch(PosOrder.prototype, {
     setup(_attr, options) {
         super.setup(...arguments);
         this.__refreshing_igtf = false;
+        // Pachacutec: v18.0.1.0.39 - SELF-HEALING
+        // Limpiamos líneas corruptas legacy al inicio para evitar crashes.
+        this._pachacutec_sanitize_lines();
+    },
+
+    init_from_JSON(json) {
+        super.init_from_JSON(...arguments);
+        this._pachacutec_sanitize_lines();
+    },
+
+    _pachacutec_sanitize_lines() {
+        if (this.lines) {
+            const corruptedIdx = [];
+            this.lines.forEach((l, idx) => {
+                // Si la línea dice ser IGTF pero no es un objeto Record de Odoo (falta getIndexMaps)
+                if (l && l.x_is_igtf_line && typeof l.getIndexMaps !== "function") {
+                    corruptedIdx.push(idx);
+                }
+            });
+            if (corruptedIdx.length > 0) {
+                console.warn(`Pachacutec: Detectadas ${corruptedIdx.length} líneas IGTF corruptas (legacy). Sanando pedido...`);
+                for (let i = corruptedIdx.length - 1; i >= 0; i--) {
+                    this.lines.splice(corruptedIdx[i], 1);
+                }
+            }
+        }
     },
 
     get x_igtf_amount() {
@@ -280,16 +306,30 @@ patch(PosOrder.prototype, {
 
     removeIGTF() {
         if (window.__pachacutec_global_lock || !this.models || this.isFinalizing) return;
-        // Pachacutec: Usamos el spread [...] para crear una copia estática y evitar 
-        // errores de concurrencia durante el borrado en el store reactivo.
-        const linesToRemove = [...(this.lines || [])].filter((l) => l && l.x_is_igtf_line);
-        for (const line of linesToRemove) {
-            if (line && typeof line.delete === "function") {
-                try {
-                    line.delete();
-                } catch (e) {
-                    console.warn("Pachacutec: Error deleting IGTF line", e);
+        
+        const linesMap = this.lines || [];
+        const linesToRemove = [];
+        
+        // Pachacutec: v18.0.1.0.39 - Borrado Dual (Suave y Forzado)
+        for (let i = linesMap.length - 1; i >= 0; i--) {
+            const line = linesMap[i];
+            if (line && line.x_is_igtf_line) {
+                if (typeof line.delete === "function") {
+                    linesToRemove.push(line);
+                } else {
+                    // BORRADO FÍSICO: Si la línea está corrupta, la quitamos del array por la fuerza
+                    linesMap.splice(i, 1);
+                    console.warn("Pachacutec: Borrado forzado de línea IGTF corrupta detectada.");
                 }
+            }
+        }
+
+        // Borrado normal para registros válidos
+        for (const line of linesToRemove) {
+            try {
+                line.delete();
+            } catch (e) {
+                console.warn("Pachacutec: Error deleting IGTF line", e);
             }
         }
     }
