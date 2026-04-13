@@ -130,6 +130,11 @@ patch(PosOrderline.prototype, {
 });
 
 patch(PosOrder.prototype, {
+    setup(_attr, options) {
+        super.setup(...arguments);
+        this.__refreshing_igtf = false;
+    },
+
     get x_igtf_amount() {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         
@@ -240,8 +245,9 @@ patch(PosOrder.prototype, {
     },
 
     refreshIGTF() {
-        if (!this.models || this.isFinalizing || window.__pachacutec_global_lock) return;
+        if (!this.models || this.isFinalizing || window.__pachacutec_global_lock || this.__refreshing_igtf) return;
         
+        this.__refreshing_igtf = true;
         try {
             this.removeIGTF();
             const config = this.config;
@@ -253,8 +259,8 @@ patch(PosOrder.prototype, {
                 const price = this.get_total_with_tax() * (igtfPercentage / 100);
 
                 if (product && Math.abs(price) > 0.001) {
-                    // Pachacutec: v18.0.1.0.37 - REACTIVE FACTORY
-                    // Usamos la factoría oficial para asegurar que la línea sea un objeto Record real.
+                    // Pachacutec: v18.0.1.0.38 - REACTIVE FACTORY
+                    // En Odoo 18, 'create' ya notifica al store. Eliminar recomputeOrderData previene bucles.
                     this.models["pos.order_line"].create({
                         order_id: this,
                         product_id: product,
@@ -263,11 +269,12 @@ patch(PosOrder.prototype, {
                         price_type: "original",
                         x_is_igtf_line: true
                     });
-                    this.recomputeOrderData();
                 }
             }
         } catch (e) {
             console.error("Error refreshing IGTF:", e);
+        } finally {
+            this.__refreshing_igtf = false;
         }
     },
 
