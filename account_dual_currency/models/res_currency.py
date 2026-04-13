@@ -338,7 +338,7 @@ class ResCurrency(models.Model):
         # Determinar si la compañia es base USD o base VES
         if company_id.currency_id.id == usd_currency.id:
             # Base USD
-            rate_record = self.env['res.currency.rate'].search([
+            rate_record = self.env['res.currency.rate'].sudo().search([
                 ('currency_id', '=', ves_currency.id),
                 '|', ('company_id', '=', company_id.id), ('company_id', '=', False)
             ], order='name desc', limit=1)
@@ -346,7 +346,7 @@ class ResCurrency(models.Model):
             
         elif company_id.currency_id.id == ves_currency.id:
             # Base VES, la tasa de USD es su valor inverso
-            rate_record = self.env['res.currency.rate'].search([
+            rate_record = self.env['res.currency.rate'].sudo().search([
                 ('currency_id', '=', usd_currency.id),
                 '|', ('company_id', '=', company_id.id), ('company_id', '=', False)
             ], order='name desc', limit=1)
@@ -357,7 +357,7 @@ class ResCurrency(models.Model):
                 tasa = usd_currency.inverse_rate if usd_currency.inverse_rate > 0 else (1.0 / usd_currency.rate if usd_currency.rate > 0 else 1.0)
         else:
             diff = company_id.currency_id_dif
-            rate_record = self.env['res.currency.rate'].search([
+            rate_record = self.env['res.currency.rate'].sudo().search([
                 ('currency_id', '=', diff.id),
                 '|', ('company_id', '=', company_id.id), ('company_id', '=', False)
             ], order='name desc', limit=1)

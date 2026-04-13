@@ -32,4 +32,7 @@ Asegurar la estabilidad y despliegue de la localización venezolana optimizada p
   - Sincronización exitosa en remotos `origin` (nerdop44) y `animalc` (tbriceno65) en ramas `Prueba` y `produccion`.
   - Corrección: Se restauró la rama `main` en `animalc` a su estado original (solo README.md) tras push accidental.
   - Estado: Pendiente de Upgrade de módulo en base de datos de producción por parte del usuario o nuevo agente.
-
+- [2026-04-12 21:55]: FIX: Resolución de error 'Access Denied' en `res.currency` (write) para cajeros.
+  - Implementación de `sudo()` en `PosSession._load_pos_data` y `ResCurrency.get_trm_systray`.
+  - Incremento de versiones: `pos_show_dual_currency` (18.0.1.0.89) y `account_dual_currency` (18.0.1.0.165).
+  - Estado: Pendiente de despliegue y validación en Odoo.sh.

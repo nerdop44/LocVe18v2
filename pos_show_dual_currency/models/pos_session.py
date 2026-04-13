@@ -104,7 +104,7 @@ class PosSession(models.Model):
         if currency_ref_data:
             currency_ref = currency_ref_data[0]
             try:
-                rate_tasa = float(self.env['res.currency'].get_trm_systray() or 0.0)
+                rate_tasa = float(self.env['res.currency'].sudo().get_trm_systray() or 0.0)
             except:
                 rate_tasa = currency_ref.get('rate', 1.0)
             
