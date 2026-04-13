@@ -154,6 +154,10 @@ patch(PosOrder.prototype, {
             return 0;
         }
     },
+    set x_igtf_amount(value) {
+        // Pachacutec: Placeholder para evitar error de Proxy 'set' durante loadData.
+        // El valor real se calcula reactivamente en el getter.
+    },
 
     update(vals, opts) {
         if (window.__pachacutec_global_lock) {
