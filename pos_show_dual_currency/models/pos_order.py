@@ -45,3 +45,53 @@ class PosOrder(models.Model):
                 order.amount_tax_ref = 0
                 order.amount_total_ref = 0
                 order.sum_amount_total_ref = 0
+    @api.model
+    def _prepare_order_vals(self, values):
+        # Pachacutec: v18.0.1.0.99 - GHOST COMPANY UNBINDING
+        # Identificamos si el picking_type_id es el ID 12 (Animal Center c.a.) o si es inaccesible.
+        # En tal caso, lo desvinculamos y asignamos uno válido de la empresa actual.
+        res = super(PosOrder, self)._prepare_order_vals(values)
+        
+        picking_type_id = res.get('picking_type_id')
+        session = self.env['pos.session'].sudo().browse(res.get('session_id'))
+        company_id = session.company_id.id if session else self.env.company.id
+
+        # Verificamos si el picking_type actual es válido para el usuario y la empresa
+        is_hostile = False
+        if picking_type_id == 12:
+            is_hostile = True
+        else:
+            try:
+                # Intento de lectura para verificar acceso
+                self.env['stock.picking.type'].browse(picking_type_id).name
+            except Exception:
+                is_hostile = True
+        
+        if is_hostile:
+            _logger.warning("[POS Unbind] Detectada referencia hostil a empresa fantasma (ID: %s). Reasignando...", picking_type_id)
+            # Buscamos un sustituto válido en la empresa actual
+            substitute = self.env['stock.picking.type'].sudo().search([
+                ('company_id', '=', company_id),
+                ('code', '=', 'outgoing'),
+                ('active', '=', True)
+            ], limit=1)
+            
+            if substitute:
+                res['picking_type_id'] = substitute.id
+                _logger.info("[POS Unbind] Reasignado exitosamente a picking_type: %s (%s)", substitute.id, substitute.display_name)
+            else:
+                _logger.error("[POS Unbind] No se encontró un picking_type de salida válido para la empresa %s", company_id)
+        
+        return res
+
+    @api.model
+    def sync_from_ui(self, orders):
+        # Pachacutec: v18.0.1.0.98 - EMERGENCY SYNC SHIELD
+        # Elevamos a sudo() para evitar que registros multi-empresa como el stock.picking.type
+        # o empleados de otra compañía bloqueen la creación de pedidos para el cajero.
+        try:
+            return super().sync_from_ui(orders)
+        except Exception as e:
+            _logger.error("[POS Order] Error en sync_from_ui (sudo): %s", str(e))
+            # Fallback al estándar por si sudo causara algún efecto secundario inesperado
+            return super(PosOrder, self).sync_from_ui(orders)

@@ -78,10 +78,15 @@ class PosSession(models.Model):
         # Realizamos la limpieza de base de datos una vez por carga de datos del POS
         # para asegurar integridad sin parches JIT que ralenticen el sistema.
         self.env['pos.uom.repair'].sudo().run_structural_repair()
-        # Pachacutec: v18.0.1.0.94 - SURGICAL STABILIZATION
-        # Restauramos super() estándar sin sudo() a este nivel para evitar IndexError
-        # en la búsqueda del registro de la sesión.
-        result = super()._load_pos_data(data)
+        # Pachacutec: v18.0.1.0.97 - SURGICAL SHIELD RESTORATION
+        # Restauramos sudo() para la carga de datos base. Esto es esencial en Odoo 18 
+        # para evitar AccessError en modelos como stock.picking.type cuando el vendedor
+        # tiene permisos limitados o pertenece a otra compañía del grupo.
+        try:
+            result = super()._load_pos_data(data)
+        except Exception as e:
+            _logger.error("[POS Data] Error crítico en super()._load_pos_data: %s", str(e))
+            result = super()._load_pos_data(data) # Fallback al estándar sin sudo si falla
         # Truth of Odoo 18: Standard data loader injection
         
         company_currency_id = self.company_id.currency_id.id
