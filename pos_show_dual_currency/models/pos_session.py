@@ -73,22 +73,15 @@ class PosSession(models.Model):
             self.message_post(body=message)
 
     @api.model
-    def load_data(self, models_to_load, data):
-        # Pachacutec: v18.0.1.0.93 - TOTAL SHIELD FIX
-        # Forzamos que TODO el proceso de carga de todos los modelos (monedas, impuestos, etc)
-        # se ejecute como superusuario para evitar AccessError en la localización.
-        return super(PosSession, self.sudo()).load_data(models_to_load, data)
-
-    @api.model
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.88 - SANEAMIENTO ESTRUCTURAL (Unificar UoM Variant-Template)
         # Realizamos la limpieza de base de datos una vez por carga de datos del POS
         # para asegurar integridad sin parches JIT que ralenticen el sistema.
         self.env['pos.uom.repair'].sudo().run_structural_repair()
-        # Pachacutec: v18.0.1.0.92 - GLOBAL SHIELD FIX
-        # Elevamos TODO el proceso de carga base a sudo para evitar AccessError en 
-        # modelos relacionados (como empleados con campos privados de nómina).
-        result = super(PosSession, self.sudo())._load_pos_data(data)
+        # Pachacutec: v18.0.1.0.94 - SURGICAL STABILIZATION
+        # Restauramos super() estándar sin sudo() a este nivel para evitar IndexError
+        # en la búsqueda del registro de la sesión.
+        result = super()._load_pos_data(data)
         # Truth of Odoo 18: Standard data loader injection
         
         company_currency_id = self.company_id.currency_id.id
