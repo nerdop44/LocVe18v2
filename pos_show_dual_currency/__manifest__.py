@@ -2,15 +2,16 @@
     "name": """[LOCVE] Venezuela: POS show dual currency""",
     "summary": """Adds price  of other currency at products in POS""",
     "category": "LocVe [Localization]",
-    "version": "18.0.1.1.3",
+    "version": "18.0.1.1.4",
 
     "application": False,
     'author': 'Remake Ing Nerdo Pulido',
     'company': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'maintainer': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'website': 'https://github.com/birkot',
-    "depends": ["point_of_sale", "stock"],
+    "depends": ["point_of_sale", "stock", "sale"],
     "data": [
+        "security/ir.model.access.csv",
         "views/pos_payment_method.xml",
         "views/pos_session.xml",
         "views/pos_payment.xml",
