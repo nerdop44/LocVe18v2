@@ -27,11 +27,11 @@ class PosOrderLine(models.Model):
     def _compute_amount_line_ref(self):
         for order in self:
             if order.session_rate != 0:
-                order.price_unit_ref = order.price_unit / order.session_rate
-                order.total_cost_ref = order.total_cost / order.session_rate
-                order.margin_ref = order.margin / order.session_rate
-                order.price_subtotal_ref = order.price_subtotal / order.session_rate
-                order.price_subtotal_incl_ref = order.price_subtotal_incl / order.session_rate
+                order.price_unit_ref = order.price_unit * order.session_rate
+                order.total_cost_ref = order.total_cost * order.session_rate
+                order.margin_ref = order.margin * order.session_rate
+                order.price_subtotal_ref = order.price_subtotal * order.session_rate
+                order.price_subtotal_incl_ref = order.price_subtotal_incl * order.session_rate
             else:
                 order.price_unit_ref = 0
                 order.total_cost_ref = 0

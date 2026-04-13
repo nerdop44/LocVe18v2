@@ -126,21 +126,15 @@ patch(PosStore.prototype, {
         let final_val = 0;
         const ref_symbol = active_currency_ref ? active_currency_ref.symbol : (this.config.show_currency_symbol || '$');
 
-        // NEW LOGIC (Pachacutec): 
-        // If fromMainCurrency is true, amount is in VEF (Bs.F). 
-        // We must divide by rate to get USD (Base).
-        let base_amount = amount;
+        // UNIFIED MATH (Pachacutec v18.0.1.0.95): 
+        // Odoo Standard conversion uses MULTIPLICATION for Target = Base * rate
+        // base_amount here is RefCurrency amount.
         if (fromMainCurrency) {
-            base_amount = amount / rate;
-        }
-
-        // Now process like usual with base_amount (USD)
-        if (ref_symbol === '$' || ref_symbol === 'USD') {
-            // Base is USD, we want USD.
-            final_val = base_amount;
+            // Odoo logic: USD = Bs * (USD/Bs_rate)
+            final_val = amount * rate;
         } else {
-            // Base is USD, we want Bs (Reference). Multiply.
-            final_val = base_amount * rate;
+            // From Ref to Main (Inverse): Bs = USD / (USD/Bs_rate)
+            final_val = amount / rate;
         }
 
         return this.format_currency_ref(final_val);
@@ -245,7 +239,12 @@ patch(PosStore.prototype, {
     },
 
     get show_currency_rate_display() {
-        const rate = this.config.show_currency_rate || 0;
-        return rate.toFixed(4);
+        // Pachacutec: v18.0.1.0.95 - Visual clarity for cashiers
+        // We show the BCV rate (e.g. 477.14) even if internal rate is 0.002
+        if (this.res_currency_ref && this.res_currency_ref.rate_ve) {
+             return parseFloat(this.res_currency_ref.rate_ve).toFixed(4);
+        }
+        const rate = this.config.show_currency_rate_ve || (this.config.show_currency_rate > 0 ? (1.0 / this.config.show_currency_rate) : 0);
+        return parseFloat(rate).toFixed(4);
     }
 });

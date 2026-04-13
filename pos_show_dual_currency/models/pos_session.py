@@ -106,16 +106,14 @@ class PosSession(models.Model):
         
         if currency_ref_data:
             currency_ref = currency_ref_data[0]
-            try:
-                rate_tasa = float(self.env['res.currency'].sudo().get_trm_systray() or 0.0)
-            except:
-                rate_tasa = currency_ref.get('rate', 1.0)
+            # Pachacutec: v18.0.1.0.95 - UNIFIED MATH
+            # Odoo Standard: rate = Target / Base. 
+            # Inyectamos rate_ve para uso visual (Humano) y rate para cálculo (Odoo).
+            rate_human = rate_tasa if rate_tasa > 1 else (1.0 / rate_tasa if rate_tasa > 0 else 1.0)
+            rate_odoo = 1.0 / rate_human if rate_human > 0 else 1.0
             
-            if currency_ref['name'] == 'USD' and self.company_id.currency_id.name != 'USD':
-                  if rate_tasa:
-                      rate_tasa = 1.0 / rate_tasa
-            
-            currency_ref['rate'] = rate_tasa
+            currency_ref['rate'] = rate_odoo
+            currency_ref['rate_ve'] = rate_human
             
             # Pachacutec: v18.0.1.0.91 - SAFE INJECTION
             # Usamos get() y verificamos existencia para evitar KeyError si la carga base falló
@@ -126,7 +124,8 @@ class PosSession(models.Model):
             pos_config_data = result.get('pos.config', {}).get('data')
             if pos_config_data:
                 pos_config_data[0].update({
-                    'show_currency_rate': rate_tasa,
+                    'show_currency_rate': rate_odoo,
+                    'show_currency_rate_ve': rate_human,
                     'show_currency_symbol': currency_ref['symbol'],
                     'show_currency_position': currency_ref['position'],
                 })
