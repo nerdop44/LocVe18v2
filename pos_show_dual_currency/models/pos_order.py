@@ -86,12 +86,12 @@ class PosOrder(models.Model):
 
     @api.model
     def sync_from_ui(self, orders):
-        # Pachacutec: v18.0.1.0.98 - EMERGENCY SYNC SHIELD
-        # Elevamos a sudo() para evitar que registros multi-empresa como el stock.picking.type
-        # o empleados de otra compañía bloqueen la creación de pedidos para el cajero.
+        # Pachacutec: v18.0.1.1.0 - MULTI-COMPANY & ACL SHIELD
+        # Elevamos privilegios mediante el modelo para asegurar que la sincronización
+        # de pedidos pueda escribir en metadatos de moneda (ACL write res.currency) 
+        # y leer tipos de picking de otras sucursales en entornos de grupo.
         try:
-            return super().sync_from_ui(orders)
+            return super(PosOrder, self.env['pos.order'].sudo()).sync_from_ui(orders)
         except Exception as e:
-            _logger.error("[POS Order] Error en sync_from_ui (sudo): %s", str(e))
-            # Fallback al estándar por si sudo causara algún efecto secundario inesperado
-            return super(PosOrder, self).sync_from_ui(orders)
+            _logger.error("[POS Sync] Error en sync_from_ui (sudo): %s", str(e))
+            return super().sync_from_ui(orders)
