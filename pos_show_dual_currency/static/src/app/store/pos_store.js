@@ -13,6 +13,8 @@ patch(PosData.prototype, {
 
         if (response && response.res_currency_ref) {
             console.log(">>>>>>>> Intercepted res_currency_ref in PosData Root:", response.res_currency_ref);
+            // Aseguramos que el DataService tenga acceso directo si se inyectó en la raíz
+            this.res_currency_ref = response.res_currency_ref;
         } else if (response && response["pos.session"]) {
             const sessionModel = response["pos.session"];
             const res_currency_ref = sessionModel.res_currency_ref || (sessionModel.data && sessionModel.data[0] ? sessionModel.data[0].res_currency_ref : null);
@@ -165,18 +167,20 @@ patch(PosStore.prototype, {
                 return this.getAmountInRefCurrency(price_with_tax, true);
             }
 
-            if (this.currency) {
+            const currency = this.currency || this.models["res.currency"].get(this.config.currency_id[0]) || { rounding: 0.01, symbol: "Bs", position: "after", decimal_places: 2 };
+
+            if (currency) {
                 // Pachacutec: Eliminamos la multiplicación redundante por rate. 
                 // Aplicamos el mismo formato profesional (puntos para miles, comas para decimales)
-                const decimals = this.currency.decimal_places || 2;
+                const decimals = currency.decimal_places || 2;
                 const parts = price_with_tax.toFixed(decimals).split('.');
                 parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
                 const formatted_val = parts.join(',');
 
-                const curr_sym = typeof this.currency.symbol === 'symbol' ? '' : (this.currency.symbol || '');
-                return (this.currency.position === 'before' ? curr_sym + ' ' : '') +
+                const curr_sym = typeof currency.symbol === 'symbol' ? '' : (currency.symbol || '');
+                return (currency.position === 'before' ? curr_sym + ' ' : '') +
                     formatted_val +
-                    (this.currency.position === 'after' ? ' ' + curr_sym : '');
+                    (currency.position === 'after' ? ' ' + curr_sym : '');
             }
             return "" + price_with_tax.toFixed(2);
         } catch (e) {
@@ -218,9 +222,10 @@ patch(PosStore.prototype, {
             // Logic adapted for Odoo 18/Owl where compute_all might be a utility
             // or we use a simplified calculation for display if compute_all is missing
 
-            if (typeof this.compute_all === 'function') {
+            const currency = this.currency || this.models["res.currency"].get(this.config.currency_id[0]);
+            if (typeof this.compute_all === 'function' && currency) {
                 // compute_all(taxes, price, quantity, currency)
-                var all_taxes = this.compute_all(taxes, price, 1, this.currency.id);
+                var all_taxes = this.compute_all(taxes, price, 1, currency.id);
                 return all_taxes.total_included;
             } else if (this.get_taxes_after_fp) {
                 // Fallback if compute_all is missing logic (unlikely in POS)

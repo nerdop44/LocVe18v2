@@ -73,6 +73,13 @@ class PosSession(models.Model):
             self.message_post(body=message)
 
     @api.model
+    def load_data(self, models_to_load, data):
+        # Pachacutec: v18.0.1.0.93 - TOTAL SHIELD FIX
+        # Forzamos que TODO el proceso de carga de todos los modelos (monedas, impuestos, etc)
+        # se ejecute como superusuario para evitar AccessError en la localización.
+        return super(PosSession, self.sudo()).load_data(models_to_load, data)
+
+    @api.model
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.88 - SANEAMIENTO ESTRUCTURAL (Unificar UoM Variant-Template)
         # Realizamos la limpieza de base de datos una vez por carga de datos del POS
@@ -130,6 +137,9 @@ class PosSession(models.Model):
                     'show_currency_symbol': currency_ref['symbol'],
                     'show_currency_position': currency_ref['position'],
                 })
+            
+            # Inyectamos también en la raíz del resultado para máxima compatibilidad con el frontend
+            result['res_currency_ref'] = currency_ref
         
         return result
 
