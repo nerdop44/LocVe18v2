@@ -78,7 +78,10 @@ class PosSession(models.Model):
         # Realizamos la limpieza de base de datos una vez por carga de datos del POS
         # para asegurar integridad sin parches JIT que ralenticen el sistema.
         self.env['pos.uom.repair'].sudo().run_structural_repair()
-        result = super()._load_pos_data(data)
+        # Pachacutec: v18.0.1.0.92 - GLOBAL SHIELD FIX
+        # Elevamos TODO el proceso de carga base a sudo para evitar AccessError en 
+        # modelos relacionados (como empleados con campos privados de nómina).
+        result = super(PosSession, self.sudo())._load_pos_data(data)
         # Truth of Odoo 18: Standard data loader injection
         
         company_currency_id = self.company_id.currency_id.id
