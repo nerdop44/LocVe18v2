@@ -1,7 +1,7 @@
 import { patch } from "@web/core/utils/patch";
 import { PosOrder, PosOrderline, PosPayment } from "@point_of_sale/app/store/models";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
-import { PosData } from "@point_of_sale/app/models/pos_data";
+import { PosData } from "@point_of_sale/app/models/data_service";
 
 // Pachacutec: v18.0.1.0.43 - REFACTORIZACIÓN PROFESIONAL POR EVENTOS
 // Esta patch elimina el uso de loops reactivos (update) y se enfoca en acciones manuales
