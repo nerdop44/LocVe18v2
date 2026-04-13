@@ -114,11 +114,15 @@ class PosSession(models.Model):
             
             currency_ref['rate'] = rate_tasa
             
-            if 'pos.session' in result and result['pos.session']['data']:
-                result['pos.session']['data'][0]['res_currency_ref'] = currency_ref
+            # Pachacutec: v18.0.1.0.91 - SAFE INJECTION
+            # Usamos get() y verificamos existencia para evitar KeyError si la carga base falló
+            pos_session_data = result.get('pos.session', {}).get('data')
+            if pos_session_data:
+                pos_session_data[0]['res_currency_ref'] = currency_ref
                 
-            if 'pos.config' in result and result['pos.config']['data']:
-                result['pos.config']['data'][0].update({
+            pos_config_data = result.get('pos.config', {}).get('data')
+            if pos_config_data:
+                pos_config_data[0].update({
                     'show_currency_rate': rate_tasa,
                     'show_currency_symbol': currency_ref['symbol'],
                     'show_currency_position': currency_ref['position'],

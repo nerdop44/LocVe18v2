@@ -10,15 +10,17 @@ class HrEmployee(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data):
-        config_id = data['pos.config']['data'][0]['id']
-        config = self.env['pos.config'].browse(config_id)
+        # Pachacutec: v18.0.1.0.45 - SHIELD FIX
+        # Usamos sudo() para acceder a la configuración y sus relaciones
+        config_id = data.get('pos.config', {}).get('data', [{}])[0].get('id')
+        if not config_id:
+            return []
+        config = self.env['pos.config'].sudo().browse(config_id)
         if config.salesman_ids:
             return [('id', 'in', config.salesman_ids.ids)]
         return []
 
     def _load_pos_data(self, data):
-        # Override to ensure the data is returned in a format the frontend expects (hr_salesmen)
-        # However, Odoo 18 loads it as 'hr.employee'. 
-        # We will keep it as 'hr.employee' and adjust JS if needed, 
-        # or we can keep the custom injection in pos.session for backward compatibility.
-        return super()._load_pos_data(data)
+        # Pachacutec: v18.0.1.0.45 - SHIELD FIX
+        # Elevamos a sudo() para ignorar campos privados de nómina que causan AccessError
+        return super(HrEmployee, self.sudo())._load_pos_data(data)
