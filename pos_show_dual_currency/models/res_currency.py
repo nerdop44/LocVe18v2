@@ -1,4 +1,5 @@
 from odoo import models, api
+from odoo.exceptions import AccessError
 
 class ResCurrency(models.Model):
     _inherit = 'res.currency'
