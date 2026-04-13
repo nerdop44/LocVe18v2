@@ -253,14 +253,15 @@ patch(PosOrder.prototype, {
                 const price = this.get_total_with_tax() * (igtfPercentage / 100);
 
                 if (product && Math.abs(price) > 0.001) {
-                    this.update({
-                        lines: [["create", {
-                            product_id: product,
-                            price_unit: price,
-                            qty: 1,
-                            price_type: "original",
-                            x_is_igtf_line: true
-                        }]]
+                    // Pachacutec: v18.0.1.0.37 - REACTIVE FACTORY
+                    // Usamos la factoría oficial para asegurar que la línea sea un objeto Record real.
+                    this.models["pos.order_line"].create({
+                        order_id: this,
+                        product_id: product,
+                        price_unit: price,
+                        qty: 1,
+                        price_type: "original",
+                        x_is_igtf_line: true
                     });
                     this.recomputeOrderData();
                 }
@@ -272,10 +273,11 @@ patch(PosOrder.prototype, {
 
     removeIGTF() {
         if (window.__pachacutec_global_lock || !this.models || this.isFinalizing) return;
-        const linesToRemove = (this.lines || []).filter((l) => l && l.x_is_igtf_line);
+        // Pachacutec: Usamos el spread [...] para crear una copia estática y evitar 
+        // errores de concurrencia durante el borrado en el store reactivo.
+        const linesToRemove = [...(this.lines || [])].filter((l) => l && l.x_is_igtf_line);
         for (const line of linesToRemove) {
-            // Extra hardening: only attempt delete if it's a valid record with the method
-            if (line && typeof line.delete === "function" && typeof line.getIndexMaps === "function") {
+            if (line && typeof line.delete === "function") {
                 try {
                     line.delete();
                 } catch (e) {
