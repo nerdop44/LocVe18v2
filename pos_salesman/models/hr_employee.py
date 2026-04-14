@@ -10,10 +10,12 @@ class HrEmployee(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data):
-        # Pachacutec: v18.0.1.0.50 - RESTORATION FIX
-        # En v18, data es un dict directo de resultados. pos.config es una lista.
-        config_data = data.get('pos.config', [{}])[0]
-        config_id = config_data.get('id')
+        # Pachacutec: v18.0.1.0.51 - EMERGENCY DATA STRUCTURE FIX
+        # En v18, cada modelo es un dict con llave 'data'.
+        config_data_obj = data.get('pos.config', {})
+        # Si ya es una lista es por una carga no estándar, manejamos ambos casos
+        config_list = config_data_obj.get('data', []) if isinstance(config_data_obj, dict) else config_data_obj
+        config_id = config_list[0].get('id') if config_list else None
         if not config_id:
             return []
         

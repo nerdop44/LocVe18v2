@@ -4,17 +4,18 @@ import { patch } from "@web/core/utils/patch";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
-// v18.0.1.0.50 - RESTAURACIÓN MINIMALISTA
-// Respetamos estrictamente los empleados cargados por el servidor.
+// v18.0.1.0.51 - CORRECCIÓN DE EMERGENCIA: ESTRUCTURA DE DATOS
+// En Odoo 18 RPC, los resultados vienen envueltos en { data: [...] }.
 
 patch(PosStore.prototype, {
     async processData(loadedData) {
         await super.processData(...arguments);
         
-        // Cargamos los empleados que el servidor nos envió (ya vienen filtrados por dominio)
-        this.salesman_ids = loadedData["hr.employee"] || [];
+        // Cargamos los empleados desde la propiedad .data (estándar RPC v18)
+        const employeeResult = loadedData["hr.employee"];
+        this.salesman_ids = (employeeResult && employeeResult.data) ? employeeResult.data : (Array.isArray(employeeResult) ? employeeResult : []);
         
-        console.log(">>>>>>>> PosStore (Salesman): Vendedores restaurados:", this.salesman_ids.length);
+        console.log(">>>>>>>> PosStore (Salesman): Vendedores restaurados estructuralmente:", this.salesman_ids.length);
     },
 });
 
