@@ -37,7 +37,6 @@ class HrEmployee(models.Model):
 
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.45 - SHIELD FIX REPAIRED (v55)
-        # El método se ha reubicado correctamente en HrEmployee para evitar el crash de herencia super()
         _logger.info(">>>>>>>> [pos_salesman] Diagnostic: _load_pos_data triggered for hr.employee")
         return super(HrEmployee, self.sudo())._load_pos_data(data)
 
@@ -46,9 +45,8 @@ class AccountTax(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v53 - ESCUDO DE EMERGENCIA: Asegurar que pos_receipt_label se cargue para evitar el crash del POS
+        # Pachacutec: v56 - REMOVE POISON PILL
+        # Se elimina la referencia a pos_receipt_label ya que no existe en el esquema de Odoo 18
+        # y causa ValueError: Invalid field 'pos_receipt_label' on model 'account.tax'
         res = super()._load_pos_data_fields(config_id)
-        # Solo añadimos si no existe ya ante una posible colisión
-        if 'pos_receipt_label' not in res:
-            res.append('pos_receipt_label')
         return res
