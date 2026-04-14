@@ -22,6 +22,10 @@ patch(PosStore.prototype, {
             }
         }
 
+        const taxResult = loadedData["account.tax"];
+        const taxFields = (taxResult && taxResult.fields) ? taxResult.fields : [];
+        console.log(">>>>>>>> [pos_salesman] Diagnostic: Campos de impuestos cargados:", taxFields.join(", "));
+
         // Cargamos los empleados desde la propiedad .data (estándar RPC v18)
         this.salesman_ids = (employeeResult && employeeResult.data) ? employeeResult.data : (Array.isArray(employeeResult) ? employeeResult : []);
         

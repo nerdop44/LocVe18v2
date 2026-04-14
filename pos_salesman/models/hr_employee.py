@@ -9,7 +9,11 @@ class HrEmployee(models.Model):
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        return ['name']
+        # Pachacutec: v53 - FIX: Usar super() para no borrar campos de otros módulos (IGTF/Localización)
+        res = super()._load_pos_data_fields(config_id)
+        if 'name' not in res:
+            res.append('name')
+        return res
 
     @api.model
     def _load_pos_data_domain(self, data):
@@ -37,6 +41,18 @@ class HrEmployee(models.Model):
         domain = [('company_id', '=', config.company_id.id)]
         _logger.info(">>>>>>>> [pos_salesman] Diagnostic: No specific salesmen. Fallback domain: %s", domain)
         return domain
+
+class AccountTax(models.Model):
+    _inherit = "account.tax"
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v53 - ESCUDO DE EMERGENCIA: Asegurar que pos_receipt_label se cargue para evitar el crash del POS
+        res = super()._load_pos_data_fields(config_id)
+        # Solo añadimos si no existe ya ante una posible colisión
+        if 'pos_receipt_label' not in res:
+            res.append('pos_receipt_label')
+        return res
 
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.45 - SHIELD FIX
