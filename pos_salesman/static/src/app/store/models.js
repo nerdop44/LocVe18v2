@@ -1,53 +1,28 @@
 /** @odoo-module */
 
 import { patch } from "@web/core/utils/patch";
-
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
-import { PosData } from "@point_of_sale/app/models/data_service";
-
-patch(PosData.prototype, {
-    async loadInitialData() {
-        const response = await super.loadInitialData(...arguments);
-        console.log(">>>>>>>> PosData (Salesman): loadInitialData intercepted. Keys:", Object.keys(response || {}));
-        
-        // Find hr.employee data in the response
-        const employees = response['hr.employee']?.data || [];
-        
-        // Find pos.config to get salesman_ids
-        const config = response['pos.config']?.data?.[0] || {};
-        const allowedIds = config.salesman_ids || [];
-        
-        // Store computed salesmen in a way PosStore can find them later
-        if (allowedIds.length > 0) {
-            this.hr_salesmen = employees.filter(e => allowedIds.includes(e.id));
-        } else {
-            this.hr_salesmen = employees;
-        }
-        
-        console.log(">>>>>>>> PosData (Salesman): Filtered salesmen count:", this.hr_salesmen.length);
-        return response;
-    }
-});
+// v18.0.1.0.49 - ESTABILIZACIÓN QUIRÚRGICA
+// Eliminamos intercepciones redundantes y aseguramos persistencia de ID.
 
 patch(PosStore.prototype, {
-    setup() {
-        super.setup(...arguments);
-        // Sync the property from PosData service if available
-        if (this.data && this.data.hr_salesmen) {
-            this.salesman_ids = this.data.hr_salesmen;
-        } else {
-            this.salesman_ids = [];
-        }
-    },
     async processData(loadedData) {
         await super.processData(...arguments);
-        // Double check after processing
-        if (this.data && this.data.hr_salesmen) {
-            this.salesman_ids = this.data.hr_salesmen;
-            console.log(">>>>>>>> PosStore (Salesman): Synced from PosData:", this.salesman_ids.length);
+        
+        // Cargamos los vendedores permitidos desde la configuración
+        const config = loadedData["pos.config"]?.[0] || {};
+        const allowedIds = config.salesman_ids || [];
+        const allEmployees = loadedData["hr.employee"] || [];
+        
+        if (allowedIds.length > 0) {
+            this.salesman_ids = allEmployees.filter(e => allowedIds.includes(e.id));
+        } else {
+            this.salesman_ids = allEmployees;
         }
+        
+        console.log(">>>>>>>> PosStore (Salesman): Vendedores cargados:", this.salesman_ids.length);
     },
 });
 
@@ -56,24 +31,34 @@ patch(PosOrder.prototype, {
         super.setup(...arguments);
         this.salesman_id = this.salesman_id || null;
     },
+    
     init_from_JSON(json) {
         super.init_from_JSON(...arguments);
         if (json.salesman_id) {
-            // Find salesman in global list
-            this.salesman_id = this.pos.salesman_ids.find(s => s.id === json.salesman_id) || null;
+            // Intentamos recuperar el objeto completo desde la lista global
+            if (this.pos && this.pos.salesman_ids) {
+                this.salesman_id = this.pos.salesman_ids.find(s => s.id === json.salesman_id) || { id: json.salesman_id, name: "Cargando..." };
+            } else {
+                this.salesman_id = { id: json.salesman_id, name: "ID: " + json.salesman_id };
+            }
         }
     },
+    
     export_as_JSON() {
         const json = super.export_as_JSON(...arguments);
-        json.salesman_id = this.salesman_id ? this.salesman_id.id : false;
+        // Enviamos siempre el ID numérico para evitar errores de tipo Many2one en el backend
+        json.salesman_id = (this.salesman_id && typeof this.salesman_id === 'object') ? this.salesman_id.id : (this.salesman_id || false);
         return json;
     },
+    
     set_salesman_id(salesman) {
         this.salesman_id = salesman;
     },
+    
     get_salesman_id() {
         return this.salesman_id;
     },
+    
     get_salesman_name() {
         return this.salesman_id ? this.salesman_id.name : "";
     },
