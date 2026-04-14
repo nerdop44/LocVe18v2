@@ -10,15 +10,19 @@ class HrEmployee(models.Model):
 
     @api.model
     def _load_pos_data_domain(self, data):
-        # Pachacutec: v18.0.1.0.45 - SHIELD FIX
-        # Usamos sudo() para acceder a la configuración y sus relaciones
-        config_id = data.get('pos.config', {}).get('data', [{}])[0].get('id')
+        # Pachacutec: v18.0.1.0.50 - RESTORATION FIX
+        # En v18, data es un dict directo de resultados. pos.config es una lista.
+        config_data = data.get('pos.config', [{}])[0]
+        config_id = config_data.get('id')
         if not config_id:
             return []
+        
         config = self.env['pos.config'].sudo().browse(config_id)
         if config.salesman_ids:
             return [('id', 'in', config.salesman_ids.ids)]
-        return []
+            
+        # Fallback: Si no hay específicos, filtramos por la compañía del POS
+        return [('company_id', '=', config.company_id.id)]
 
     def _load_pos_data(self, data):
         # Pachacutec: v18.0.1.0.45 - SHIELD FIX
