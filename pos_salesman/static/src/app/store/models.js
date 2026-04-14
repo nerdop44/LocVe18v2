@@ -4,18 +4,28 @@ import { patch } from "@web/core/utils/patch";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
-// v18.0.1.0.51 - CORRECCIÓN DE EMERGENCIA: ESTRUCTURA DE DATOS
-// En Odoo 18 RPC, los resultados vienen envueltos en { data: [...] }.
+// v18.0.1.0.52 - DIAGNOSTIC INSTRUMENTATION
+// Agregamos logs para inspeccionar la estructura de datos en el cliente.
 
 patch(PosStore.prototype, {
     async processData(loadedData) {
         await super.processData(...arguments);
         
-        // Cargamos los empleados desde la propiedad .data (estándar RPC v18)
+        console.log(">>>>>>>> [pos_salesman] Diagnostic: loadedData keys:", Object.keys(loadedData));
         const employeeResult = loadedData["hr.employee"];
+        console.log(">>>>>>>> [pos_salesman] Diagnostic: hr.employee result type:", typeof employeeResult);
+        
+        if (employeeResult) {
+            console.log(">>>>>>>> [pos_salesman] Diagnostic: hr.employee has data:", !!employeeResult.data);
+            if (employeeResult.data) {
+                console.log(">>>>>>>> [pos_salesman] Diagnostic: hr.employee.data count:", employeeResult.data.length);
+            }
+        }
+
+        // Cargamos los empleados desde la propiedad .data (estándar RPC v18)
         this.salesman_ids = (employeeResult && employeeResult.data) ? employeeResult.data : (Array.isArray(employeeResult) ? employeeResult : []);
         
-        console.log(">>>>>>>> PosStore (Salesman): Vendedores restaurados estructuralmente:", this.salesman_ids.length);
+        console.log(">>>>>>>> [pos_salesman] Diagnostic Final: salesman_ids count:", this.salesman_ids.length);
     },
 });
 
