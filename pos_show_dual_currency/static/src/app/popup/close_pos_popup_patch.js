@@ -9,15 +9,14 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 // Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
 // Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
 
-// Pachacutec: v18.0.1.1.2 - Definición de props ultra-robusta con check de existencia
-const originalCloseProps = ClosePosPopup.props || {};
+// Pachacutec: v18.0.1.1.5 - Definición de props ultra-robusta. 
+// Usamos merge directo para evitar capturar objetos incompletos durante la carga de assets.
 patch(ClosePosPopup, {
     props: {
-        ...originalCloseProps,
+        ...ClosePosPopup.props,
         other_payment_methods: { type: Array, optional: true },
         amount_authorized_diff_ref: { type: Number, optional: true },
-        // Aseguramos tipos estándar para evitar crash en describeType
-        default_cash_details: originalCloseProps.default_cash_details || { type: Object, optional: true },
+        default_cash_details: { type: Object, optional: true },
     }
 });
 
@@ -72,9 +71,10 @@ patch(ClosePosPopup.prototype, {
     },
 
     openDetailsPopupUSD() {
-        const ref_id = this.props.default_cash_details.default_cash_details_ref.id;
+        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        if (!ref_id || !this.state.payments_usd[ref_id]) return;
         this.state.payments_usd[ref_id].counted = 0;
-        this.state.payments_usd[ref_id].difference = -this.props.default_cash_details.default_cash_details_ref.amount;
+        this.state.payments_usd[ref_id].difference = -(this.props.default_cash_details.default_cash_details_ref.amount || 0);
         this.state.displayMoneyDetailsPopupUSD = true;
     },
 
