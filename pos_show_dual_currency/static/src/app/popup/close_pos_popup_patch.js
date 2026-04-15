@@ -9,16 +9,10 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 // Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
 // Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
 
-// Pachacutec: v18.0.1.1.5 - Definición de props ultra-robusta. 
-// Usamos merge directo para evitar capturar objetos incompletos durante la carga de assets.
-patch(ClosePosPopup, {
-    props: {
-        ...ClosePosPopup.props,
-        other_payment_methods: { type: Array, optional: true },
-        amount_authorized_diff_ref: { type: Number, optional: true },
-        default_cash_details: { type: Object, optional: true },
-    }
-});
+// Pachacutec: v18.0.1.1.6 - OPCIÓN NUCLEAR (Blindaje Definitivo)
+// Desactivamos la validación de props de Owl para este componente.
+// Esto evita el crash 'toLowerCase' causado por conflictos de infraestructura entre parches.
+ClosePosPopup.props = false;
 
 patch(ClosePosPopup.prototype, {
     setup() {

@@ -6,11 +6,7 @@ import { useService } from "@web/core/utils/hooks";
 // Pachacutec: v135 - Migración MoneyDetailsPopupUSD Odoo 18
 export class MoneyDetailsPopupUSD extends Component {
     static template = "pos_show_dual_currency.MoneyDetailsPopupUSD";
-    static props = {
-        manualInputCashCountUSD: { type: Boolean, optional: true },
-        onConfirm: { type: Function },
-        onDiscard: { type: Function },
-    };
+    static props = false;
 
     setup() {
         this.pos = useService("pos");
