@@ -121,18 +121,21 @@ class ReportSaleDetails(models.AbstractModel):
                     taxes[0]['base_amount_ref'] += line.price_subtotal_incl_ref
 
         payment_ids = self.env["pos.payment"].search([('pos_order_id', 'in', orders.ids)]).ids
+        payments = []
         if payment_ids:
-            self.env.cr.execute("""
-                        SELECT COALESCE(method.name->>%s, method.name->>'en_US') as name, sum(amount) total, sum(amount_ref) total_ref
-                        FROM pos_payment AS payment,
-                             pos_payment_method AS method
-                        WHERE payment.payment_method_id = method.id
-                            AND payment.id IN %s
-                        GROUP BY method.name
-                    """, (self.env.lang, tuple(payment_ids),))
-            payments = self.env.cr.dictfetchall()
-        else:
-            payments = []
+            # Pachacutec: v18.0.1.1.4 - Migración a ORM para evitar KeyError: 'name' en traducciones SQL
+            payment_groups = self.env['pos.payment'].read_group(
+                [('id', 'in', payment_ids)],
+                ['payment_method_id', 'amount', 'amount_ref'],
+                ['payment_method_id']
+            )
+            for group in payment_groups:
+                method_id, method_name = group['payment_method_id']
+                payments.append({
+                    'name': method_name,
+                    'total': group['amount'],
+                    'total_ref': group['amount_ref'],
+                })
 
         return {
             'total_paid_ref': self.env.company.currency_id_dif.round(total_ref),

@@ -20,27 +20,29 @@
         <!-- Cash Overview headers / body modifications -->
         <!-- Injecting USD counted cash row -->
         <xpath expr="//div[hasclass('payment-methods-overview')]" position="before">
-            <div class="cash-overview-usd-container mb-3" style="border: 1px solid #dee2e6; border-radius: 4px; padding: 10px;">
-                <h4 style="color: #008784; border-bottom: 1px solid #eee; padding-bottom: 5px;">Resumen USD</h4>
-                <div class="cash-row-usd d-flex justify-content-between align-items-center">
-                    <div><t t-esc="props.default_cash_details.default_cash_details_ref.name"/></div>
-                    <div class="text-end font-weight-bold">
-                        Total Sistema: <span style="color: #008784;" t-esc="pos.format_currency_ref(props.default_cash_details.default_cash_details_ref.amount)"/>
+            <t t-if="pos.config.cash_control and props.default_cash_details and props.default_cash_details.default_cash_details_ref and state.payments_usd[props.default_cash_details.default_cash_details_ref.id]">
+                <div class="cash-overview-usd-container mb-3" style="border: 1px solid #dee2e6; border-radius: 4px; padding: 10px;">
+                    <h4 style="color: #008784; border-bottom: 1px solid #eee; padding-bottom: 5px;">Resumen USD</h4>
+                    <div class="cash-row-usd d-flex justify-content-between align-items-center">
+                        <div><t t-esc="props.default_cash_details.default_cash_details_ref.name"/></div>
+                        <div class="text-end font-weight-bold">
+                            Total Sistema: <span style="color: #008784;" t-esc="pos.format_currency_ref(props.default_cash_details.default_cash_details_ref.amount)"/>
+                        </div>
+                    </div>
+                    <div class="input-group mt-2">
+                        <span class="input-group-text">Contado USD</span>
+                        <input class="form-control" type="number" step="0.01"
+                               t-model.number="state.payments_usd[props.default_cash_details.default_cash_details_ref.id].counted"
+                               t-on-input="() => this.handleInputChangeUSD(props.default_cash_details.default_cash_details_ref.id)"/>
+                        <button class="btn btn-outline-secondary" t-on-click="openDetailsPopupUSD">
+                            <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
+                        </button>
+                    </div>
+                    <div class="mt-2 text-end" t-att-class="{'text-danger': state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference}">
+                        Diferencia: <t t-esc="pos.format_currency_ref(state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference)"/>
                     </div>
                 </div>
-                <div class="input-group mt-2">
-                    <span class="input-group-text">Contado USD</span>
-                    <input class="form-control" type="number" step="0.01"
-                           t-model.number="state.payments_usd[props.default_cash_details.default_cash_details_ref.id].counted"
-                           t-on-input="() => this.handleInputChangeUSD(props.default_cash_details.default_cash_details_ref.id)"/>
-                    <button class="btn btn-outline-secondary" t-on-click="openDetailsPopupUSD">
-                        <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
-                    </button>
-                </div>
-                <div class="mt-2 text-end" t-att-class="{'text-danger': state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference}">
-                    Diferencia: <t t-esc="pos.format_currency_ref(state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference)"/>
-                </div>
-            </div>
+            </t>
         </xpath>
 
         <!-- Money Details Popup Instance (v18 compatible component) -->

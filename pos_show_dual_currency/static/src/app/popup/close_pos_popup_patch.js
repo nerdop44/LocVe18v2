@@ -83,19 +83,24 @@ patch(ClosePosPopup.prototype, {
     },
 
     handleInputChangeUSD(paymentId) {
+        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        if (!this.state.payments_usd || !this.state.payments_usd[paymentId]) return;
+
         let expectedAmount;
-        if (paymentId === this.props.default_cash_details.default_cash_details_ref.id) {
+        if (paymentId === ref_id) {
             this.manualInputCashCountUSD = true;
             expectedAmount = this.props.default_cash_details.default_cash_details_ref.amount;
         } else {
-            expectedAmount = this.props.non_cash_payment_methods.find(pm => paymentId === pm.id).amount;
+            expectedAmount = this.props.non_cash_payment_methods.find(pm => paymentId === pm.id)?.amount || 0;
         }
         this.state.payments_usd[paymentId].difference =
             this.pos.round_decimals_currency(this.state.payments_usd[paymentId].counted - expectedAmount);
     },
 
     updateCountedCashUSD({ total_ref, moneyDetailsNotesRef }) {
-        const ref_id = this.props.default_cash_details.default_cash_details_ref.id;
+        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        if (!ref_id || !this.state.payments_usd || !this.state.payments_usd[ref_id]) return;
+
         this.state.payments_usd[ref_id].counted = total_ref;
         this.state.payments_usd[ref_id].difference =
             this.pos.round_decimals_currency(this.state.payments_usd[ref_id].counted - this.props.default_cash_details.default_cash_details_ref.amount);
@@ -108,11 +113,13 @@ patch(ClosePosPopup.prototype, {
     },
 
     hasDifferenceUSD() {
-        return Object.entries(this.state.payments_usd || {}).find(pm => pm[1].difference != 0);
+        if (!this.state.payments_usd) return false;
+        return Object.entries(this.state.payments_usd).find(pm => pm[1].difference != 0);
     },
 
     hasUserAuthorityUSD() {
-        const absDifferences = Object.entries(this.state.payments_usd || {}).map(pm => Math.abs(pm[1].difference));
+        if (!this.state.payments_usd) return true;
+        const absDifferences = Object.entries(this.state.payments_usd).map(pm => Math.abs(pm[1].difference));
         const maxDiff = absDifferences.length ? Math.max(...absDifferences) : 0;
         return this.pos.get_cashier().role === 'manager' || this.props.amount_authorized_diff_ref == null || maxDiff <= this.props.amount_authorized_diff_ref;
     },
@@ -120,8 +127,8 @@ patch(ClosePosPopup.prototype, {
     async closeSession() {
         if (!this.closeSessionClicked) {
             this.closeSessionClicked = true;
-            if (this.pos.config.cash_control) {
-                const ref_id = this.props.default_cash_details.default_cash_details_ref.id;
+            const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+            if (this.pos.config.cash_control && ref_id && this.state.payments_usd && this.state.payments_usd[ref_id]) {
                 const response = await this.pos.data.call('pos.session', 'post_closing_cash_details_ref', [
                     [this.pos.pos_session.id]
                 ], {
