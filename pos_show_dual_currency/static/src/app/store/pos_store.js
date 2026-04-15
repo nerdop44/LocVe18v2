@@ -37,36 +37,25 @@ patch(PosData.prototype, {
 
 // Patch PosStore to use the intercepted data
 patch(PosStore.prototype, {
-    get res_currency_ref() {
-        return this.get_currency_ref();
-    },
-
     get_currency_ref() {
-        // 1. Try accessing from PosData if available (this.data is commonly the data service in Odoo 18 PosStore)
-        // Pachacutec: v18.0.1.1.2 - Redundancia de carga para res_currency_ref
-        console.log("[DualCurrency] Intentando cargar res_currency_ref desde data...");
+        // Pachacutec: v18.0.1.1.3 - Resolución de recursión infinita
+        // 1. Try accessing from PosData if available (this.data is the data service in Odoo 18)
         if (this.data && this.data.res_currency_ref) {
-            this.res_currency_ref = this.data.res_currency_ref?.[0] || false;
-            console.log("[DualCurrency] res_currency_ref cargado:", this.res_currency_ref);
-        } else {
-            console.warn("[DualCurrency] res_currency_ref NO Hallado en data. Intentando fallback desde pos_session...");
-            const session = this.pos_session || this.session;
-            if (session && session.res_currency_ref) {
-                this.res_currency_ref = session.res_currency_ref[0] || false;
-            }
+            const data_ref = this.data.res_currency_ref;
+            return Array.isArray(data_ref) ? data_ref[0] : data_ref;
         }
 
-        // 2. Try accessing from this.session (if loaded as a property)
-        if (this.session && this.session.res_currency_ref) {
-            return this.session.res_currency_ref;
+        // 2. Try accessing from session property
+        const session = this.pos_session || this.session;
+        if (session && session.res_currency_ref) {
+            const sess_ref = session.res_currency_ref;
+            return Array.isArray(sess_ref) ? sess_ref[0] : sess_ref;
         }
 
-        // 3. Try finding it in the loaded models if they are accessible
+        // 3. Try finding it in the loaded models
         if (this.models && this.models['pos.session']) {
             const sessionModel = this.models['pos.session'];
-            if (sessionModel.res_currency_ref) return sessionModel.res_currency_ref;
-
-            const sessionData = sessionModel.data || sessionModel;
+            const sessionData = sessionModel.data || [sessionModel];
             if (Array.isArray(sessionData) && sessionData.length > 0) {
                 const sess = sessionData.find(s => s.id === this.session?.id) || sessionData[0];
                 if (sess && sess.res_currency_ref) return sess.res_currency_ref;
@@ -74,6 +63,11 @@ patch(PosStore.prototype, {
         }
 
         return null;
+    },
+
+    // Getter seguro para uso en templates y otras lógicas
+    get res_currency_ref() {
+        return this.get_currency_ref();
     },
 
     format_currency_ref(value) {
