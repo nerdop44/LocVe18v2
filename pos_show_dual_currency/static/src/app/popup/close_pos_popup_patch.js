@@ -9,38 +9,41 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 // Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
 // Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
 
+// Pachacutec: v18.0.1.1.2 - Definición de props ultra-robusta con check de existencia
+const originalCloseProps = ClosePosPopup.props || {};
 patch(ClosePosPopup, {
-    // Definición de props estáticos (v18)
     props: {
-        ...ClosePosPopup.props,
+        ...originalCloseProps,
         other_payment_methods: { type: Array, optional: true },
         amount_authorized_diff_ref: { type: Number, optional: true },
+        // Aseguramos tipos estándar para evitar crash en describeType
+        default_cash_details: originalCloseProps.default_cash_details || { type: Object, optional: true },
     }
 });
 
 patch(ClosePosPopup.prototype, {
     setup() {
         super.setup();
-        this.dialog = useService("dialog"); // Pachacutec: v136 - Requisito Owl 18
+        this.dialog = useService("dialog");
         this.manualInputCashCountUSD = false;
 
-        // Initialize state payments_usd for dual currency ref
+        // Initialize state payments_usd safely
         if (!this.state.payments_usd) {
             this.state.payments_usd = {};
         }
         
-        if (this.pos.config.cash_control && this.props.default_cash_details?.default_cash_details_ref) {
-            const ref_id = this.props.default_cash_details.default_cash_details_ref.id;
-            if (!this.state.payments_usd[ref_id]) {
+        const cashDetails = this.props.default_cash_details;
+        if (this.pos.config.cash_control && cashDetails && cashDetails.default_cash_details_ref) {
+            const ref_id = cashDetails.default_cash_details_ref.id;
+            if (ref_id && !this.state.payments_usd[ref_id]) {
                 this.state.payments_usd[ref_id] = {
                     counted: 0,
-                    difference: -this.props.default_cash_details.default_cash_details_ref.amount,
+                    difference: -(cashDetails.default_cash_details_ref.amount || 0),
                     number: 0
                 };
             }
         }
 
-        // Estado reactivo adicional para dólars
         Object.assign(this.state, {
             displayMoneyDetailsPopupUSD: false,
         });

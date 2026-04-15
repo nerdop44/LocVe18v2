@@ -43,8 +43,17 @@ patch(PosStore.prototype, {
 
     get_currency_ref() {
         // 1. Try accessing from PosData if available (this.data is commonly the data service in Odoo 18 PosStore)
+        // Pachacutec: v18.0.1.1.2 - Redundancia de carga para res_currency_ref
+        console.log("[DualCurrency] Intentando cargar res_currency_ref desde data...");
         if (this.data && this.data.res_currency_ref) {
-            return this.data.res_currency_ref;
+            this.res_currency_ref = this.data.res_currency_ref?.[0] || false;
+            console.log("[DualCurrency] res_currency_ref cargado:", this.res_currency_ref);
+        } else {
+            console.warn("[DualCurrency] res_currency_ref NO Hallado en data. Intentando fallback desde pos_session...");
+            const session = this.pos_session || this.session;
+            if (session && session.res_currency_ref) {
+                this.res_currency_ref = session.res_currency_ref[0] || false;
+            }
         }
 
         // 2. Try accessing from this.session (if loaded as a property)

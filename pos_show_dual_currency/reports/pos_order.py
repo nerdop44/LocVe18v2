@@ -42,7 +42,9 @@ class ReportSaleDetails(models.AbstractModel):
         data['rate_today'] = rate_today
         for prod in products:
             if pos_session:
-                prod['price_unit_ref'] = prod['price_unit'] / rate_today
+                # Odoo 18 puede usar 'price_unit' o 'price'. Usamos .get() para evitar KeyError.
+                price_unit = prod.get('price_unit') or prod.get('price', 0.0)
+                prod['price_unit_ref'] = price_unit / rate_today
         data['products'] = products
         data['payments'] = values_data['payments']
         data['taxes'] = values_data['taxes']
