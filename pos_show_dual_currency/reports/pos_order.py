@@ -26,12 +26,13 @@ class ReportSaleDetails(models.AbstractModel):
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
         # Odoo 18: data['products'] es una lista de CATEGORÍAS:
         # [{'name': 'Cat', 'qty': N, 'total': T, 'products': [{...}, ...]}, ...]
-        products = data['products']
+        # REGLA: NUNCA reemplazar data['products'], data['payments'] ni data['taxes']
+        # con estructuras simplificadas. Solo ENRIQUECER con campos _ref.
+
         pos_session = self.env['pos.session'].search([('id', 'in', session_ids)]) if session_ids else self.env['pos.session']
         rate_today = 1
-        if pos_session:
-            if pos_session[0].tax_today != 0:
-                rate_today = pos_session[0].tax_today
+        if pos_session and pos_session[0].tax_today != 0:
+            rate_today = pos_session[0].tax_today
 
         currency_id_dif = self.env.company.currency_id_dif
         data['currency_precision_ref'] = currency_id_dif.decimal_places
@@ -43,17 +44,20 @@ class ReportSaleDetails(models.AbstractModel):
         ) if rate_today else 0.0
 
         # Inyectar price_unit_ref DENTRO de cada producto de cada categoría
-        for category in products:
+        for category in data.get('products', []):
             for prod in category.get('products', []):
                 price_unit = prod.get('price_unit') or prod.get('price', 0.0)
                 prod['price_unit_ref'] = price_unit / rate_today if rate_today else 0.0
 
-        data['products'] = products
+        # Enriquecer payments nativos con total_ref (preservar TODA la estructura nativa)
+        for payment in data.get('payments', []):
+            payment['total_ref'] = payment.get('total', 0.0) / rate_today if rate_today else 0.0
 
-        # Enriquecer payments y taxes con datos de moneda referencia
-        values_data = self.update_key_values_data(date_start, date_stop, config_ids, session_ids)
-        data['payments'] = values_data['payments']
-        data['taxes'] = values_data['taxes']
+        # Enriquecer taxes nativos con _ref (preservar TODA la estructura nativa)
+        for tax in data.get('taxes', []):
+            tax['tax_amount_ref'] = tax.get('tax_amount', 0.0) / rate_today if rate_today else 0.0
+            tax['base_amount_ref'] = tax.get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
         return data
 
     def update_key_values_data(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
