@@ -24,28 +24,34 @@ class ReportSaleDetails(models.AbstractModel):
     @api.model
     def get_sale_details(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):
         data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
+        # Odoo 18: data['products'] es una lista de CATEGORÍAS:
+        # [{'name': 'Cat', 'qty': N, 'total': T, 'products': [{...}, ...]}, ...]
         products = data['products']
-        pos_session = self.env['pos.session'].search([('id', 'in', session_ids)])
+        pos_session = self.env['pos.session'].search([('id', 'in', session_ids)]) if session_ids else self.env['pos.session']
         rate_today = 1
-        values_data = self.update_key_values_data(date_start, date_stop, config_ids, session_ids)
         if pos_session:
             if pos_session[0].tax_today != 0:
                 rate_today = pos_session[0].tax_today
-        else:
-            products = values_data['products']
+
         currency_id_dif = self.env.company.currency_id_dif
         data['currency_precision_ref'] = currency_id_dif.decimal_places
-        data['total_paid_ref'] = currency_id_dif.round(data['total_paid'] / rate_today) if pos_session else values_data[
-            'total_paid_ref']
         data['symbol_ref'] = currency_id_dif.symbol
         data['symbol'] = self.env.company.currency_id.symbol
         data['rate_today'] = rate_today
-        for prod in products:
-            if pos_session:
-                # Odoo 18 puede usar 'price_unit' o 'price'. Usamos .get() para evitar KeyError.
+        data['total_paid_ref'] = currency_id_dif.round(
+            data['total_paid'] / rate_today
+        ) if rate_today else 0.0
+
+        # Inyectar price_unit_ref DENTRO de cada producto de cada categoría
+        for category in products:
+            for prod in category.get('products', []):
                 price_unit = prod.get('price_unit') or prod.get('price', 0.0)
-                prod['price_unit_ref'] = price_unit / rate_today
+                prod['price_unit_ref'] = price_unit / rate_today if rate_today else 0.0
+
         data['products'] = products
+
+        # Enriquecer payments y taxes con datos de moneda referencia
+        values_data = self.update_key_values_data(date_start, date_stop, config_ids, session_ids)
         data['payments'] = values_data['payments']
         data['taxes'] = values_data['taxes']
         return data
