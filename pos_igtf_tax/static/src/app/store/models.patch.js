@@ -175,13 +175,14 @@ patch(PosOrder.prototype, {
             if (igtf_monto > 0.01 && igtfProduct) {
                 const product = this.models["product.product"]?.get(igtfProduct[0]);
                 if (product) {
-                    this.models["pos.order.line"].create({
-                        order_id: this.id,
-                        product_id: product.id,
-                        price_unit: igtf_monto,
-                        qty: 1,
-                        price_type: "original",
-                        x_is_igtf_line: true
+                    this.update({
+                        lines: [["create", {
+                            product_id: product,
+                            price_unit: igtf_monto,
+                            qty: 1,
+                            price_type: "original",
+                            x_is_igtf_line: true
+                        }]]
                     });
                     if (typeof this.recomputeOrderData === "function") {
                         this.recomputeOrderData();
