@@ -175,15 +175,18 @@ patch(PosOrder.prototype, {
             if (igtf_monto > 0.01 && igtfProduct) {
                 const product = this.models["product.product"]?.get(igtfProduct[0]);
                 if (product) {
-                    this.update({
-                        lines: [["create", {
-                            product_id: product,
-                            price_unit: igtf_monto,
-                            qty: 1,
-                            price_type: "original",
-                            x_is_igtf_line: true
-                        }]]
-                    });
+                    const pos = this.pos || this.models["pos.config"]?.getFirst()?.env?.services?.pos || window.pos;
+                    if (pos && typeof pos.addLineToCurrentOrder === 'function') {
+                        pos.addLineToCurrentOrder(product, {
+                            price: igtf_monto,
+                            quantity: 1,
+                            merge: false,
+                            extras: {
+                                price_type: "original",
+                                x_is_igtf_line: true
+                            }
+                        }).catch(e => console.warn("Pachacutec: Error async adding IGTF line", e));
+                    }
                     if (typeof this.recomputeOrderData === "function") {
                         this.recomputeOrderData();
                     }
