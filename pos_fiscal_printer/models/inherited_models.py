@@ -39,6 +39,12 @@ class PosSession(models.Model):
     x_pos_z_report_number = fields.Char("Número Reporte Z")
     pos_report_z_id = fields.Many2one("pos.report.z", "Reporte Z")
 
+    def _loader_params_pos_payment_method(self):
+        result = super()._loader_params_pos_payment_method()
+        if 'x_printer_code' not in result['search_params']['fields']:
+            result['search_params']['fields'].append('x_printer_code')
+        return result
+
     def set_z_report(self, number):
         z_report = self.env['pos.report.z'].sudo().search([('number','=',number)])
         if z_report:
@@ -103,10 +109,6 @@ class PosPaymentMethod(models.Model):
         for rec in self:
             if rec.x_printer_code and len(rec.x_printer_code) != 2:
                 raise ValidationError("El código en la impresora sólo puede tener dos caracteres")
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + ['x_printer_code']
 
 class ResPartner(models.Model):
     _inherit = "res.partner"

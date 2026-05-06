@@ -15,7 +15,7 @@ patch(PaymentScreen.prototype, {
         });
 
         onWillUnmount(() => {
-            if (this.currentOrder && !this.currentOrder.finalized) {
+            if (this.currentOrder && typeof this.currentOrder.is_paid === 'function' && !this.currentOrder.is_paid()) {
                 this.currentOrder.removeIGTF();
             }
         });
