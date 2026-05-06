@@ -4,7 +4,7 @@
     <t t-name="ClosePosPopupPatch" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
         
         <!-- TRM Global para cálculos rápidos -->
-        <xpath expr="." position="inside">
+        <xpath expr="//div[hasclass('total-orders')]" position="before">
             <t t-set="trm" t-value="pos.config.show_currency_rate ? (1 / pos.config.show_currency_rate) : 1"/>
         </xpath>
 

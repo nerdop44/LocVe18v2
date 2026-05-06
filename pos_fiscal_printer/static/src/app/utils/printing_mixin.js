@@ -931,55 +931,45 @@ export const FiscalPrinterMixin = {
     },
 
     setTotal() {
-        console.log("[FISCAL] v182 - setTotal Dinámico (Restauración Paridad v16)");
+        console.log("[FISCAL] v200 - setTotal Corregido (Sin comando 199)");
         
-        // AHORA SÍ: Comando 3 (Subtotal) -> Bloquea a Estado de Pago
+        // Comando 3 (Subtotal) -> Bloquea a Estado de Pago
         this.printerCommands.push("3"); 
 
-        // Pachacutec: v182 - Lógica de Pagos Dinámicos
-        // Iteramos sobre payment_ids (Odoo 18)
+        // Lógica de Pagos Dinámicos (Odoo 18)
         const payments = this.order.payment_ids || [];
         const positivePayments = payments.filter(p => (p.amount || 0) > 0);
 
         if (positivePayments.length === 0) {
-            console.warn("[FISCAL] v182 - No se hallaron pagos positivos, usando fallback 101");
+            console.warn("[FISCAL] v200 - No se hallaron pagos positivos, usando fallback 101");
             this.printerCommands.push("101");
         } else {
             positivePayments.forEach((payment, index) => {
                 const isLast = (index === positivePayments.length - 1);
                 
-                // Diagnóstico v194: Recuperación Ultra-Segura vía DataHelper
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
                 const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
                 
-                console.log(`[FISCAL] v194 - Pago ${index + 1}: Código=${code}, Monto=${payment.amount}`);
+                console.log(`[FISCAL] v200 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
                 if (isLast && positivePayments.length === 1) {
-                    // Pago único: Comando 1 (Cierre Total)
+                    // Pago único: Comando 1 (Cierre Total, impresora calcula)
                     this.printerCommands.push("1" + code);
-                } else {
-                    // Pagos parciales o último de varios: Comando 2 (Pago Parcial con Monto)
+                } else if (!isLast) {
+                    // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
                     let amountStr = String(Math.round(Math.abs(payment.amount || 0) * 100));
-                    // Flag 21 decide si 10 o 15 dígitos
                     const padding = (this.pos.config.flag_21 === '30') ? 15 : 10;
                     amountStr = amountStr.padStart(padding, "0");
-                    
                     this.printerCommands.push("2" + code + amountStr);
-                    
-                    // Si es el último de varios, debemos cerrar con un comando 1 genérico o volver a enviar el código
-                    if (isLast) {
-                        this.printerCommands.push("1" + code);
-                    }
+                } else {
+                    // Último pago de varios: Comando 1 (Cierre Total)
+                    this.printerCommands.push("1" + code);
                 }
             });
         }
 
-        // Comando 199 para finalizar factura fiscal si no se ha enviado (Safe Closing)
-        if (!this.printerCommands.includes("199")) {
-            this.printerCommands.push("199");
-        }
-
-        console.log("[FISCAL] v182 - Cierre Fiscal Dinámico Finalizado.");
+        // v200: ELIMINADO comando 199 espurio que causaba NAK y anulaciones
+        console.log("[FISCAL] v200 - Cierre Fiscal Dinámico Finalizado.");
     },
 
     printFiscal() {
@@ -991,7 +981,6 @@ export const FiscalPrinterMixin = {
     setLines(char) {
         console.warn("[FISCAL] setLines - Inicio con char:", char);
         this.order.lines
-            .filter(line => !line.x_is_igtf_line)
             .forEach((line) => {
                 // Pachacutec: v42 - Declaración de variables con ámbito correcto
                 let tax_ids = [];

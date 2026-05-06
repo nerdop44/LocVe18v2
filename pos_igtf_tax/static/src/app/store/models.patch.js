@@ -63,9 +63,9 @@ patch(PosPayment.prototype, {
         const config = this.models?.["pos.config"]?.getFirst();
         let amount = value;
         if (this.isForeignExchange && this.pos_order_id && config) {
-            const due = typeof this.pos_order_id.getTotalDue === "function" ? this.pos_order_id.getTotalDue() : 0;
-            if (Math.abs(value - due) > 0.01) {
-                amount = value * (config.show_currency_rate || 1.0);
+            const rate = config.show_currency_rate;
+            if (rate && rate > 0 && rate < 1) {
+                amount = value / rate;
             }
         }
         super.set_amount(amount);
