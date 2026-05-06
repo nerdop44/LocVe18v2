@@ -3,18 +3,11 @@
     <!-- Pachacutec: v135 - Migración Extension XML Cierre de Caja Odoo 18 -->
     <t t-name="ClosePosPopupPatch" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
         
-        <!-- TRM Global para cálculos rápidos -->
-        <xpath expr="//div[hasclass('total-orders')]" position="before">
-            <t t-set="trm" t-value="pos.config.show_currency_rate ? (1 / pos.config.show_currency_rate) : 1"/>
-        </xpath>
-
         <!-- Total Orders in USD -->
         <xpath expr="//div[hasclass('total-orders')]" position="inside">
-            <t t-if="trm != 0">
-                <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em;">
-                    (<t t-esc="pos.format_currency_ref(props.orders_details.amount / trm)"/>)
-                </div>
-            </t>
+            <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em;">
+                (<t t-esc="pos.getAmountInRefCurrency(props.orders_details.amount, true)"/>)
+            </div>
         </xpath>
 
         <!-- Cash Overview headers / body modifications -->
@@ -57,8 +50,8 @@
         
         <!-- Multi-currency columns in payment methods (Stuctural XPath: added after amount span) -->
         <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('fs-3')]/span[2]" position="after">
-            <span t-if="trm != 0" class="usd-amount ms-2 text-muted" style="font-size: 0.8em;">
-                (<t t-esc="pos.format_currency_ref(pm.amount / trm)"/>)
+            <span class="usd-amount ms-2 text-muted" style="font-size: 0.8em;">
+                (<t t-esc="pos.getAmountInRefCurrency(pm.amount, true)"/>)
             </span>
         </xpath>
     </t>
