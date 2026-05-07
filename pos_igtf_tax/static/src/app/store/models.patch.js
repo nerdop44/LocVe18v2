@@ -6,20 +6,14 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { PosData } from "@point_of_sale/app/models/data_service";
 import DevicesSynchronisation from "@point_of_sale/app/store/devices_synchronisation";
-import { PosPaymentMethod } from "@point_of_sale/app/models/pos_payment_method";
 import { patch } from "@web/core/utils/patch";
 import { roundDecimals } from "@web/core/utils/numbers";
 
 // Pachacutec: v18 - Registro formal de campos para evitar errores de getIndexMaps
+// PosOrderline es un módulo independiente, podemos registrarlo aquí.
 PosOrderline.fields = {
     ...PosOrderline.fields,
     x_is_igtf_line: { type: "boolean" },
-};
-
-PosPaymentMethod.fields = {
-    ...PosPaymentMethod.fields,
-    x_igtf_percentage: { type: "float" },
-    x_is_foreign_exchange: { type: "boolean" },
 };
 
 // v18.0.1.0.48 - ESTABILIZACIÓN REACTIVA
