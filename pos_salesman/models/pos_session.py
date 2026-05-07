@@ -5,11 +5,22 @@ class PosConfig(models.Model):
 
     @api.model
     def _load_pos_data(self, data):
-        # Pachacutec: v18 - Inyectar salesman_ids de forma segura sin romper la lista de campos core (evita KeyError: 'use_pricelist')
+        # Pachacutec: v18 - Inyectar salesman_ids de forma segura
+        # Odoo 18 pos.config retorna {'data': [...], 'fields': [...]}
         res = super()._load_pos_data(data)
-        if res and len(res) > 0:
-            config = self.browse(data['pos_config_id'])
-            res[0]['salesman_ids'] = config.salesman_ids.ids
+        
+        # Obtenemos el config_id desde la sesión cargada previamente
+        try:
+            config_id = data['pos.session']['data'][0]['config_id']
+            config = self.browse(config_id)
+            
+            if isinstance(res, dict) and 'data' in res and len(res['data']) > 0:
+                res['data'][0]['salesman_ids'] = config.salesman_ids.ids
+            elif isinstance(res, list) and len(res) > 0:
+                res[0]['salesman_ids'] = config.salesman_ids.ids
+        except (KeyError, IndexError, TypeError):
+            pass
+            
         return res
 
 class HrEmployee(models.Model):
@@ -18,25 +29,26 @@ class HrEmployee(models.Model):
     @api.model
     def _load_pos_data_domain(self, data):
         # Pachacutec: v18 - Inyectar vendedores configurados en el dominio de carga
-        config_id = self.env['pos.config'].browse(data['pos_config_id'])
-        
-        # Intentamos obtener el dominio base de pos_hr u otros módulos
+        # Odoo 18 pos.session ya debe estar en data
+        try:
+            config_id_val = data['pos.session']['data'][0]['config_id']
+            config_id = self.env['pos.config'].browse(config_id_val)
+        except (KeyError, IndexError, TypeError):
+            return super()._load_pos_data_domain(data)
+            
+        # Obtener dominio base
         domain = []
         try:
-            # En Odoo 18, super()._load_pos_data_domain(data) es el estándar
             domain = super()._load_pos_data_domain(data)
         except AttributeError:
-            # Fallback si nadie más lo define
             domain = [('company_id', '=', config_id.company_id.id)]
         
         if config_id.salesman_ids:
-            # Forzamos la inclusión de nuestros vendedores con un OR (|)
-            # Esto asegura que aparezcan aunque no tengan usuario (pos_hr suele filtrar por user_id)
             domain = ['|'] + domain + [('id', 'in', config_id.salesman_ids.ids)]
         
         return domain
 
     @api.model
     def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v18 - Asegurar campos requeridos para la UI del selector de vendedores
+        # Pachacutec: v18 - Asegurar campos requeridos
         return super()._load_pos_data_fields(config_id) + ['name']

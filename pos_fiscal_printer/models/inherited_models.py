@@ -102,11 +102,13 @@ class PosPaymentMethod(models.Model):
 
     @api.model
     def _load_pos_data(self, data):
-        # Pachacutec: v18 - Inyección segura de x_printer_code para evitar romper el Loader core
+        # Pachacutec: v18 - Inyección segura de x_printer_code compatible con Dict/List
         res = super()._load_pos_data(data)
-        for rec in res:
-            pm = self.browse(rec['id'])
-            rec['x_printer_code'] = pm.x_printer_code
+        records = res.get('data', []) if isinstance(res, dict) else res
+        if isinstance(records, list):
+            for rec in records:
+                pm = self.browse(rec['id'])
+                rec['x_printer_code'] = pm.x_printer_code
         return res
 
     @api.constrains("x_printer_code")
