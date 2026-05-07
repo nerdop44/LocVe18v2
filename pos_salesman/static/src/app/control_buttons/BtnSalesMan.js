@@ -53,10 +53,9 @@ export class BtnSalesMan extends Component {
     }
 }
 
-// Registro en Odoo 18 para pos_control_buttons
-export const btnSalesManConfig = {
-    component: BtnSalesMan,
-};
+import { ActionpadWidget } from "@point_of_sale/app/screens/product_screen/action_pad/action_pad";
+import { patch } from "@web/core/utils/patch";
 
-registry.category("pos_control_buttons").add("BtnSalesMan", btnSalesManConfig);
-
+patch(ActionpadWidget.components, {
+    BtnSalesMan,
+});
