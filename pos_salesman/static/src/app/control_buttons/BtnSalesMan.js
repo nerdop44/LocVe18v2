@@ -30,8 +30,9 @@ export class BtnSalesMan extends Component {
             console.log("BtnSalesMan: Store NOT FOUND in this.pos.models");
         }
 
-        const salesman_list = employeeStore ? employeeStore.getAll().filter(s => s.is_salesman) : [];
-        console.log("BtnSalesMan: Final salesman_list (filtered) count:", salesman_list.length);
+        const salesman_ids = this.pos.config.salesman_ids || [];
+        const salesman_list = employeeStore ? employeeStore.getAll().filter(s => salesman_ids.includes(s.id)) : [];
+        console.log("BtnSalesMan: Final salesman_list (config filtered) count:", salesman_list.length);
 
         if (salesman_list.length === 0) {
             this.notification.add(_t("No hay vendedores configurados para este punto de venta."), {
