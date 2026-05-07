@@ -8,8 +8,8 @@
     'maintainer': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'website': 'https://github.com/birkot',
     'category': 'Point of Sale',
-    "version": "18.0.1.0.58",
-    'depends': ['hr', 'point_of_sale'],
+    "version": "18.0.1.0.59",
+    'depends': ['hr', 'point_of_sale', 'pos_hr'],
     'data': [
         'security/ir.model.access.csv',
         'views/pos_config.xml',

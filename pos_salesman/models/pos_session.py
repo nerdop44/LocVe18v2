@@ -16,15 +16,29 @@ class PosSession(models.Model):
         return result
 
     def _loader_params_hr_employee(self):
-        domain = [('company_id', '=', self.config_id.company_id.id)]
-        if self.config_id.salesman_ids:
-            domain = [('id', 'in', self.config_id.salesman_ids.ids)]
-        return {
-            'search_params': {
-                'domain': domain,
-                'fields': ['name', 'id'],
+        try:
+            result = super()._loader_params_hr_employee()
+        except AttributeError:
+            result = {
+                'search_params': {
+                    'domain': [('company_id', '=', self.config_id.company_id.id)],
+                    'fields': ['name', 'id'],
+                }
             }
-        }
+        
+        # Combinar con nuestros vendedores usando OR (|)
+        if self.config_id.salesman_ids:
+            my_domain = [('id', 'in', self.config_id.salesman_ids.ids)]
+            if result['search_params'].get('domain'):
+                result['search_params']['domain'] = ['|'] + result['search_params']['domain'] + my_domain
+            else:
+                result['search_params']['domain'] = my_domain
+        
+        return result
 
     def _get_pos_ui_hr_employee(self, params):
-        return self.env['hr.employee'].search_read(**params['search_params'])
+        # Intentamos obtenerlo de super si existe
+        try:
+            return super()._get_pos_ui_hr_employee(params)
+        except AttributeError:
+            return self.env['hr.employee'].search_read(**params['search_params'])

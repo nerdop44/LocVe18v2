@@ -13,9 +13,13 @@
     </t>
 
     <t t-name="pos_salesman.ActionpadWidget" t-inherit="point_of_sale.ActionpadWidget" t-inherit-mode="extension" owl="1">
-        <xpath expr="//button[hasclass('pay')]" position="before">
-            <BtnSalesMan />
+        <xpath expr="//div[hasclass('actionpad')]/*[1]" position="before">
+            <div class="d-flex align-items-center justify-content-between gap-2 mb-2 w-100">
+                <BtnSalesMan />
+            </div>
         </xpath>
     </t>
+
+
 </templates>
 
