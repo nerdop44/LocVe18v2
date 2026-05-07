@@ -1080,9 +1080,13 @@ export const FiscalPrinterMixin = {
                 }
 
                 // Pachacutec: v157 - Restauración de Estructura Exacta v16 (Fuente de Verdad)
-                // Basado en el skill hka_fiscal_expert: 16 Precio + 17 Cantidad + Pipes
-                let price = String(Math.round((unitPrice || 0) * 100)).padStart(16, '0').slice(-16);
-                let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(17, '0').slice(-17);
+                // Pachacutec: v203 - Longitud Dinámica basada en Flag 21 (00=10/8, 30=15/10)
+                const isExtended = this.pos.config.flag_21 === '30';
+                const pLen = isExtended ? 15 : 10;
+                const qLen = isExtended ? 10 : 8;
+                
+                let price = String(Math.round((unitPrice || 0) * 100)).padStart(pLen, '0').slice(-pLen);
+                let quantity = String(Math.round(Math.abs(line.qty || line.quantity || 0) * 1000)).padStart(qLen, '0').slice(-qLen);
                 
                 let command = tag + price + quantity;
                 
