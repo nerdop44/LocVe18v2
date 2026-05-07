@@ -22,8 +22,15 @@ export class BtnSalesMan extends Component {
         if (!order) return;
 
         console.log("BtnSalesMan: accessing this.pos.models['hr.employee']...");
-        // Odoo 18: fetch models from the reactive store
-        const salesman_list = this.pos.models && this.pos.models['hr.employee'] ? this.pos.models['hr.employee'].getAll() : [];
+        const employeeStore = this.pos.models['hr.employee'];
+        if (employeeStore) {
+            console.log("BtnSalesMan: Store found. Record count:", employeeStore.records.length);
+            console.log("BtnSalesMan: All records:", employeeStore.getAll());
+        } else {
+            console.log("BtnSalesMan: Store NOT FOUND in this.pos.models");
+        }
+
+        const salesman_list = employeeStore ? employeeStore.getAll() : [];
         console.log("BtnSalesMan: Final salesman_list count:", salesman_list.length);
 
         if (salesman_list.length === 0) {

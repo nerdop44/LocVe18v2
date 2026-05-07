@@ -37,8 +37,15 @@ class PosSession(models.Model):
         return result
 
     def _get_pos_ui_hr_employee(self, params):
-        # Intentamos obtenerlo de super si existe
+        # Intentamos obtenerlo de super si existe (configuración nativa de pos_hr)
+        res = []
         try:
-            return super()._get_pos_ui_hr_employee(params)
+            res = super()._get_pos_ui_hr_employee(params)
         except AttributeError:
-            return self.env['hr.employee'].search_read(**params['search_params'])
+            pass
+        
+        # Si res está vacío (ej. pos_hr desactivado), o si queremos asegurar 
+        # que todos los que coinciden con nuestro dominio (incluidos vendedores) se carguen:
+        if not res or len(res) < self.env['hr.employee'].search_count(params['search_params']['domain']):
+             res = self.env['hr.employee'].search_read(**params['search_params'])
+        return res
