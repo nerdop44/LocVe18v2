@@ -101,9 +101,13 @@ class PosPaymentMethod(models.Model):
     x_printer_code = fields.Char("Código en la impresora")
 
     @api.model
-    def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v18 - Migración a Loader nativo para x_printer_code
-        return super()._load_pos_data_fields(config_id) + ['x_printer_code']
+    def _load_pos_data(self, data):
+        # Pachacutec: v18 - Inyección segura de x_printer_code para evitar romper el Loader core
+        res = super()._load_pos_data(data)
+        for rec in res:
+            pm = self.browse(rec['id'])
+            rec['x_printer_code'] = pm.x_printer_code
+        return res
 
     @api.constrains("x_printer_code")
     def _check_x_printer_code(self):
