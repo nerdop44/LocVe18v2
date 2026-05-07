@@ -3,25 +3,11 @@ from odoo import models, api, fields
 class PosConfig(models.Model):
     _inherit = 'pos.config'
 
-    @api.model
-    def _load_pos_data(self, data):
-        # Pachacutec: v18 - Inyectar salesman_ids de forma segura preservando la estructura core
-        # Odoo 18 pos.config espera un dict {'data': [...], 'fields': [...]}
-        res = super()._load_pos_data(data)
-        
-        try:
-            # En Odoo 18, el config_id se puede obtener de la sesión cargada o del contexto
-            config_id = self.env.context.get('pos_config_id') or (data.get('pos.session') and data['pos.session']['data'][0]['config_id'])
-            if config_id:
-                config = self.browse(config_id)
-                if isinstance(res, dict) and 'data' in res and len(res['data']) > 0:
-                    res['data'][0]['salesman_ids'] = config.salesman_ids.ids
-                    # Pachacutec: v18 - Protección contra fallos de iteración en trusted_config_ids
-                    if not res['data'][0].get('trusted_config_ids'):
-                        res['data'][0]['trusted_config_ids'] = []
-        except Exception:
-            pass
-            
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v18 - Registro estándar de campos personalizados
+        res = super()._load_pos_data_fields(config_id)
+        if 'salesman_ids' not in res:
+            res.append('salesman_ids')
         return res
 
 class HrEmployee(models.Model):

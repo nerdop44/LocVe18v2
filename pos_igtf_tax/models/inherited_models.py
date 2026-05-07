@@ -9,13 +9,8 @@ _logger = logging.getLogger(__name__)
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        result['search_params']['fields'].extend([
-            "x_igtf_percentage",
-            "x_is_foreign_exchange",
-        ])
-        return result
+    # Pachacutec: v18 - Odoo 18 usa _load_pos_data_fields en el modelo.
+    # Eliminamos _loader_params obsoletos de Odoo 17/16.
 
     def _get_igtf_fallback_account(self, type='income'):
         """
