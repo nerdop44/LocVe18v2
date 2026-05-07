@@ -101,14 +101,11 @@ class PosPaymentMethod(models.Model):
     x_printer_code = fields.Char("Código en la impresora")
 
     @api.model
-    def _load_pos_data(self, data):
-        # Pachacutec: v18 - Inyección segura de x_printer_code compatible con Dict/List
-        res = super()._load_pos_data(data)
-        records = res.get('data', []) if isinstance(res, dict) else res
-        if isinstance(records, list):
-            for rec in records:
-                pm = self.browse(rec['id'])
-                rec['x_printer_code'] = pm.x_printer_code
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v18 - Método estándar para evitar errores de getIndexMaps
+        res = super()._load_pos_data_fields(config_id)
+        if 'x_printer_code' not in res:
+            res.append('x_printer_code')
         return res
 
     @api.constrains("x_printer_code")

@@ -18,7 +18,7 @@ patch(PosOrder.prototype, {
             if (salesman) {
                 this.salesman_id = salesman;
             } else {
-                this.salesman_id = { id: json.salesman_id, name: "ID: " + json.salesman_id };
+                this.salesman_id = null;
             }
         }
     },
