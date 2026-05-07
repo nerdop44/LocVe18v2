@@ -1,63 +1,34 @@
-from odoo import models, api
+from odoo import models, api, fields
 
-class PosSession(models.Model):
-    _inherit = 'pos.session'
+class PosConfig(models.Model):
+    _inherit = 'pos.config'
 
-    def _pos_ui_models_to_load(self):
-        result = super()._pos_ui_models_to_load()
-        if 'hr.employee' not in result:
-            result.append('hr.employee')
-        return result
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v18 - Migración a Loader nativo
+        return super()._load_pos_data_fields(config_id) + ['salesman_ids']
 
-    def _loader_params_pos_config(self):
-        result = super()._loader_params_pos_config()
-        if 'salesman_ids' not in result['search_params']['fields']:
-            result['search_params']['fields'].extend(['salesman_ids'])
-        return result
+class HrEmployee(models.Model):
+    _inherit = 'hr.employee'
 
-    def _loader_params_hr_employee(self):
+    @api.model
+    def _load_pos_data_domain(self, data):
+        # Pachacutec: v18 - Inyectar vendedores configurados en el dominio de carga
+        config_id = self.env['pos.config'].browse(data['pos_config_id'])
+        # Obtenemos el dominio base si existe
+        domain = []
         try:
-            result = super()._loader_params_hr_employee()
+            domain = super()._load_pos_data_domain(data)
         except AttributeError:
-            result = {
-                'search_params': {
-                    'domain': [('company_id', '=', self.config_id.company_id.id)],
-                    'fields': ['name', 'id'],
-                }
-            }
+            domain = [('company_id', '=', config_id.company_id.id)]
         
-        # Combinar con nuestros vendedores usando OR (|)
-        if self.config_id.salesman_ids:
-            my_domain = [('id', 'in', self.config_id.salesman_ids.ids)]
-            if result['search_params'].get('domain'):
-                result['search_params']['domain'] = ['|'] + result['search_params']['domain'] + my_domain
-            else:
-                result['search_params']['domain'] = my_domain
+        if config_id.salesman_ids:
+            # Forzamos la inclusión de nuestros vendedores con un OR
+            domain = ['|'] + domain + [('id', 'in', config_id.salesman_ids.ids)]
         
-        return result
+        return domain
 
-    def _get_pos_ui_hr_employee(self, params):
-        # Intentamos obtenerlo de super si existe (configuración nativa de pos_hr)
-        res = []
-        try:
-            res = super()._get_pos_ui_hr_employee(params)
-        except AttributeError:
-            pass
-        
-        # Aseguramos que todos los vendedores del POS estén cargados
-        salesman_ids = self.config_id.salesman_ids.ids
-        current_ids = [r['id'] for r in res]
-        
-        if any(sid not in current_ids for sid in salesman_ids):
-             missing_ids = [sid for sid in salesman_ids if sid not in current_ids]
-             extra_res = self.env['hr.employee'].search_read(
-                 domain=[('id', 'in', missing_ids)], 
-                 fields=params['search_params']['fields']
-             )
-             res.extend(extra_res)
-             
-        # Marcamos a los que son vendedores específicamente para este POS
-        for emp in res:
-            emp['is_salesman'] = emp['id'] in salesman_ids
-            
-        return res
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v18 - Asegurar campos requeridos para el botón de vendedores
+        return super()._load_pos_data_fields(config_id) + ['name']

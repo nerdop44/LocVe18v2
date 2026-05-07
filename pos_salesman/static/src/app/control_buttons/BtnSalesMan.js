@@ -21,16 +21,17 @@ export class BtnSalesMan extends Component {
         const order = this.pos.get_order();
         if (!order) return;
 
+        const salesman_ids = this.pos.config.salesman_ids || [];
         console.log("BtnSalesMan: accessing this.pos.models['hr.employee']...");
         const employeeStore = this.pos.models['hr.employee'];
         if (employeeStore) {
-            console.log("BtnSalesMan: Store found. Record count:", employeeStore.records.length);
-            console.log("BtnSalesMan: All records:", employeeStore.getAll());
+            console.log("BtnSalesMan: Store found. Record count:", employeeStore.getAll().length);
+            console.log("BtnSalesMan: IDs in Store:", employeeStore.getAll().map(e => e.id));
+            console.log("BtnSalesMan: IDs in Config:", salesman_ids);
         } else {
             console.log("BtnSalesMan: Store NOT FOUND in this.pos.models");
         }
 
-        const salesman_ids = this.pos.config.salesman_ids || [];
         const salesman_list = employeeStore ? employeeStore.getAll().filter(s => salesman_ids.includes(s.id)) : [];
         console.log("BtnSalesMan: Final salesman_list (config filtered) count:", salesman_list.length);
 

@@ -39,11 +39,7 @@ class PosSession(models.Model):
     x_pos_z_report_number = fields.Char("Número Reporte Z")
     pos_report_z_id = fields.Many2one("pos.report.z", "Reporte Z")
 
-    def _loader_params_pos_payment_method(self):
-        result = super()._loader_params_pos_payment_method()
-        if 'x_printer_code' not in result['search_params']['fields']:
-            result['search_params']['fields'].append('x_printer_code')
-        return result
+    # Odoo 18 Loader Migration: x_printer_code is now loaded via PosPaymentMethod._load_pos_data_fields
 
     def set_z_report(self, number):
         z_report = self.env['pos.report.z'].sudo().search([('number','=',number)])
@@ -103,6 +99,11 @@ class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
 
     x_printer_code = fields.Char("Código en la impresora")
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v18 - Migración a Loader nativo para x_printer_code
+        return super()._load_pos_data_fields(config_id) + ['x_printer_code']
 
     @api.constrains("x_printer_code")
     def _check_x_printer_code(self):

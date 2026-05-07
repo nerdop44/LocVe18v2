@@ -225,12 +225,14 @@ export const FiscalPrinterMixin = {
                             this.reader = false;
                             return true;
                         } else {
-                            console.error("[FISCAL] Comando no reconocido o NAK (", value[0], "). Enviando comando 7 (Anulación) v16...");
+                            console.error("[FISCAL] v201 - Comando RECHAZADO (NAK ", value[0], "). Se ha DESACTIVADO la anulación automática (Comando 7) por solicitud del usuario.");
+                            this.env.services.notification.add(_t("Error Fiscal: Comando Rechazado (NAK ").concat(value[0], "). Verifique consola para detalles."), { type: "danger" });
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
                             
-                            // Protocolo de Desbloqueo v16: IDÉNTICO
+                            /* 
+                            // Pachacutec: v201 - Bloque de anulación comentado para evitar corte anticipado
                             await new Promise((res) => setTimeout(() => res(), 100));
                             this.writer = this.port.writable.getWriter();
                             const unlockCmd = toBytes("7");
@@ -240,9 +242,10 @@ export const FiscalPrinterMixin = {
                             }, 150));
                             await this.writer.releaseLock();
                             this.writer = false;
+                            */
                             
-                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL
-                            return true; // Retorna true para que el bucle write() termine su ciclo pero this.printing sea false
+                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL SIN ANULAR EN LA MÁQUINA
+                            return false; // Retorna false para indicar fallo mandatorio
                         }
                     } else {
                         console.log("No hay datos...");
@@ -957,7 +960,7 @@ export const FiscalPrinterMixin = {
                     this.printerCommands.push("1" + code);
                 } else if (!isLast) {
                     // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
-                    let amountStr = String(Math.round(Math.abs(payment.amount || 0) * 100));
+                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
                     const padding = (this.pos.config.flag_21 === '30') ? 15 : 10;
                     amountStr = amountStr.padStart(padding, "0");
                     this.printerCommands.push("2" + code + amountStr);
