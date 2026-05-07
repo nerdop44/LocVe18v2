@@ -21,8 +21,9 @@ export class BtnSalesMan extends Component {
         const order = this.pos.get_order();
         if (!order) return;
 
-        console.log("BtnSalesMan: accessing this.pos.salesman_ids...");
-        const salesman_list = this.pos.salesman_ids || [];
+        console.log("BtnSalesMan: accessing this.pos.models['hr.employee']...");
+        // Odoo 18: fetch models from the reactive store
+        const salesman_list = this.pos.models && this.pos.models['hr.employee'] ? this.pos.models['hr.employee'].getAll() : [];
         console.log("BtnSalesMan: Final salesman_list count:", salesman_list.length);
 
         if (salesman_list.length === 0) {
@@ -52,9 +53,10 @@ export class BtnSalesMan extends Component {
     }
 }
 
-import { ActionpadWidget } from "@point_of_sale/app/screens/product_screen/action_pad/action_pad";
-import { patch } from "@web/core/utils/patch";
+// Registro en Odoo 18 para pos_control_buttons
+export const btnSalesManConfig = {
+    component: BtnSalesMan,
+};
 
-patch(ActionpadWidget.components, {
-    BtnSalesMan,
-});
+registry.category("pos_control_buttons").add("BtnSalesMan", btnSalesManConfig);
+

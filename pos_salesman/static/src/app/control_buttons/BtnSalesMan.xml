@@ -9,10 +9,4 @@
             </t>
         </button>
     </t>
-
-    <t t-name="pos_salesman.ActionpadWidget" t-inherit="point_of_sale.ActionpadWidget" t-inherit-mode="extension" owl="1">
-        <xpath expr="//div[hasclass('validation')]" position="before">
-            <BtnSalesMan />
-        </xpath>
-    </t>
 </templates>
