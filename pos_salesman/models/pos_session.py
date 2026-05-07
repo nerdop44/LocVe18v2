@@ -16,7 +16,11 @@ class PosConfig(models.Model):
                 config = self.browse(config_id)
                 if isinstance(res, dict) and 'data' in res and len(res['data']) > 0:
                     res['data'][0]['salesman_ids'] = config.salesman_ids.ids
-                    if 'salesman_ids' not in res['fields']:
+                    # Pachacutec: v18 - Protección contra fallos de iteración en trusted_config_ids
+                    if not res['data'][0].get('trusted_config_ids'):
+                        res['data'][0]['trusted_config_ids'] = []
+                    
+                    if res.get('fields') and 'salesman_ids' not in res['fields']:
                         res['fields'].append('salesman_ids')
         except Exception:
             pass
