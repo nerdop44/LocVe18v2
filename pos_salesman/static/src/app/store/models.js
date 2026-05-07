@@ -3,10 +3,15 @@
 import { patch } from "@web/core/utils/patch";
 import { PosOrder } from "@point_of_sale/app/models/pos_order";
 
+// Pachacutec: v18 - Registro formal del campo en el esquema para evitar errores de getIndexMaps
+PosOrder.fields = {
+    ...PosOrder.fields,
+    salesman_id: { type: "many2one", model: "hr.employee" },
+};
+
 patch(PosOrder.prototype, {
     setup(_attr, options) {
         super.setup(...arguments);
-        this.salesman_id = this.salesman_id || null;
     },
     
     init_from_JSON(json) {
