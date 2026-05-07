@@ -21,13 +21,17 @@ export class BtnSalesMan extends Component {
         const order = this.pos.get_order();
         if (!order) return;
 
-        const salesman_ids = this.pos.config.salesman_ids || [];
+        let salesman_ids = this.pos.config.salesman_ids || [];
+        // Normalización para Odoo 18: asegurar que tengamos IDs numéricos puros
+        if (salesman_ids && typeof salesman_ids === 'object') {
+            salesman_ids = Object.values(salesman_ids).map(id => typeof id === 'object' ? id.id : id);
+        }
+        
         console.log("BtnSalesMan: accessing this.pos.models['hr.employee']...");
         const employeeStore = this.pos.models['hr.employee'];
         if (employeeStore) {
             console.log("BtnSalesMan: Store found. Record count:", employeeStore.getAll().length);
-            console.log("BtnSalesMan: IDs in Store:", employeeStore.getAll().map(e => e.id));
-            console.log("BtnSalesMan: IDs in Config:", salesman_ids);
+            console.log("BtnSalesMan: IDs in Config (normalized):", salesman_ids);
         } else {
             console.log("BtnSalesMan: Store NOT FOUND in this.pos.models");
         }
