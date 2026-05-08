@@ -914,6 +914,11 @@ export const FiscalPrinterMixin = {
         const order = this.pos.get_order();
         const client = order?.get_partner?.() || order?.partner;
         
+        // Pachacutec: v208 - Anulación Preventiva de Emergencia
+        // Si la impresora quedó abierta por un error anterior, el comando 7 la libera.
+        // Si ya está cerrada, la impresora simplemente devolverá un NAK/ACK inofensivo.
+        this.printerCommands.push("7");
+
         // Pachacutec: v194 - Recuperación vía DataHelper (Blindaje de Prefijo)
         const vat = DataHelper.getFullVat(this.pos, client);
         
