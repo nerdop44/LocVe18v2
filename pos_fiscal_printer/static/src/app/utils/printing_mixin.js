@@ -963,21 +963,15 @@ export const FiscalPrinterMixin = {
                 
                 console.log(`[FISCAL] v200 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
-                if (isLast && positivePayments.length === 1) {
-                    // Pago único: Comando 1 (Cierre Total, impresora calcula)
-                    this.printerCommands.push("1" + code);
-                } else if (!isLast) {
-                    // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
-                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    // Pachacutec: v209 - UNIFICACIÓN FINAL A 12 DÍGITOS (Confirmado en Manual Pág 35)
-                    // Se usa 12 para modo extendido en Bixolon/HKA-NG.
-                    const padding = 12;
-                    amountStr = amountStr.padStart(padding, "0");
-                    this.printerCommands.push("2" + code + amountStr);
-                } else {
-                    // Último pago de varios: Comando 1 (Cierre Total)
-                    this.printerCommands.push("1" + code);
-                }
+                // Pachacutec: v210 - MIGRACIÓN A PAGO DIRECTO (COMANDO 1)
+                // El comando '2' (Pago Parcial) es rechazado por el firmware NG en modo extendido.
+                // El manual HKA permite usar el Comando '1' con monto para pagos parciales y totales.
+                let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
+                const padding = 12;
+                amountStr = amountStr.padStart(padding, "0");
+                
+                console.warn("[FISCAL] v210 - Pago Directo (CMD 1):", {code, amountStr});
+                this.printerCommands.push("1" + code + amountStr);
             });
         }
 
