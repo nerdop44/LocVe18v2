@@ -225,14 +225,12 @@ export const FiscalPrinterMixin = {
                             this.reader = false;
                             return true;
                         } else {
-                            console.error("[FISCAL] v201 - Comando RECHAZADO (NAK ", value[0], "). Se ha DESACTIVADO la anulación automática (Comando 7) por solicitud del usuario.");
-                            this.env.services.notification.add(_t("Error Fiscal: Comando Rechazado (NAK ").concat(value[0], "). Verifique consola para detalles."), { type: "danger" });
+                            console.error("[FISCAL] Comando no reconocido o NAK (", value[0], "). Enviando comando 7 (Anulación) v16...");
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
                             
-                            /* 
-                            // Pachacutec: v201 - Bloque de anulación comentado para evitar corte anticipado
+                            // Protocolo de Desbloqueo v16: IDÉNTICO
                             await new Promise((res) => setTimeout(() => res(), 100));
                             this.writer = this.port.writable.getWriter();
                             const unlockCmd = toBytes("7");
@@ -242,10 +240,9 @@ export const FiscalPrinterMixin = {
                             }, 150));
                             await this.writer.releaseLock();
                             this.writer = false;
-                            */
                             
-                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL SIN ANULAR EN LA MÁQUINA
-                            return false; // Retorna false para indicar fallo mandatorio
+                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL
+                            return true; // Retorna true para que el bucle write() termine su ciclo pero this.printing sea false
                         }
                     } else {
                         console.log("No hay datos...");
@@ -960,9 +957,8 @@ export const FiscalPrinterMixin = {
                     this.printerCommands.push("1" + code);
                 } else if (!isLast) {
                     // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
-                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    // Pachacutec: v203 - Unificación a 12 dígitos para HKA-NG Extended
-                    const padding = 12;
+                    let amountStr = String(Math.round(Math.abs(payment.amount || 0) * 100));
+                    const padding = (this.pos.config.flag_21 === '30') ? 15 : 10;
                     amountStr = amountStr.padStart(padding, "0");
                     this.printerCommands.push("2" + code + amountStr);
                 } else {
@@ -972,11 +968,8 @@ export const FiscalPrinterMixin = {
             });
         }
 
-        // Pachacutec: v206 - Restauración controlada del comando 199 (Finalizar y Cortar)
-        // Se envía al final para asegurar el paper-feed y corte en Bixolon/HKA-NG
-        this.printerCommands.push("199");
-        
-        console.log("[FISCAL] v206 - Cierre Fiscal y Corte Finalizado.");
+        // v200: ELIMINADO comando 199 espurio que causaba NAK y anulaciones
+        console.log("[FISCAL] v200 - Cierre Fiscal Dinámico Finalizado.");
     },
 
     printFiscal() {

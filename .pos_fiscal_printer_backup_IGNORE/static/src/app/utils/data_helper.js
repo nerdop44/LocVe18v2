@@ -37,28 +37,16 @@ export class DataHelper {
     static getFullVat(pos, partner) {
         if (!partner) return "V00000000";
         
-        // Pachacutec: v202 - Reconstrucción Blindada con Padding Mandatorio
-        const rawVat = (partner.vat || "").toString().toUpperCase().replace(/[^A-Z0-9]/g, "");
-        let prefix = "V";
-        let numericPart = "";
-
-        if (rawVat.match(/^[A-Z]\d+$/)) {
-            prefix = rawVat.substring(0, 1);
-            numericPart = rawVat.substring(1);
-        } else if (rawVat.match(/^\d+$/)) {
-            prefix = partner.prefix_vat || "V";
-            numericPart = rawVat;
-        } else {
-            // Caso fallback si el VAT está muy mal formado o vacío
-            return rawVat || "V00000000";
-        }
-
-        // Padding mandatorio a 8 dígitos (Total 9 chars con prefijo)
-        // Evita el NAK 21 en impresoras HKA para RIFs de personas naturales de 7 dígitos.
-        const paddedNumeric = numericPart.padStart(8, "0");
-        const finalVat = `${prefix}${paddedNumeric}`;
+        // Pachacutec: v194 - Reconstrucción Blindada
+        // Buscamos prefijos (V, J, G, E, P) que Odoo 18 a veces "pierde" en el proxy reactivo
+        const vat = (partner.vat || "").toString().toUpperCase().replace(/[^A-Z0-9]/g, "");
         
-        console.log(`[FISCAL] DataHelper - RIF Normalizado: ${rawVat} -> ${finalVat}`);
-        return finalVat;
+        // Si ya tiene el prefijo alpha, lo devolvemos tal cual
+        if (vat.match(/^[A-Z]\d+$/)) return vat;
+
+        // Si es numérico puro, le inyectamos el prefijo recuperado del modelo o el crudo
+        const prefix = partner.prefix_vat || "V";
+        console.log(`[FISCAL] DataHelper - Reconstruyendo RIF con prefijo ${prefix}: ${vat}`);
+        return `${prefix}${vat}`;
     }
 }

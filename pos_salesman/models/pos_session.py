@@ -30,20 +30,6 @@ class HrEmployee(models.Model):
         # No añadimos 'name' porque ya está en el core de pos_hr
         return res
 
-    @api.model
-    def _load_pos_data_domain(self, data):
-        # Pachacutec: v18 - Dominio filtrado por vendedores
-        config_id_val = self.env.context.get('pos_config_id')
-        if not config_id_val:
-            try:
-                config_id_val = data['pos.session']['data'][0]['config_id']
-            except (KeyError, IndexError, TypeError):
-                return super()._load_pos_data_domain(data)
-        
-        config = self.env['pos.config'].browse(config_id_val)
-        domain = super()._load_pos_data_domain(data)
-        
-        if config.salesman_ids:
-            domain = ['&'] + domain + [('id', 'in', config.salesman_ids.ids)]
-        
-        return domain
+    # Pachacutec: v205 - ELIMINADO filtro de dominio restrictivo.
+    # El filtrado de vendedores se debe manejar solo en el frontend (BtnSalesMan.js)
+    # para no bloquear la carga de cajeros/managers legítimos en Odoo 18.
