@@ -961,8 +961,9 @@ export const FiscalPrinterMixin = {
                 } else if (!isLast) {
                     // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
                     let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    // Pachacutec: v203 - Unificación a 12 dígitos para HKA-NG Extended
-                    const padding = 12;
+                    // Pachacutec: v207 - Ajuste a 10 dígitos (Estándar HKA) para pagos parciales.
+                    // Se revierte de 12 a 10 para corregir el NAK 21 observado en pagos combinados.
+                    const padding = 10;
                     amountStr = amountStr.padStart(padding, "0");
                     this.printerCommands.push("2" + code + amountStr);
                 } else {
