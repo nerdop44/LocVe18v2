@@ -309,10 +309,13 @@ export const FiscalPrinterMixin = {
             if (this.printing) {
                 // Pachacutec: v36 - VALIDACIÓN ACK ESTRICTA (AWAIT directo y chequeo de éxito)
                 const success = await new Promise((res) => {
+                    // Pachacutec: v209 - Delay Post-Subtotal (1000ms extra)
+                    // La Bixolon necesita tiempo para imprimir el desglose de IVA del subtotal.
+                    const extra_delay = (command === '3') ? 1000 : 0;
                     setTimeout(async () => {
                         const res_ok = await this.escribe_leer(command, is_linea);
                         res(res_ok);
-                    }, TIME);
+                    }, TIME + extra_delay);
                 });
 
                 if (!success) {
@@ -966,9 +969,9 @@ export const FiscalPrinterMixin = {
                 } else if (!isLast) {
                     // Pago parcial intermedio: Comando 2 (Pago Parcial con Monto)
                     let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    // Pachacutec: v207 - Ajuste a 10 dígitos (Estándar HKA) para pagos parciales.
-                    // Se revierte de 12 a 10 para corregir el NAK 21 observado en pagos combinados.
-                    const padding = 10;
+                    // Pachacutec: v209 - UNIFICACIÓN FINAL A 12 DÍGITOS (Confirmado en Manual Pág 35)
+                    // Se usa 12 para modo extendido en Bixolon/HKA-NG.
+                    const padding = 12;
                     amountStr = amountStr.padStart(padding, "0");
                     this.printerCommands.push("2" + code + amountStr);
                 } else {
