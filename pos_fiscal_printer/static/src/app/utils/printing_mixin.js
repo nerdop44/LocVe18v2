@@ -309,9 +309,9 @@ export const FiscalPrinterMixin = {
             if (this.printing) {
                 // Pachacutec: v36 - VALIDACIÓN ACK ESTRICTA (AWAIT directo y chequeo de éxito)
                 const success = await new Promise((res) => {
-                    // Pachacutec: v209 - Delay Post-Subtotal (1000ms extra)
-                    // La Bixolon necesita tiempo para imprimir el desglose de IVA del subtotal.
-                    const extra_delay = (command === '3') ? 1000 : 0;
+                    // Pachacutec: v211 - Delay Estratégico (1000ms extra)
+                    // La Bixolon necesita tiempo post-subtotal (3) y entre abonos parciales (1).
+                    const extra_delay = (command === '3' || command.substring(0, 1) === '1') ? 1000 : 0;
                     setTimeout(async () => {
                         const res_ok = await this.escribe_leer(command, is_linea);
                         res(res_ok);
@@ -963,15 +963,19 @@ export const FiscalPrinterMixin = {
                 
                 console.log(`[FISCAL] v200 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
-                // Pachacutec: v210 - MIGRACIÓN A PAGO DIRECTO (COMANDO 1)
-                // El comando '2' (Pago Parcial) es rechazado por el firmware NG en modo extendido.
-                // El manual HKA permite usar el Comando '1' con monto para pagos parciales y totales.
-                let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                const padding = 12;
-                amountStr = amountStr.padStart(padding, "0");
-                
-                console.warn("[FISCAL] v210 - Pago Directo (CMD 1):", {code, amountStr});
-                this.printerCommands.push("1" + code + amountStr);
+                // Pachacutec: v211 - SOPORTE PARA N PAGOS COMBINADOS
+                // Todos los pagos excepto el último llevan monto. El último cierra el saldo.
+                if (index < positivePayments.length - 1) {
+                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
+                    const padding = 12;
+                    amountStr = amountStr.padStart(padding, "0");
+                    console.warn("[FISCAL] v211 - Pago Parcial (CMD 1):", {code, amountStr});
+                    this.printerCommands.push("1" + code + amountStr);
+                } else {
+                    // El último pago cierra el documento fiscal automáticamente con el saldo restante
+                    console.warn("[FISCAL] v211 - Cierre Total (CMD 1):", {code});
+                    this.printerCommands.push("1" + code);
+                }
             });
         }
 
