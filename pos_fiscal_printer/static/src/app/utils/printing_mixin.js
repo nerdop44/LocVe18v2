@@ -961,16 +961,20 @@ export const FiscalPrinterMixin = {
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
                 const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
                 
-                console.log(`[FISCAL] v200 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
+                console.log(`[FISCAL] v214 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
-                // Pachacutec: v212 - RÉPLICA DE PATRÓN EXITOSO (12 DÍGITOS PARA TODOS)
-                // Se elimina el comando corto para el último pago. Se replica el formato de 12 dígitos
-                // que funcionó en el primer abono para evitar desincronización por longitud de trama.
+                // Pachacutec: v214 - JERARQUÍA DE COMANDOS (2=Parcial, 1=Cierre)
+                // Inspirado en la lógica v16 pero adaptado a la precisión de Odoo 18:
+                // - Los pagos intermedios usan el comando '2' (Abono Parcial) para mantener la factura abierta.
+                // - El último pago usa el comando '1' (Totalización) para cerrar la factura y disparar el corte.
+                // Se mantiene el padding de 12 dígitos para uniformidad de trama en Bixolon NG.
                 let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
                 const padding = 12;
                 amountStr = amountStr.padStart(padding, "0");
-                console.warn("[FISCAL] v212 - Replicando Patrón (CMD 1):", {code, amountStr});
-                this.printerCommands.push("1" + code + amountStr);
+                
+                const commandId = isLast ? "1" : "2";
+                console.warn(`[FISCAL] v214 - Replicando Patrón (CMD ${commandId}):`, {code, amountStr});
+                this.printerCommands.push(commandId + code + amountStr);
             });
         }
 
