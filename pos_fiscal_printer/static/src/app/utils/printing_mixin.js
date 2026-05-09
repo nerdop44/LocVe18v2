@@ -319,16 +319,22 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
-                    // Pachacutec: v220 - REINTENTO INTELIGENTE DE PAGO (Auto-curativo)
-                    // Si un comando de pago parcial (2) falla, intentamos cambiar el padding (10 <-> 15)
-                    // para adaptarnos al firmware de la impresora sin intervención del usuario.
+                    // Pachacutec: v235 - Blindaje de Comandos Preventivos
+                    // El comando 7 (anulación) y comandos 'i' (cabecera) suelen dar NAK si el estado es limpio.
+                    // NO deben abortar la factura bajo ninguna circunstancia.
+                    const isPreventive = (command === '7' || command.startsWith('i'));
+                    if (isPreventive) {
+                        console.warn(`[FISCAL] v235 - Ignorando NAK en comando preventivo (${command}). Continuando...`);
+                        cantidad_comandos--;
+                        continue;
+                    }
+
+                    // Pachacutec: v230 - Reintento de Pago (Solo si falló el primer intento)
                     if (command.startsWith('2')) {
                         const code = command.substring(1, 3);
                         const amountStr = command.substring(3);
                         const currentTotalLen = amountStr.length;
                         
-                        // Pachacutec: v230 - Prioridad NG (17) -> Fallback Legacy (12)
-                        // Si falló con 17, probamos 12. Si falló con 12, probamos 17.
                         const newIntPad = (currentTotalLen === 17) ? 10 : 15;
                         const altTotalLen = newIntPad + 2;
                         
@@ -342,22 +348,15 @@ export const FiscalPrinterMixin = {
                         const retrySuccess = await this.escribe_leer(retryCommand, false);
                         if (retrySuccess) {
                             console.log(`[FISCAL] v230 - Reintento exitoso con ${altTotalLen} dígitos. Hardware identificado.`);
-                            success = true; // MARCADO CRÍTICO: Evita que el bucle superior aborte
                             cantidad_comandos--;
                             continue; 
                         }
                     }
 
-                    // Pachacutec: v216 - Tolerancia a NAK en comandos no-críticos
-                    if (command === "7" || command === "199" || command.substring(0, 2) === "i0") {
-                        console.warn(`[FISCAL] v216 - Comando no-crítico (${command}) falló (NAK), continuando factura...`);
-                        cantidad_comandos--; 
-                        continue;
-                    }
-
-                    console.error("[FISCAL] Error en comando MANDATORIO:", command, ". Abortando impresión.");
+                    // Pachacutec: v235 - Si llegamos aquí, el error es fatal para la factura
+                    console.error("[FISCAL] v235 - Error CRÍTICO en comando mandatorio:", command, ". Abortando impresión.");
                     this.printing = false;
-                    break; 
+                    return false;
                 }
 
                 // Pachacutec: v74 - Sincronización vía Status S2
