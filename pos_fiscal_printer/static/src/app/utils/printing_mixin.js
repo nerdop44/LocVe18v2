@@ -967,13 +967,17 @@ export const FiscalPrinterMixin = {
                 // Inspirado en la lógica v16 pero adaptado a la precisión de Odoo 18:
                 // - Los pagos intermedios usan el comando '2' (Abono Parcial) para mantener la factura abierta.
                 // - El último pago usa el comando '1' (Totalización) para cerrar la factura y disparar el corte.
-                // Se mantiene el padding de 12 dígitos para uniformidad de trama en Bixolon NG.
+                // Pachacutec: v215 - ESTÁNDAR DE PADDING (10 DÍGITOS)
+                // Se ajusta el padding a 10 dígitos para cumplir con el protocolo estricto de 
+                // la Bixolon NG para abonos parciales (Comando 2). 
+                // - Comando 2 + Código (2) + Monto (10) = 13 caracteres (ACK esperado).
+                // - El último pago (Comando 1) también usará 10 dígitos para consistencia.
                 let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                const padding = 12;
+                const padding = 10; 
                 amountStr = amountStr.padStart(padding, "0");
                 
                 const commandId = isLast ? "1" : "2";
-                console.warn(`[FISCAL] v214 - Replicando Patrón (CMD ${commandId}):`, {code, amountStr});
+                console.warn(`[FISCAL] v215 - Replicando Patrón (CMD ${commandId}):`, {code, amountStr});
                 this.printerCommands.push(commandId + code + amountStr);
             });
         }
