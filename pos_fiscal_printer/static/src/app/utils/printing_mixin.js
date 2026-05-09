@@ -948,7 +948,8 @@ export const FiscalPrinterMixin = {
         console.log("[FISCAL] v200 - setTotal Corregido (Sin comando 199)");
         
         // Comando 3 (Subtotal) -> Bloquea a Estado de Pago
-        this.printerCommands.push("3"); 
+        // Pachacutec: v217 - Paridad v16: Se ELIMINA el comando '3' (Subtotal)
+        // En algunos firmwares, el subtotal bloquea el flujo de abonos parciales (CMD 2).
 
         // Lógica de Pagos Dinámicos (Odoo 18)
         const payments = this.order.payment_ids || [];
@@ -964,24 +965,22 @@ export const FiscalPrinterMixin = {
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
                 const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
                 
-                console.log(`[FISCAL] v214 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
+                console.log(`[FISCAL] v217 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
-                // Pachacutec: v214 - JERARQUÍA DE COMANDOS (2=Parcial, 1=Cierre)
-                // Inspirado en la lógica v16 pero adaptado a la precisión de Odoo 18:
-                // - Los pagos intermedios usan el comando '2' (Abono Parcial) para mantener la factura abierta.
-                // - El último pago usa el comando '1' (Totalización) para cerrar la factura y disparar el corte.
-                // Pachacutec: v215 - ESTÁNDAR DE PADDING (10 DÍGITOS)
-                // Se ajusta el padding a 10 dígitos para cumplir con el protocolo estricto de 
-                // la Bixolon NG para abonos parciales (Comando 2). 
-                // - Comando 2 + Código (2) + Monto (10) = 13 caracteres (ACK esperado).
-                // - El último pago (Comando 1) también usará 10 dígitos para consistencia.
-                let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                const padding = 10; 
-                amountStr = amountStr.padStart(padding, "0");
-                
-                const commandId = isLast ? "1" : "2";
-                console.warn(`[FISCAL] v215 - Replicando Patrón (CMD ${commandId}):`, {code, amountStr});
-                this.printerCommands.push(commandId + code + amountStr);
+                if (isLast) {
+                    // Pachacutec: v217 - Paridad v16: Comando 1 (Totalización) SIN MONTO.
+                    // Indica a la impresora cerrar la factura con el saldo restante.
+                    console.warn(`[FISCAL] v217 - Cierre Final (CMD 1 + Code):`, {code});
+                    this.printerCommands.push("1" + code);
+                } else {
+                    // Pachacutec: v215 - ESTÁNDAR DE PADDING (10 DÍGITOS)
+                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
+                    const padding = 10; 
+                    amountStr = amountStr.padStart(padding, "0");
+                    
+                    console.warn(`[FISCAL] v217 - Abono Parcial (CMD 2):`, {code, amountStr});
+                    this.printerCommands.push("2" + code + amountStr);
+                }
             });
         }
 
