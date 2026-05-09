@@ -325,6 +325,7 @@ export const FiscalPrinterMixin = {
                     const isPreventive = (command === '7' || command.startsWith('i'));
                     if (isPreventive) {
                         console.warn(`[FISCAL] v235 - Ignorando NAK en comando preventivo (${command}). Continuando...`);
+                        success = true; // MARCADO CRÍTICO: Resetea el estado para que el bucle no aborte al final.
                         cantidad_comandos--;
                         continue;
                     }
