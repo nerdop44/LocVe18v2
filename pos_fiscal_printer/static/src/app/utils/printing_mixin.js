@@ -325,21 +325,25 @@ export const FiscalPrinterMixin = {
                     if (command.startsWith('2')) {
                         const code = command.substring(1, 3);
                         const amountStr = command.substring(3);
-                        const currentPad = amountStr.length;
-                        const altPad = (currentPad === 10) ? 15 : 10;
+                        const currentTotalLen = amountStr.length;
                         
-                        // Recalculamos la trama con el padding alternativo
-                        const rawAmount = parseInt(amountStr) / 100;
-                        let altAmountStr = String(Math.round(rawAmount * 100)).padStart(altPad, "0");
+                        // Pachacutec: v225 - Ajuste de longitudes Legacy (12) y NG (17)
+                        const newIntPad = (currentTotalLen === 12) ? 15 : 10;
+                        const altTotalLen = newIntPad + 2;
+                        
+                        // Reconstruimos la trama: extraemos los últimos 2 decimales y re-padeamos el resto
+                        const rawInt = amountStr.substring(0, currentTotalLen - 2).replace(/^0+/, '');
+                        const rawDec = amountStr.substring(currentTotalLen - 2);
+                        const altAmountStr = rawInt.padStart(newIntPad, "0") + rawDec;
                         const retryCommand = "2" + code + altAmountStr;
                         
-                        console.warn(`[FISCAL] v220 - NAK 21 detectado en pago. Reintentando con Padding Alternativo (${altPad}):`, retryCommand);
+                        console.warn(`[FISCAL] v225 - NAK 21. Reintentando Pago con Padding Maestro (${altTotalLen} dig):`, retryCommand);
                         
                         const retrySuccess = await this.escribe_leer(retryCommand, false);
                         if (retrySuccess) {
-                            console.log("[FISCAL] v220 - Reintento exitoso con padding adaptado.");
+                            console.log("[FISCAL] v225 - Reintento exitoso. Hardware detectado.");
                             cantidad_comandos--;
-                            continue; // Éxito, continuamos con el siguiente comando del array original
+                            continue; 
                         }
                     }
 
@@ -996,13 +1000,16 @@ export const FiscalPrinterMixin = {
                 if (isLast) {
                     // Pachacutec: v217 - Paridad v16: Comando 1 (Totalización) SIN MONTO.
                     // Indica a la impresora cerrar la factura con el saldo restante.
-                    console.warn(`[FISCAL] v218 - Protocolo [Flag ${flag21}]: Cierre Final (CMD 1 + Code):`, {code});
+                    console.warn(`[FISCAL] v218 - Protocolo [Flag ${flag_21}]: Cierre Final (CMD 1 + Code):`, {code});
                     this.printerCommands.push("1" + code);
                 } else {
-                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    amountStr = amountStr.padStart(padding, "0");
+                    // Pachacutec: v225 - Padding Maestro v16 (10/15 + 2 decimales siempre)
+                    const rawAmount = Math.abs(payment.amount);
+                    const integerPart = Math.floor(rawAmount);
+                    const decimalPart = Math.round((rawAmount - integerPart) * 100);
+                    const amountStr = String(integerPart).padStart(flag_pad, "0") + String(decimalPart).padStart(2, "0");
                     
-                    console.warn(`[FISCAL] v218 - Protocolo [Flag ${flag21} - Pad ${padding}]: Abono Parcial (CMD 2):`, {code, amountStr});
+                    console.log(`[FISCAL] v218 - Protocolo [Flag ${flag_21} - Pad ${flag_pad+2}]: Abono Parcial (CMD 2):`, { code, amountStr });
                     this.printerCommands.push("2" + code + amountStr);
                 }
             });
