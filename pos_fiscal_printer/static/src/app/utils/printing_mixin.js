@@ -319,13 +319,34 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
+                    // Pachacutec: v220 - REINTENTO INTELIGENTE DE PAGO (Auto-curativo)
+                    // Si un comando de pago parcial (2) falla, intentamos cambiar el padding (10 <-> 15)
+                    // para adaptarnos al firmware de la impresora sin intervención del usuario.
+                    if (command.startsWith('2')) {
+                        const code = command.substring(1, 3);
+                        const amountStr = command.substring(3);
+                        const currentPad = amountStr.length;
+                        const altPad = (currentPad === 10) ? 15 : 10;
+                        
+                        // Recalculamos la trama con el padding alternativo
+                        const rawAmount = parseInt(amountStr) / 100;
+                        let altAmountStr = String(Math.round(rawAmount * 100)).padStart(altPad, "0");
+                        const retryCommand = "2" + code + altAmountStr;
+                        
+                        console.warn(`[FISCAL] v220 - NAK 21 detectado en pago. Reintentando con Padding Alternativo (${altPad}):`, retryCommand);
+                        
+                        const retrySuccess = await this.escribe_leer(retryCommand, false);
+                        if (retrySuccess) {
+                            console.log("[FISCAL] v220 - Reintento exitoso con padding adaptado.");
+                            cantidad_comandos--;
+                            continue; // Éxito, continuamos con el siguiente comando del array original
+                        }
+                    }
+
                     // Pachacutec: v216 - Tolerancia a NAK en comandos no-críticos
-                    // - i0: Encabezados opcionales.
-                    // - 7: Anulación preventiva (falla si no hay factura abierta).
-                    // - 199: Corte final (falla si la impresora ya se cerró con el pago 1).
                     if (command === "7" || command === "199" || command.substring(0, 2) === "i0") {
                         console.warn(`[FISCAL] v216 - Comando no-crítico (${command}) falló (NAK), continuando factura...`);
-                        cantidad_comandos--; // Descontamos para que la cuenta final sea 0 si todo lo demás pasa
+                        cantidad_comandos--; 
                         continue;
                     }
 
