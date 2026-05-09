@@ -94,6 +94,11 @@ class PosConfig(models.Model):
     x_fiscal_command_parity = fields.Selection(related="x_fiscal_printer_id.x_fiscal_command_parity")
     api_url = fields.Char(related="x_fiscal_printer_id.api_url")
 
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v218 - Carga de Flag 21 para discriminación de protocolo en JS
+        return super()._load_pos_data_fields(config_id) + ['flag_21']
+
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"

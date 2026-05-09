@@ -965,20 +965,23 @@ export const FiscalPrinterMixin = {
                 const pmId = payment.payment_method_id?.id || payment.payment_method_id;
                 const code = DataHelper.getPaymentMethodCode(this.pos, pmId);
                 
-                console.log(`[FISCAL] v217 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
+                // Pachacutec: v218 - ARQUITECTURA DINÁMICA (Universal Compatibility)
+                // Se hereda el selector de v16 para decidir el padding según el hardware:
+                // - Flag 30: Padding 15 (Modelos NG / Alta Capacidad).
+                // - Flag 00 / Default: Padding 10 (Modelos Estándar / Legacy).
+                const flag21 = this.pos.config.flag_21 || "00";
+                const padding = (flag21 === "30") ? 15 : 10;
                 
                 if (isLast) {
                     // Pachacutec: v217 - Paridad v16: Comando 1 (Totalización) SIN MONTO.
                     // Indica a la impresora cerrar la factura con el saldo restante.
-                    console.warn(`[FISCAL] v217 - Cierre Final (CMD 1 + Code):`, {code});
+                    console.warn(`[FISCAL] v218 - Protocolo [Flag ${flag21}]: Cierre Final (CMD 1 + Code):`, {code});
                     this.printerCommands.push("1" + code);
                 } else {
-                    // Pachacutec: v215 - ESTÁNDAR DE PADDING (10 DÍGITOS)
                     let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    const padding = 10; 
                     amountStr = amountStr.padStart(padding, "0");
                     
-                    console.warn(`[FISCAL] v217 - Abono Parcial (CMD 2):`, {code, amountStr});
+                    console.warn(`[FISCAL] v218 - Protocolo [Flag ${flag21} - Pad ${padding}]: Abono Parcial (CMD 2):`, {code, amountStr});
                     this.printerCommands.push("2" + code + amountStr);
                 }
             });
