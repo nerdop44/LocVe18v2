@@ -963,19 +963,14 @@ export const FiscalPrinterMixin = {
                 
                 console.log(`[FISCAL] v200 - Pago ${index + 1}/${positivePayments.length}: Código=${code}, Monto=${payment.amount}`);
                 
-                // Pachacutec: v211 - SOPORTE PARA N PAGOS COMBINADOS
-                // Todos los pagos excepto el último llevan monto. El último cierra el saldo.
-                if (index < positivePayments.length - 1) {
-                    let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
-                    const padding = 12;
-                    amountStr = amountStr.padStart(padding, "0");
-                    console.warn("[FISCAL] v211 - Pago Parcial (CMD 1):", {code, amountStr});
-                    this.printerCommands.push("1" + code + amountStr);
-                } else {
-                    // El último pago cierra el documento fiscal automáticamente con el saldo restante
-                    console.warn("[FISCAL] v211 - Cierre Total (CMD 1):", {code});
-                    this.printerCommands.push("1" + code);
-                }
+                // Pachacutec: v212 - RÉPLICA DE PATRÓN EXITOSO (12 DÍGITOS PARA TODOS)
+                // Se elimina el comando corto para el último pago. Se replica el formato de 12 dígitos
+                // que funcionó en el primer abono para evitar desincronización por longitud de trama.
+                let amountStr = String(Math.round(Math.abs(parseFloat(payment.amount || 0)) * 100));
+                const padding = 12;
+                amountStr = amountStr.padStart(padding, "0");
+                console.warn("[FISCAL] v212 - Replicando Patrón (CMD 1):", {code, amountStr});
+                this.printerCommands.push("1" + code + amountStr);
             });
         }
 
