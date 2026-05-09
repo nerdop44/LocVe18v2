@@ -327,21 +327,22 @@ export const FiscalPrinterMixin = {
                         const amountStr = command.substring(3);
                         const currentTotalLen = amountStr.length;
                         
-                        // Pachacutec: v225 - Ajuste de longitudes Legacy (12) y NG (17)
-                        const newIntPad = (currentTotalLen === 12) ? 15 : 10;
+                        // Pachacutec: v230 - Prioridad NG (17) -> Fallback Legacy (12)
+                        // Si falló con 17, probamos 12. Si falló con 12, probamos 17.
+                        const newIntPad = (currentTotalLen === 17) ? 10 : 15;
                         const altTotalLen = newIntPad + 2;
                         
-                        // Reconstruimos la trama: extraemos los últimos 2 decimales y re-padeamos el resto
                         const rawInt = amountStr.substring(0, currentTotalLen - 2).replace(/^0+/, '');
                         const rawDec = amountStr.substring(currentTotalLen - 2);
                         const altAmountStr = rawInt.padStart(newIntPad, "0") + rawDec;
                         const retryCommand = "2" + code + altAmountStr;
                         
-                        console.warn(`[FISCAL] v225 - NAK 21. Reintentando Pago con Padding Maestro (${altTotalLen} dig):`, retryCommand);
+                        console.warn(`[FISCAL] v230 - NAK 21. Probando Fallback de Padding (${altTotalLen} dig):`, retryCommand);
                         
                         const retrySuccess = await this.escribe_leer(retryCommand, false);
                         if (retrySuccess) {
-                            console.log("[FISCAL] v225 - Reintento exitoso. Hardware detectado.");
+                            console.log(`[FISCAL] v230 - Reintento exitoso con ${altTotalLen} dígitos. Hardware identificado.`);
+                            success = true; // MARCADO CRÍTICO: Evita que el bucle superior aborte
                             cantidad_comandos--;
                             continue; 
                         }
@@ -994,8 +995,11 @@ export const FiscalPrinterMixin = {
                 // Se hereda el selector de v16 para decidir el padding según el hardware:
                 // - Flag 30: Padding 15 (Modelos NG / Alta Capacidad).
                 // - Flag 00 / Default: Padding 10 (Modelos Estándar / Legacy).
-                const flag_21 = this.pos.config.flag_21 || "00";
-                const flag_pad = (flag_21 === "30") ? 15 : 10;
+                // Pachacutec: v230 - PRIORIDAD MODERNA (NG Default)
+                // Usamos Padding 15 (17 dig totales) por defecto para modelos modernos.
+                // El motor de reintento en 'write' bajará a 10 (12 dig) si es necesario.
+                const flag_21 = this.pos.config.flag_21 || "30"; 
+                const flag_pad = (flag_21 === "00") ? 10 : 15;
                 
                 if (isLast) {
                     // Pachacutec: v217 - Paridad v16: Comando 1 (Totalización) SIN MONTO.
