@@ -95,9 +95,15 @@ class PosConfig(models.Model):
     api_url = fields.Char(related="x_fiscal_printer_id.api_url")
 
     @api.model
-    def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v218 - Carga de Flag 21 para discriminación de protocolo en JS
-        return super()._load_pos_data_fields(config_id) + ['flag_21']
+    def _load_pos_data(self, data):
+        # Pachacutec: v218 - Inyectar flag_21 para discriminación de protocolo en JS
+        res = super()._load_pos_data(data)
+        if isinstance(res, dict) and 'data' in res and len(res['data']) > 0:
+            config_id = self.env.context.get('pos_config_id')
+            if config_id:
+                config = self.browse(config_id)
+                res['data'][0]['flag_21'] = config.flag_21
+        return res
 
 
 class PosPaymentMethod(models.Model):
