@@ -319,9 +319,12 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
-                    // Pachacutec: v70 - Tolerancia a NAK en encabezados opcionales (i00-i03)
-                    if (command.substring(0, 2) === "i0") {
-                        console.warn("[FISCAL] v70 - Encabezado opcional falló (NAK), continuando factura...", command);
+                    // Pachacutec: v216 - Tolerancia a NAK en comandos no-críticos
+                    // - i0: Encabezados opcionales.
+                    // - 7: Anulación preventiva (falla si no hay factura abierta).
+                    // - 199: Corte final (falla si la impresora ya se cerró con el pago 1).
+                    if (command === "7" || command === "199" || command.substring(0, 2) === "i0") {
+                        console.warn(`[FISCAL] v216 - Comando no-crítico (${command}) falló (NAK), continuando factura...`);
                         cantidad_comandos--; // Descontamos para que la cuenta final sea 0 si todo lo demás pasa
                         continue;
                     }
