@@ -994,8 +994,8 @@ export const FiscalPrinterMixin = {
                 // Se hereda el selector de v16 para decidir el padding según el hardware:
                 // - Flag 30: Padding 15 (Modelos NG / Alta Capacidad).
                 // - Flag 00 / Default: Padding 10 (Modelos Estándar / Legacy).
-                const flag21 = this.pos.config.flag_21 || "00";
-                const padding = (flag21 === "30") ? 15 : 10;
+                const flag_21 = this.pos.config.flag_21 || "00";
+                const flag_pad = (flag_21 === "30") ? 15 : 10;
                 
                 if (isLast) {
                     // Pachacutec: v217 - Paridad v16: Comando 1 (Totalización) SIN MONTO.
