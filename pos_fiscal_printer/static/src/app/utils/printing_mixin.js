@@ -298,19 +298,16 @@ export const FiscalPrinterMixin = {
         
         const TIME = this.pos.config.x_fiscal_commands_time || 750;
         this.printing = true;
-        // Pachacutec: v52 - ELIMINADA sanitización global que borraba '!', '*', '|'
+        let print_success = true;
         console.log("Comandos a enviar: ", this.printerCommands);
-        var cantidad_comandos = this.printerCommands.length;
+        
         for (const command of this.printerCommands) {
             var is_linea = false;
             if (command.substring(0, 1) === ' ' || command.substring(0, 1) === '!' || command.substring(0, 1) === 'd' || command.substring(0, 1) === '-') {
                 is_linea = true;
             }
             if (this.printing) {
-                // Pachacutec: v36 - VALIDACIÓN ACK ESTRICTA (AWAIT directo y chequeo de éxito)
                 let success = await new Promise((res) => {
-                    // Pachacutec: v211 - Delay Estratégico (1000ms extra)
-                    // La Bixolon necesita tiempo post-subtotal (3) y entre abonos parciales (1).
                     const extra_delay = (command === '3' || command.substring(0, 1) === '1') ? 1000 : 0;
                     setTimeout(async () => {
                         const res_ok = await this.escribe_leer(command, is_linea);
@@ -319,61 +316,42 @@ export const FiscalPrinterMixin = {
                 });
 
                 if (!success) {
-                    // Pachacutec: v235 - Blindaje de Comandos Preventivos
-                    // El comando 7 (anulación) y comandos 'i' (cabecera) suelen dar NAK si el estado es limpio.
-                    // NO deben abortar la factura bajo ninguna circunstancia.
                     const isPreventive = (command === '7' || command.startsWith('i'));
                     if (isPreventive) {
-                        console.warn(`[FISCAL] v235 - Ignorando NAK en comando preventivo (${command}). Continuando...`);
-                        success = true; // MARCADO CRÍTICO: Resetea el estado para que el bucle no aborte al final.
-                        cantidad_comandos--;
+                        console.warn(`[FISCAL] v245 - Ignorando NAK en comando preventivo (${command}). Continuando...`);
                         continue;
                     }
 
-                    // Pachacutec: v230 - Reintento de Pago (Solo si falló el primer intento)
                     if (command.startsWith('2')) {
                         const code = command.substring(1, 3);
                         const amountStr = command.substring(3);
                         const currentTotalLen = amountStr.length;
-                        
                         const newIntPad = (currentTotalLen === 17) ? 10 : 15;
                         const altTotalLen = newIntPad + 2;
-                        
                         const rawInt = amountStr.substring(0, currentTotalLen - 2).replace(/^0+/, '');
                         const rawDec = amountStr.substring(currentTotalLen - 2);
                         const altAmountStr = rawInt.padStart(newIntPad, "0") + rawDec;
                         const retryCommand = "2" + code + altAmountStr;
                         
-                        console.warn(`[FISCAL] v230 - NAK 21. Probando Fallback de Padding (${altTotalLen} dig):`, retryCommand);
-                        
+                        console.warn(`[FISCAL] v245 - NAK 21. Probando Fallback de Padding (${altTotalLen} dig):`, retryCommand);
                         const retrySuccess = await this.escribe_leer(retryCommand, false);
                         if (retrySuccess) {
-                            console.log(`[FISCAL] v230 - Reintento exitoso con ${altTotalLen} dígitos. Hardware identificado.`);
-                            cantidad_comandos--;
+                            console.log(`[FISCAL] v245 - Reintento exitoso con ${altTotalLen} dígitos. Hardware identificado.`);
                             continue; 
                         }
                     }
 
-                    // Pachacutec: v235 - Si llegamos aquí, el error es fatal para la factura
-                    console.error("[FISCAL] v235 - Error CRÍTICO en comando mandatorio:", command, ". Abortando impresión.");
+                    console.error("[FISCAL] v245 - Error CRÍTICO en comando mandatorio:", command);
+                    print_success = false;
                     this.printing = false;
-                    return false;
+                    break;
                 }
-
-                // Pachacutec: v74 - Sincronización vía Status S2
-                // Si el comando enviado fue "S2", el 'success' contiene la trama de respuesta.
-                if (command === "S2" && Array.isArray(success)) {
-                    console.log("[FISCAL] v74 - Analizando Status S2 para sincronizar montos...");
-                    // El Manual v8.5.0 indica que S2 devuelve montos acumulados.
-                    // Aquí podríamos inyectar lógica para ajustar el siguiente comando de pago si hay discrepancia.
-                }
-
-                cantidad_comandos--;
             }
         }
+
         this.modal_imprimiendo.close();
-        if (cantidad_comandos == 0) {
-            console.log("Comandos finalizados");
+        if (print_success) {
+            console.log("Comandos finalizados con éxito");
             if (this.order) {
                 this.order.impresa = true;
                 Swal.fire({
@@ -384,10 +362,8 @@ export const FiscalPrinterMixin = {
                     timer: 1500
                 });
             }
-
         } else {
-            //error en impresion
-            console.log("Error en impresion, factura anulada");
+            console.error("Error en impresion, factura anulada o incompleta");
             Swal.fire({
                 position: 'top-end',
                 icon: 'error',
