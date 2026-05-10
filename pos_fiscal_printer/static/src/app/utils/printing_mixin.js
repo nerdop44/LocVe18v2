@@ -378,7 +378,7 @@ export const FiscalPrinterMixin = {
         this.printing = false;
 
         this.writer = false;
-        if (this.read_s2 && cantidad_comandos == 0) {
+        if (this.read_s2 && print_success) {
             //mandar comando S2 y leer
             await this.write_s2();
 
