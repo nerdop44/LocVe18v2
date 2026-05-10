@@ -308,7 +308,7 @@ export const FiscalPrinterMixin = {
             }
             if (this.printing) {
                 // Pachacutec: v36 - VALIDACIÓN ACK ESTRICTA (AWAIT directo y chequeo de éxito)
-                const success = await new Promise((res) => {
+                let success = await new Promise((res) => {
                     // Pachacutec: v211 - Delay Estratégico (1000ms extra)
                     // La Bixolon necesita tiempo post-subtotal (3) y entre abonos parciales (1).
                     const extra_delay = (command === '3' || command.substring(0, 1) === '1') ? 1000 : 0;
