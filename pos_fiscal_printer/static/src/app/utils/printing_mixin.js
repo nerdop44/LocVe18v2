@@ -244,7 +244,6 @@ export const FiscalPrinterMixin = {
                             this.writer = false;
                             */
                             
-                            this.printing = false; // ABORTA LA IMPRESIÓN ACTUAL SIN ANULAR EN LA MÁQUINA
                             return false; // Retorna false para indicar fallo mandatorio
                         }
                     } else {
@@ -307,6 +306,7 @@ export const FiscalPrinterMixin = {
                 is_linea = true;
             }
             if (this.printing) {
+                console.log(`[FISCAL] v255 - Procesando Comando: ${command}`);
                 let success = await new Promise((res) => {
                     const extra_delay = (command === '3' || command.substring(0, 1) === '1') ? 1000 : 0;
                     setTimeout(async () => {
@@ -318,7 +318,8 @@ export const FiscalPrinterMixin = {
                 if (!success) {
                     const isPreventive = (command === '7' || command.startsWith('i'));
                     if (isPreventive) {
-                        console.warn(`[FISCAL] v245 - Ignorando NAK en comando preventivo (${command}). Continuando...`);
+                        console.warn(`[FISCAL] v255 - Ignorando NAK en comando preventivo (${command}). Manteniendo flujo activo.`);
+                        this.printing = true; // REFUERZO: Asegurar que el flag de impresión siga activo
                         continue;
                     }
 
@@ -333,15 +334,16 @@ export const FiscalPrinterMixin = {
                         const altAmountStr = rawInt.padStart(newIntPad, "0") + rawDec;
                         const retryCommand = "2" + code + altAmountStr;
                         
-                        console.warn(`[FISCAL] v245 - NAK 21. Probando Fallback de Padding (${altTotalLen} dig):`, retryCommand);
+                        console.warn(`[FISCAL] v255 - NAK 21 en Pago. Probando Fallback (${altTotalLen} dig):`, retryCommand);
                         const retrySuccess = await this.escribe_leer(retryCommand, false);
                         if (retrySuccess) {
-                            console.log(`[FISCAL] v245 - Reintento exitoso con ${altTotalLen} dígitos. Hardware identificado.`);
+                            console.log(`[FISCAL] v255 - Reintento exitoso con ${altTotalLen} dígitos.`);
+                            this.printing = true; // REFUERZO
                             continue; 
                         }
                     }
 
-                    console.error("[FISCAL] v245 - Error CRÍTICO en comando mandatorio:", command);
+                    console.error("[FISCAL] v255 - Error CRÍTICO en comando mandatorio:", command);
                     print_success = false;
                     this.printing = false;
                     break;
