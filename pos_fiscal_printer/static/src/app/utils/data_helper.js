@@ -12,20 +12,28 @@ export class DataHelper {
 
         // 1. Intentar desde el modelo reactivo (Odoo 18 Store)
         const pm = pos.models['pos.payment.method']?.get(id);
-        if (pm && pm.x_printer_code) {
-            console.log(`[FISCAL] DataHelper - Código hallado en Modelo para PM ${id}: ${pm.x_printer_code}`);
-            return pm.x_printer_code.padStart(2, "0");
+        if (pm) {
+            if (pm.x_printer_code) {
+                console.log(`[FISCAL] DataHelper - Código hallado en Modelo para PM ${pm.name} (${id}): ${pm.x_printer_code}`);
+                return pm.x_printer_code.padStart(2, "0");
+            } else {
+                console.warn(`[FISCAL] DataHelper - PM ${pm.name} (${id}) NO tiene x_printer_code configurado.`);
+            }
         }
 
         // 2. Intentar desde Datos Crudos (Safe Box)
         const rawData = pos.data?.["pos.payment.method"] || [];
         const found = rawData.find(r => r.id === id);
-        if (found && found.x_printer_code) {
-            console.log(`[FISCAL] DataHelper - Código hallado en Data Cruda para PM ${id}: ${found.x_printer_code}`);
-            return found.x_printer_code.padStart(2, "0");
+        if (found) {
+            if (found.x_printer_code) {
+                console.log(`[FISCAL] DataHelper - Código hallado en Data Cruda para PM ${found.name} (${id}): ${found.x_printer_code}`);
+                return found.x_printer_code.padStart(2, "0");
+            } else {
+                console.warn(`[FISCAL] DataHelper - PM ${found.name} en Data Cruda NO tiene x_printer_code.`);
+            }
         }
 
-        console.warn(`[FISCAL] DataHelper - No se halló x_printer_code para PM ${id}. Usando 01.`);
+        console.warn(`[FISCAL] DataHelper - Fallback '01' para PM ID ${id}`);
         return "01";
     }
 
