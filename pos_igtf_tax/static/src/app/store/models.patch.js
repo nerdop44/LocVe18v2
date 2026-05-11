@@ -119,6 +119,20 @@ patch(PosOrder.prototype, {
         return line && typeof line.getIndexMaps !== "function";
     },
 
+    get_total_with_tax() {
+        let total = super.get_total_with_tax();
+        // Pachacutec: v74 - Sincronización de Total Visual
+        // Si el IGTF está calculado pero la línea física aún no está en el array (por latencia reactiva),
+        // sumamos el monto virtualmente para que la pantalla de pago y el mixin fiscal vean el total real.
+        const igtf_monto = this.x_igtf_amount;
+        const has_igtf_line = (this.lines || []).some(l => l && l.x_is_igtf_line);
+        if (igtf_monto > 0.01 && !has_igtf_line) {
+            console.warn("[IGTF] v74 - Sumando IGTF virtual al total visual (Widget Verde):", igtf_monto);
+            return total + igtf_monto;
+        }
+        return total;
+    },
+
     getDisplayData() {
         return super.getDisplayData(...arguments);
     },
@@ -212,9 +226,13 @@ patch(PosOrder.prototype, {
                                 x_is_igtf_line: true
                             }
                         }).then(() => {
-                            console.log("[IGTF] v73 - Línea añadida con éxito, recalculando totales...");
+                            console.log("[IGTF] v74 - Línea añadida con éxito, forzando recalculo y notificación...");
                             if (typeof this.recomputeOrderData === "function") {
                                 this.recomputeOrderData();
+                            }
+                            // Pachacutec: v74 - Disparar evento para que OWL actualice los componentes
+                            if (this.models) {
+                                this.models.dispatchEvent("change", { record: this });
                             }
                         }).catch(e => console.warn("Pachacutec: Error async adding IGTF line", e));
                     }

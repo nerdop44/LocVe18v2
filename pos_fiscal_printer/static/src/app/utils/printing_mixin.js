@@ -1143,6 +1143,25 @@ export const FiscalPrinterMixin = {
                     this.printerCommands.push((char === "GC" ? "A##" : "@##") + sanitize(line.customer_note) + "##");
                 }
             });
+        
+        // Pachacutec: v74 - Guardia de Último Minuto para IGTF (Aseguramiento Fiscal)
+        // Si el pedido tiene un monto de IGTF pero la línea física no aparece en 'lines'
+        // (por latencia reactiva de Odoo 18), generamos el comando virtualmente.
+        try {
+            const igtf_monto = this.order.x_igtf_amount;
+            const has_igtf_line = (this.order.lines || []).some(l => l && l.x_is_igtf_line);
+            if (igtf_monto > 0.01 && !has_igtf_line) {
+                console.warn("[FISCAL] v74 - LÍNEA IGTF NO HALLADA EN 'lines'. Generando comando virtual...");
+                let price = String(Math.round(igtf_monto * 100)).padStart(16, '0').slice(-16);
+                let quantity = String(1000).padStart(17, '0').slice(-17); // Cantidad 1.000 (3 decimales)
+                let tag = ' '; // Tag Exento para IGTF percibido
+                let virtual_cmd = tag + price + quantity + "||IGTF 3%";
+                this.printerCommands.push(virtual_cmd);
+                console.log("[FISCAL] v74 - Comando virtual IGTF añadido:", virtual_cmd);
+            }
+        } catch (e) {
+            console.error("[FISCAL] Error en guardia IGTF v74:", e);
+        }
     },
 
     printNoFiscal() {

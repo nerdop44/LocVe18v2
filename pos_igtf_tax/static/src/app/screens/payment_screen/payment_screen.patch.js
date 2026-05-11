@@ -9,9 +9,11 @@ patch(PaymentScreen.prototype, {
         super.setup();
 
         onMounted(() => {
-            if (this.currentOrder) {
-                this.currentOrder.removeIGTF();
-            }
+            // Pachacutec: v74 - Desactivamos removeIGTF al montar para evitar
+            // parpadeos visuales y pérdida del total real al entrar a la pantalla.
+            // if (this.currentOrder) {
+            //     this.currentOrder.removeIGTF();
+            // }
         });
 
         onWillUnmount(() => {
