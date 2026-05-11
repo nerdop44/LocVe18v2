@@ -225,8 +225,14 @@ export const FiscalPrinterMixin = {
                             this.reader = false;
                             return true;
                         } else {
-                            console.error("[FISCAL] v201 - Comando RECHAZADO (NAK ", value[0], "). Se ha DESACTIVADO la anulación automática (Comando 7) por solicitud del usuario.");
-                            this.env.services.notification.add(_t("Error Fiscal: Comando Rechazado (NAK ").concat(value[0], "). Verifique consola para detalles."), { type: "danger" });
+                            // Pachacutec: v256 - Gestión Inteligente de NAK
+                            if (command === "7") {
+                                console.log("[FISCAL] v256 - Impresora limpia (NAK 21 en CMD 7). Procediendo sin alarmar al usuario.");
+                            } else {
+                                console.error("[FISCAL] v256 - Comando RECHAZADO (NAK ", value[0], ").");
+                                this.env.services.notification.add(_t("Error Fiscal: Comando Rechazado (NAK ").concat(value[0], ")."), { type: "danger" });
+                            }
+                            
                             leer = false;
                             await this.reader.releaseLock();
                             this.reader = false;
