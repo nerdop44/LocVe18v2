@@ -86,31 +86,34 @@ class PosSession(models.Model):
         currency_rounding = self.currency_id.rounding
         closed_orders = self._get_closed_orders()
 
-        for order in closed_orders:
-            if order.is_invoiced:
-                continue
-            igtf_amount = order.x_igtf_amount
-            if not igtf_amount:
-                continue
-            igtf_amount_rounded = float_round(igtf_amount, precision_rounding=currency_rounding)
-            if igtf_amount_rounded == 0.0:
-                continue
+        try:
+            for order in closed_orders:
+                if order.is_invoiced:
+                    continue
+                igtf_amount = order.x_igtf_amount
+                if not igtf_amount:
+                    continue
+                igtf_amount_rounded = float_round(igtf_amount, precision_rounding=currency_rounding)
+                if igtf_amount_rounded == 0.0:
+                    continue
 
-            igtf_key = (
-                igtf_account.id,
-                1,
-                tuple(),
-                tuple(),
-                igtf_product.id if self.config_id.is_closing_entry_by_product else False,
-            )
-            sales[igtf_key] = self._update_amounts(
-                sales[igtf_key],
-                {
-                    'amount': igtf_amount_rounded,
-                    'amount_converted': igtf_amount_rounded,
-                },
-                order.date_order,
-            )
+                igtf_key = (
+                    igtf_account.id,
+                    1,
+                    tuple(),
+                    tuple(),
+                    igtf_product.id if self.config_id.is_closing_entry_by_product else False,
+                )
+                sales[igtf_key] = self._update_amounts(
+                    sales[igtf_key],
+                    {
+                        'amount': igtf_amount_rounded,
+                        'amount_converted': igtf_amount_rounded,
+                    },
+                    order.date_order,
+                )
+        except Exception as e:
+            _logger.error("[IGTF] Error en _accumulate_amounts: %s", str(e))
 
         return data
 
@@ -124,6 +127,11 @@ class PosOrder(models.Model):
     def _compute_x_igtf_amount(self):
         for rec in self:
             rec.x_igtf_amount = sum(rec.lines.filtered("x_is_igtf_line").mapped("price_subtotal_incl"))
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v80 - Inyectar monto IGTF en la carga de órdenes para el POS
+        return super()._load_pos_data_fields(config_id) + ['x_igtf_amount']
 
     def _get_fields_for_order_line(self):
         fields = super()._get_fields_for_order_line()
