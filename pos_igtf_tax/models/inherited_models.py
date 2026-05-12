@@ -86,34 +86,31 @@ class PosSession(models.Model):
         currency_rounding = self.currency_id.rounding
         closed_orders = self._get_closed_orders()
 
-        try:
-            for order in closed_orders:
-                if order.is_invoiced:
-                    continue
-                igtf_amount = order.x_igtf_amount
-                if not igtf_amount:
-                    continue
-                igtf_amount_rounded = float_round(igtf_amount, precision_rounding=currency_rounding)
-                if igtf_amount_rounded == 0.0:
-                    continue
+        for order in closed_orders:
+            if order.is_invoiced:
+                continue
+            igtf_amount = order.x_igtf_amount
+            if not igtf_amount:
+                continue
+            igtf_amount_rounded = float_round(igtf_amount, precision_rounding=currency_rounding)
+            if igtf_amount_rounded == 0.0:
+                continue
 
-                igtf_key = (
-                    igtf_account.id,
-                    1,
-                    tuple(),
-                    tuple(),
-                    igtf_product.id if self.config_id.is_closing_entry_by_product else False,
-                )
-                sales[igtf_key] = self._update_amounts(
-                    sales[igtf_key],
-                    {
-                        'amount': igtf_amount_rounded,
-                        'amount_converted': igtf_amount_rounded,
-                    },
-                    order.date_order,
-                )
-        except Exception as e:
-            _logger.error("[IGTF] Error en _accumulate_amounts: %s", str(e))
+            igtf_key = (
+                igtf_account.id,
+                1,
+                tuple(),
+                tuple(),
+                igtf_product.id if self.config_id.is_closing_entry_by_product else False,
+            )
+            sales[igtf_key] = self._update_amounts(
+                sales[igtf_key],
+                {
+                    'amount': igtf_amount_rounded,
+                    'amount_converted': igtf_amount_rounded,
+                },
+                order.date_order,
+            )
 
         return data
 
@@ -130,7 +127,9 @@ class PosOrder(models.Model):
 
     def _get_fields_for_order_line(self):
         fields = super()._get_fields_for_order_line()
+
         fields.append('x_is_igtf_line')
+        
         return fields
         
 class PosOrderLine(models.Model):
@@ -138,7 +137,24 @@ class PosOrderLine(models.Model):
 
     x_is_igtf_line = fields.Boolean("Linea IGTF")
 
-    # Pachacutec: v83 - ELIMINADOS métodos incompatibles para estabilidad de Odoo 18.
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['x_is_igtf_line']
+
+    def _order_line_fields(self, line, session_id):
+        result = super()._order_line_fields(line, session_id)
+        vals = result[2]
+
+        vals["x_is_igtf_line"] = vals.get("x_is_igtf_line", line[2].get("x_is_igtf_line", False))
+
+        return result
+
+    def _export_for_ui(self, orderline):
+        res = super()._export_for_ui(orderline)
+
+        res["x_is_igtf_line"] = orderline.x_is_igtf_line
+
+        return res
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
@@ -172,13 +188,6 @@ class PosConfig(models.Model):
     x_igtf_product_id = fields.Many2one("product.product", "Producto IGTF")
 
     aplicar_igtf = fields.Boolean("Aplicar IGTF", default=False)
-
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v79 - Inyectar campos IGTF para evitar fallos de carga en Odoo 18
-        res = super()._load_pos_data_fields(config_id)
-        res += ['x_igtf_product_id', 'aplicar_igtf']
-        return res
 
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
