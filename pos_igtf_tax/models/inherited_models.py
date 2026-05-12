@@ -128,16 +128,9 @@ class PosOrder(models.Model):
         for rec in self:
             rec.x_igtf_amount = sum(rec.lines.filtered("x_is_igtf_line").mapped("price_subtotal_incl"))
 
-    def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v81 - ELIMINADO para evitar corrupción en Odoo 18. 
-        # Las órdenes no se cargan mediante este método en el flujo inicial.
-        return super()._load_pos_data_fields(config_id)
-
     def _get_fields_for_order_line(self):
         fields = super()._get_fields_for_order_line()
-
         fields.append('x_is_igtf_line')
-        
         return fields
         
 class PosOrderLine(models.Model):
@@ -145,8 +138,7 @@ class PosOrderLine(models.Model):
 
     x_is_igtf_line = fields.Boolean("Linea IGTF")
 
-    # Pachacutec: v82 - MÉTODOS DE LEGADO ELIMINADOS (v17/v16)
-    # En Odoo 18, la sincronización de campos se maneja vía los nuevos cargadores.
+    # Pachacutec: v83 - ELIMINADOS métodos incompatibles para estabilidad de Odoo 18.
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
