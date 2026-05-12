@@ -121,13 +121,24 @@ patch(PosOrder.prototype, {
 
     get_total_with_tax() {
         let total = super.get_total_with_tax();
-        // Pachacutec: v74 - Sincronización de Total Visual
-        // Si el IGTF está calculado pero la línea física aún no está en el array (por latencia reactiva),
-        // sumamos el monto virtualmente para que la pantalla de pago y el mixin fiscal vean el total real.
+        // Pachacutec: v75 - Sincronización de Total Visual
+        // Evitamos que el widget se ponga en cero si falta el IGTF físico
         const igtf_monto = this.x_igtf_amount;
         const has_igtf_line = (this.lines || []).some(l => l && l.x_is_igtf_line);
         if (igtf_monto > 0.01 && !has_igtf_line) {
-            console.warn("[IGTF] v74 - Sumando IGTF virtual al total visual (Widget Verde):", igtf_monto);
+            return total + igtf_monto;
+        }
+        return total;
+    },
+
+    get_total_without_tax() {
+        let total = super.get_total_without_tax();
+        // Pachacutec: v75 - Subtotal Virtual
+        // Si no hay línea de IGTF física, sumamos el monto virtual al subtotal
+        // para que la UI de Odoo 18 no colapse a 0,00 Bs.
+        const igtf_monto = this.x_igtf_amount;
+        const has_igtf_line = (this.lines || []).some(l => l && l.x_is_igtf_line);
+        if (igtf_monto > 0.01 && !has_igtf_line) {
             return total + igtf_monto;
         }
         return total;
@@ -143,16 +154,10 @@ patch(PosOrder.prototype, {
             const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
             const foreignPayments = paymentLines.filter((p) => p.isForeignExchange);
             
-            if (foreignPayments.length > 0) {
-                console.warn("[IGTF] v73 - Pagos en Divisas Detectados:", foreignPayments.length);
-            }
-
             const igtf_monto = foreignPayments
                 .map(({ amount, payment_method_id }) => {
                     const percentage = payment_method_id?.x_igtf_percentage || 3.0;
-                    const calc = (amount || 0) * (percentage / 100);
-                    console.log(`[IGTF] v73 - Pago ${payment_method_id?.name}: Amnt ${amount} * ${percentage}% = ${calc}`);
-                    return calc;
+                    return (amount || 0) * (percentage / 100);
                 })
                 .reduce((prev, current) => prev + current, 0);
 
@@ -161,11 +166,7 @@ patch(PosOrder.prototype, {
                 .map((p) => typeof p.get_price_with_tax === "function" ? p.get_price_with_tax() : 0)
                 .reduce((prev, current) => prev + current, 0);
 
-            const final_igtf = roundDecimals(Math.min(igtf_monto, totalBase * 0.031), 2);
-            if (final_igtf > 0) {
-                console.warn(`[IGTF] v73 - Monto Final Calculado: ${final_igtf} (Base: ${totalBase})`);
-            }
-            return final_igtf;
+            return roundDecimals(Math.min(igtf_monto, totalBase * 0.031), 2);
         } catch (e) {
             return 0;
         }
