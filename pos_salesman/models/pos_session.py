@@ -1,25 +1,5 @@
 from odoo import models, api, fields
 
-class PosConfig(models.Model):
-    _inherit = 'pos.config'
-
-    @api.model
-    def _load_pos_data(self, data):
-        # Pachacutec: v18 - Inyectar salesman_ids sin filtrar otros campos
-        res = super()._load_pos_data(data)
-        config_id = self.env.context.get('pos_config_id')
-        if not config_id and data.get('pos.session'):
-            try:
-                config_id = data['pos.session']['data'][0]['config_id']
-            except (KeyError, IndexError):
-                pass
-        
-        if config_id:
-            config = self.browse(config_id)
-            if isinstance(res, dict) and 'data' in res and len(res['data']) > 0:
-                res['data'][0]['salesman_ids'] = config.salesman_ids.ids
-        return res
-
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
