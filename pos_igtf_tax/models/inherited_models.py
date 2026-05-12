@@ -128,10 +128,10 @@ class PosOrder(models.Model):
         for rec in self:
             rec.x_igtf_amount = sum(rec.lines.filtered("x_is_igtf_line").mapped("price_subtotal_incl"))
 
-    @api.model
     def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v80 - Inyectar monto IGTF en la carga de órdenes para el POS
-        return super()._load_pos_data_fields(config_id) + ['x_igtf_amount']
+        # Pachacutec: v81 - ELIMINADO para evitar corrupción en Odoo 18. 
+        # Las órdenes no se cargan mediante este método en el flujo inicial.
+        return super()._load_pos_data_fields(config_id)
 
     def _get_fields_for_order_line(self):
         fields = super()._get_fields_for_order_line()
@@ -145,9 +145,7 @@ class PosOrderLine(models.Model):
 
     x_is_igtf_line = fields.Boolean("Linea IGTF")
 
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        return super()._load_pos_data_fields(config_id) + ['x_is_igtf_line']
+    # Pachacutec: v81 - ELIMINADO _load_pos_data_fields en OrderLine (Incorrecto en Odoo 18)
 
     def _order_line_fields(self, line, session_id):
         result = super()._order_line_fields(line, session_id)

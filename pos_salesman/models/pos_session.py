@@ -3,12 +3,7 @@ from odoo import models, api, fields
 class HrEmployee(models.Model):
     _inherit = 'hr.employee'
 
-    @api.model
-    def _load_pos_data_fields(self, config_id):
-        # Pachacutec: v18 - Usar el método estándar para evitar errores de getIndexMaps
-        res = super()._load_pos_data_fields(config_id)
-        # No añadimos 'name' porque ya está en el core de pos_hr
-        return res
+    # Pachacutec: v81 - ELIMINADO cargador vacío para estabilidad.
 
     # Pachacutec: v205 - ELIMINADO filtro de dominio restrictivo.
     # El filtrado de vendedores se debe manejar solo en el frontend (BtnSalesMan.js)
