@@ -189,6 +189,13 @@ class PosConfig(models.Model):
 
     aplicar_igtf = fields.Boolean("Aplicar IGTF", default=False)
 
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        # Pachacutec: v79 - Inyectar campos IGTF para evitar fallos de carga en Odoo 18
+        res = super()._load_pos_data_fields(config_id)
+        res += ['x_igtf_product_id', 'aplicar_igtf']
+        return res
+
 class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
