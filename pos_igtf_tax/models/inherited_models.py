@@ -145,22 +145,8 @@ class PosOrderLine(models.Model):
 
     x_is_igtf_line = fields.Boolean("Linea IGTF")
 
-    # Pachacutec: v81 - ELIMINADO _load_pos_data_fields en OrderLine (Incorrecto en Odoo 18)
-
-    def _order_line_fields(self, line, session_id):
-        result = super()._order_line_fields(line, session_id)
-        vals = result[2]
-
-        vals["x_is_igtf_line"] = vals.get("x_is_igtf_line", line[2].get("x_is_igtf_line", False))
-
-        return result
-
-    def _export_for_ui(self, orderline):
-        res = super()._export_for_ui(orderline)
-
-        res["x_is_igtf_line"] = orderline.x_is_igtf_line
-
-        return res
+    # Pachacutec: v82 - MÉTODOS DE LEGADO ELIMINADOS (v17/v16)
+    # En Odoo 18, la sincronización de campos se maneja vía los nuevos cargadores.
 
 class PosPaymentMethod(models.Model):
     _inherit = "pos.payment.method"
