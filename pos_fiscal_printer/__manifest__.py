@@ -18,12 +18,12 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_fiscal_printer/static/src/scss/**/*',
+            'pos_fiscal_printer/static/src/app/utils/data_helper.js',
+            'pos_fiscal_printer/static/src/app/utils/printing_mixin.js',
             'pos_fiscal_printer/static/src/app/popup/nota_credito_popup.xml',
             'pos_fiscal_printer/static/src/app/popup/nota_credito_popup.js',
             'pos_fiscal_printer/static/src/app/popup/close_pos_popup_patch.xml',
             'pos_fiscal_printer/static/src/app/popup/close_pos_popup_patch.js',
-            'pos_fiscal_printer/static/src/app/utils/data_helper.js',
-            'pos_fiscal_printer/static/src/app/utils/printing_mixin.js',
             'pos_fiscal_printer/static/src/app/screens/receipt_screen/receipt_screen_patch.xml',
             'pos_fiscal_printer/static/src/app/screens/receipt_screen/receipt_screen_patch.js',
             'pos_fiscal_printer/static/lib/js/**/*',
