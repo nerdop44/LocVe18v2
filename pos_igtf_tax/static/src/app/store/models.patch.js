@@ -148,6 +148,23 @@ patch(PosOrder.prototype, {
         return super.getDisplayData(...arguments);
     },
 
+    get total_with_igtf() {
+        return this.get_total_with_tax();
+    },
+
+    get sale_total_without_igtf() {
+        return this.get_total_with_tax() - this.x_igtf_amount;
+    },
+
+    get igtf_base_bs() {
+        // Pachacutec: v76 - Base de cálculo del IGTF (Suma de montos en divisas)
+        const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
+        return paymentLines
+            .filter((p) => p.isForeignExchange)
+            .map((p) => p.amount || 0)
+            .reduce((prev, current) => prev + current, 0);
+    },
+
     get x_igtf_amount() {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         try {

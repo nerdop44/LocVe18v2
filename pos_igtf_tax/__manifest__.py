@@ -15,7 +15,6 @@
         'point_of_sale._assets_pos': [
             'pos_igtf_tax/static/src/scss/**/*',
             'pos_igtf_tax/static/src/app/**/*.js',
-            'pos_igtf_tax/static/src/app/**/*.xml',
         ],
     },
     'license': 'LGPL-3',
