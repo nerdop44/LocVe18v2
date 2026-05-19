@@ -87,7 +87,7 @@ class ResCurrency(models.Model):
                 rec.inverse_rate = 0.0
 
 
-    def _convert(self, from_amount, to_currency, company, date, round=True, custom_rate=0.0):
+    def _convert(self, from_amount, to_currency, company=None, date=None, round=True, custom_rate=0.0):
         self, to_currency = self or to_currency, to_currency or self
         assert self, "convert amount from unknown currency"
         to_currency = to_currency or self
