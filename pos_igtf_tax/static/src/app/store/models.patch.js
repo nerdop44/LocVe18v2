@@ -16,10 +16,6 @@ PosOrderline.fields = {
     x_is_igtf_line: { type: "boolean" },
 };
 
-// v18.0.1.0.48 - ESTABILIZACIÓN REACTIVA
-// Eliminamos splice destructivos y reforzamos bloqueos globales para evitar
-// colisiones con syncAllOrders de Odoo 18.
-
 window.__pachacutec_global_lock = false;
 
 // 1. Identificación del Producto IGTF
@@ -106,7 +102,6 @@ patch(PosOrderline.prototype, {
 
 // 5. Gestión de Pedido y Protección de Memoria
 patch(PosOrder.prototype, {
-    // Reducción del Escudo: Solo detección, nunca alteración directa del arreglo (NO splice)
     _pachacutec_is_ghost(line) {
         return line && typeof line.getIndexMaps !== "function";
     },
@@ -208,54 +203,45 @@ patch(PosOrder.prototype, {
     remove_paymentline(line) {
         super.remove_paymentline(line);
         if (!window.__pachacutec_global_lock) {
-            this.refreshIGTF();
+            try {
+                this.refreshIGTF();
+            } catch (e) {
+                console.warn("Pachacutec: refreshIGTF failed during remove_paymentline", e);
+            }
         }
     },
 
     refreshIGTF() {
         if (!this.models || this.finalized || window.__pachacutec_global_lock) return;
         
-        window.__pachacutec_global_lock = true;
         try {
             this.removeIGTF();
-            const config = this.models["pos.config"].getFirst();
-            const igtf_monto = this.x_igtf_amount;
+            const config = this.config;
             const igtfProduct = config?.x_igtf_product_id;
+            const price = this.x_igtf_amount;
 
-            if (igtf_monto > 0.01 && igtfProduct) {
+            if (igtfProduct && Math.abs(price) > 0.001) {
                 const product = this.models["product.product"]?.get(igtfProduct[0]);
                 if (product) {
-                    const pos = this.pos || this.models["pos.config"]?.getFirst()?.env?.services?.pos || window.pos;
-                    if (pos && typeof pos.addLineToCurrentOrder === 'function') {
-                        pos.addLineToCurrentOrder(product, {
-                            price: igtf_monto,
-                            quantity: 1,
-                            merge: false,
-                            extras: {
-                                price_type: "original",
-                                x_is_igtf_line: true
-                            }
-                        }).then(() => {
-                            console.log("[IGTF] v74 - Línea añadida con éxito, forzando recalculo y notificación...");
-                            if (typeof this.recomputeOrderData === "function") {
-                                this.recomputeOrderData();
-                            }
-                            // Pachacutec: v74 - Disparar evento para que OWL actualice los componentes
-                            if (this.models) {
-                                this.models.dispatchEvent("change", { record: this });
-                            }
-                        }).catch(e => console.warn("Pachacutec: Error async adding IGTF line", e));
-                    }
+                    this.update({
+                        lines: [["create", {
+                            product_id: product,
+                            price_unit: price,
+                            qty: 1,
+                            price_type: "original",
+                            x_is_igtf_line: true
+                        }]]
+                    });
+                    this.recomputeOrderData();
                 }
             }
         } catch (e) {
             console.error("Pachacutec: Error refreshing IGTF:", e);
-        } finally {
-            window.__pachacutec_global_lock = false;
         }
     },
 
     removeIGTF() {
+        if (window.__pachacutec_global_lock || !this.models) return;
         const linesToRemove = (this.lines || []).filter((l) => l && l.x_is_igtf_line);
         for (const line of linesToRemove) {
             if (line && !this._pachacutec_is_ghost(line) && typeof line.delete === "function") {

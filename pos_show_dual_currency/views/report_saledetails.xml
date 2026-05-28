@@ -73,7 +73,7 @@
         </xpath>
 
         <!-- 8. Descuentos -->
-        <xpath expr="//div[@id='discounts']//div[strong[contains(text(), 'Amount of discounts')]]" position="inside">
+        <xpath expr="//div[@id='discounts']/div[2]/div" position="inside">
             / <span style="color: red"><t t-esc="discount_amount_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
 
