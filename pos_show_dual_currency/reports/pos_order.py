@@ -40,23 +40,70 @@ class ReportSaleDetails(models.AbstractModel):
         data['symbol'] = self.env.company.currency_id.symbol
         data['rate_today'] = rate_today
         data['total_paid_ref'] = currency_id_dif.round(
-            data['total_paid'] / rate_today
+            data.get('total_paid', 0.0) / rate_today
         ) if rate_today else 0.0
 
-        # Inyectar price_unit_ref DENTRO de cada producto de cada categoría
+        # Enriquecer categorías y líneas de producto en ventas
         for category in data.get('products', []):
+            category['total_ref'] = category.get('total', 0.0) / rate_today if rate_today else 0.0
             for prod in category.get('products', []):
                 price_unit = prod.get('price_unit') or prod.get('price', 0.0)
                 prod['price_unit_ref'] = price_unit / rate_today if rate_today else 0.0
+                prod['base_amount_ref'] = prod.get('base_amount', 0.0) / rate_today if rate_today else 0.0
 
-        # Enriquecer payments nativos con total_ref (preservar TODA la estructura nativa)
+        if 'products_info' in data:
+            data['products_info']['total_ref'] = data['products_info'].get('total', 0.0) / rate_today if rate_today else 0.0
+
+        # Enriquecer categorías y líneas de producto en devoluciones
+        for category in data.get('refund_products', []):
+            category['total_ref'] = category.get('total', 0.0) / rate_today if rate_today else 0.0
+            for prod in category.get('products', []):
+                price_unit = prod.get('price_unit') or prod.get('price', 0.0)
+                prod['price_unit_ref'] = price_unit / rate_today if rate_today else 0.0
+                prod['base_amount_ref'] = prod.get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
+        if 'refund_info' in data:
+            data['refund_info']['total_ref'] = data['refund_info'].get('total', 0.0) / rate_today if rate_today else 0.0
+
+        # Enriquecer pagos nativos con total_ref y campos de control de sesión
         for payment in data.get('payments', []):
             payment['total_ref'] = payment.get('total', 0.0) / rate_today if rate_today else 0.0
+            payment['final_count_ref'] = payment.get('final_count', 0.0) / rate_today if rate_today else 0.0
+            payment['money_counted_ref'] = payment.get('money_counted', 0.0) / rate_today if rate_today else 0.0
+            payment['money_difference_ref'] = payment.get('money_difference', 0.0) / rate_today if rate_today else 0.0
+            if 'cash_moves' in payment:
+                for cm in payment['cash_moves']:
+                    cm['amount_ref'] = cm.get('amount', 0.0) / rate_today if rate_today else 0.0
 
-        # Enriquecer taxes nativos con _ref (preservar TODA la estructura nativa)
+        for ppm in data.get('payments_per_method', []):
+            ppm['total_ref'] = ppm.get('total', 0.0) / rate_today if rate_today else 0.0
+
+        # Enriquecer impuestos nativos (ventas y devoluciones)
         for tax in data.get('taxes', []):
             tax['tax_amount_ref'] = tax.get('tax_amount', 0.0) / rate_today if rate_today else 0.0
             tax['base_amount_ref'] = tax.get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
+        if 'taxes_info' in data:
+            data['taxes_info']['tax_amount_ref'] = data['taxes_info'].get('tax_amount', 0.0) / rate_today if rate_today else 0.0
+            data['taxes_info']['base_amount_ref'] = data['taxes_info'].get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
+        for tax in data.get('refund_taxes', []):
+            tax['tax_amount_ref'] = tax.get('tax_amount', 0.0) / rate_today if rate_today else 0.0
+            tax['base_amount_ref'] = tax.get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
+        if 'refund_taxes_info' in data:
+            data['refund_taxes_info']['tax_amount_ref'] = data['refund_taxes_info'].get('tax_amount', 0.0) / rate_today if rate_today else 0.0
+            data['refund_taxes_info']['base_amount_ref'] = data['refund_taxes_info'].get('base_amount', 0.0) / rate_today if rate_today else 0.0
+
+        # Descuentos
+        data['discount_amount_ref'] = data.get('discount_amount', 0.0) / rate_today if rate_today else 0.0
+
+        # Facturas
+        for inv in data.get('invoiceList', []):
+            if 'invoices' in inv:
+                for invoice in inv['invoices']:
+                    invoice['total_ref'] = invoice.get('total', 0.0) / rate_today if rate_today else 0.0
+        data['invoiceTotal_ref'] = data.get('invoiceTotal', 0.0) / rate_today if rate_today else 0.0
 
         return data
 

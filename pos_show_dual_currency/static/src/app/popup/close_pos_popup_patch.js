@@ -5,6 +5,7 @@ import { patch } from "@web/core/utils/patch";
 import { useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
+import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
 
 // Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
 // Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
@@ -13,6 +14,7 @@ import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_d
 // Desactivamos la validación de props de Owl para este componente.
 // Esto evita el crash 'toLowerCase' causado por conflictos de infraestructura entre parches.
 ClosePosPopup.props = false;
+ClosePosPopup.components = { ...ClosePosPopup.components, MoneyDetailsPopupUSD };
 
 patch(ClosePosPopup.prototype, {
     setup() {

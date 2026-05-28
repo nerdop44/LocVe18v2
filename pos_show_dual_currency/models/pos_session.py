@@ -11,6 +11,15 @@ from odoo.tools import float_is_zero, float_compare, float_round
 from odoo.osv.expression import AND, OR
 from odoo.service.common import exp_version
 
+def convert_ref(amount, rate, from_currency, to_currency):
+    if not rate or from_currency == to_currency:
+        return amount
+    if from_currency.name in ['VES', 'VEF'] and to_currency.name == 'USD':
+        return amount / rate if rate > 1.0 else amount * rate
+    elif from_currency.name == 'USD' and to_currency.name in ['VES', 'VEF']:
+        return amount * rate if rate > 1.0 else amount / rate
+    return amount
+
 class PosSession(models.Model):
     _inherit = "pos.session"
 
@@ -172,7 +181,7 @@ class PosSession(models.Model):
 
     @api.depends('config_id', 'payment_method_ids')
     def _compute_cash_all(self):
-        # super(PosSession, self)._compute_cash_all()
+        super(PosSession, self)._compute_cash_all()
         for session in self:
             session.me_ref_cash_journal_id = False
             cash_journal_ref = session.payment_method_ids.filtered(
@@ -186,17 +195,42 @@ class PosSession(models.Model):
         self.ensure_one()
         orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
         payments = orders.payment_ids.filtered(lambda p: p.payment_method_id.type != "pay_later")
-        cash_payment_method_ref_ids = self.payment_method_ids.filtered(
-            lambda pm: pm.type == 'cash' and pm.currency_id == self.ref_me_currency_id)
-        default_cash_payment_ref_method_id = cash_payment_method_ref_ids[0] if cash_payment_method_ref_ids else None
+        
+        cash_payment_methods = self.payment_method_ids.filtered(lambda pm: pm.type == 'cash')
+        
+        # Identificar método de efectivo de referencia (USD) de forma robusta e inteligente
+        default_cash_payment_ref_method_id = None
+        for pm in cash_payment_methods:
+            if pm.currency_id == self.ref_me_currency_id or (pm.journal_id and pm.journal_id.currency_id == self.ref_me_currency_id):
+                default_cash_payment_ref_method_id = pm
+                break
+        
+        # Fallback heurístico si no se detectó por moneda pero el nombre contiene "$" o "USD"
+        if not default_cash_payment_ref_method_id:
+            for pm in cash_payment_methods:
+                name_upper = (pm.name or '').upper()
+                if '$' in name_upper or 'USD' in name_upper:
+                    default_cash_payment_ref_method_id = pm
+                    break
+        
+        # Identificar método de efectivo principal (Bs)
+        default_cash_payment_method_id = None
+        for pm in cash_payment_methods:
+            if pm != default_cash_payment_ref_method_id:
+                default_cash_payment_method_id = pm
+                break
+
         total_default_cash_ref_payment_amount = sum(
             payments.filtered(lambda p: p.payment_method_id == default_cash_payment_ref_method_id).mapped(
                 'amount_ref')) if default_cash_payment_ref_method_id else 0
-        cash_payment_method_ids = self.payment_method_ids.filtered(
-            lambda pm: pm.type == 'cash' and pm.currency_id != self.ref_me_currency_id)
-        default_cash_payment_method_id = cash_payment_method_ids[0] if cash_payment_method_ids else None
+                
+        total_ref_payments_in_bs = sum(
+            payments.filtered(lambda p: p.payment_method_id == default_cash_payment_ref_method_id).mapped(
+                'amount')) if default_cash_payment_ref_method_id else 0
+
         other_payment_method_ids = self.payment_method_ids - default_cash_payment_ref_method_id if default_cash_payment_ref_method_id else self.payment_method_ids
         other_payment_method_update_ids = other_payment_method_ids - default_cash_payment_method_id if default_cash_payment_method_id else other_payment_method_ids
+        
         cash_in_count = 0
         cash_out_count = 0
         cash_in_count_ref = 0
@@ -229,7 +263,7 @@ class PosSession(models.Model):
                 })
 
         default_cash_details_ref = {
-            'name': default_cash_payment_ref_method_id.name,
+            'name': default_cash_payment_ref_method_id.name if default_cash_payment_ref_method_id else None,
             'amount': last_session.cash_register_balance_end_real_mn_ref
                       + total_default_cash_ref_payment_amount
                       + sum(
@@ -237,24 +271,20 @@ class PosSession(models.Model):
             'opening': last_session.cash_register_balance_end_real_mn_ref,
             'moves': cash_in_out_list_ref,
             'payment_amount': total_default_cash_ref_payment_amount,
-            'id': default_cash_payment_ref_method_id.id,
-        } if default_cash_payment_ref_method_id else {
-            'name': None,
-            'amount': last_session.cash_register_balance_end_real_mn_ref
-                      + total_default_cash_ref_payment_amount
-                      + sum(
-                self.statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped('amount')),
-            'opening': last_session.cash_register_balance_end_real_mn_ref,
-            'moves': cash_in_out_list_ref,
-            'payment_amount': total_default_cash_ref_payment_amount,
-            'id': None,
+            'id': default_cash_payment_ref_method_id.id if default_cash_payment_ref_method_id else None,
         }
+        
         if 'default_cash_details' in closing_control_data:
             if closing_control_data['default_cash_details']:
+                # Restar movimientos en divisa de referencia
                 closing_control_data['default_cash_details']['amount'] = closing_control_data['default_cash_details'][
                                                                              'amount'] - sum(
                     self.statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped(
                         'amount'))
+                # Restar cobros en efectivo USD si Odoo los sumó en el diario principal en Bs
+                if default_cash_payment_ref_method_id and (not default_cash_payment_ref_method_id.journal_id.currency_id or default_cash_payment_ref_method_id.journal_id.currency_id != self.ref_me_currency_id):
+                    closing_control_data['default_cash_details']['amount'] -= total_ref_payments_in_bs
+                    
                 closing_control_data['default_cash_details']['default_cash_details_ref'] = default_cash_details_ref
                 closing_control_data['default_cash_details']['moves'] = cash_in_out_list
         return closing_control_data
@@ -303,15 +333,21 @@ class PosSession(models.Model):
         for session in self:
             cash_payment_method = session.payment_method_ids.filtered(
                 lambda p: p.is_cash_count and p.currency_id == session.ref_me_currency_id)[:1]
+            if not cash_payment_method:
+                for pm in session.payment_method_ids.filtered(lambda p: p.is_cash_count):
+                    name_upper = (pm.name or '').upper()
+                    if '$' in name_upper or 'USD' in name_upper:
+                        cash_payment_method = pm
+                        break
             if cash_payment_method:
                 total_cash_payment = 0.0
                 last_session = session.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
                                               limit=1)
                 result = self.env['pos.payment']._read_group(
                     [('session_id', '=', session.id), ('payment_method_id', '=', cash_payment_method.id)], ['session_id'],
-                    ['amount:sum'])
+                    ['amount_ref:sum'])
                 if result:
-                    total_cash_payment = result[0]['amount']
+                    total_cash_payment = result[0]['amount_ref']
                 session.cash_register_total_entry_encoding_ref = sum(
                     session.statement_line_ids.filtered(lambda s: s.currency_id == session.ref_me_currency_id).mapped(
                         'amount')) + (
@@ -356,6 +392,8 @@ class PosSession(models.Model):
                 self.env.cr.rollback()
                 return self._close_session_action(balance)
             self.sudo()._post_statement_difference(cash_difference_before_statements)
+            if self.config_id.cash_control and self.cash_register_difference_ref:
+                self.sudo()._post_statement_difference_usd(self.cash_register_difference_ref)
             if self.move_id.line_ids:
                 self.move_id.sudo().with_company(self.company_id)._post()
                 self.env['pos.order'].search([('session_id', '=', self.id), ('state', '=', 'paid')]).write({'state': 'done'})
@@ -364,6 +402,8 @@ class PosSession(models.Model):
             self.sudo().with_company(self.company_id)._reconcile_account_move_lines(data)
         else:
             self.sudo()._post_statement_difference(self.cash_register_difference)
+            if self.config_id.cash_control and self.cash_register_difference_ref:
+                self.sudo()._post_statement_difference_usd(self.cash_register_difference_ref)
         if self.config_id.order_edit_tracking:
             from markupsafe import Markup
             edited_orders = self.get_session_orders().filtered(lambda o: o.is_edited)
@@ -436,12 +476,18 @@ class PosSession(models.Model):
                                                              bank_payment_method_diffs)
             if session.rescue and session.config_id.cash_control:
                 default_cash_payment_method_id = self.payment_method_ids.filtered(
-                    lambda pm: pm.type == 'cash' and pm.payment_method_id.currency_id == self.ref_me_currency_id)[0]
+                    lambda pm: pm.type == 'cash' and pm.currency_id == self.ref_me_currency_id)[:1]
+                if not default_cash_payment_method_id:
+                    for pm in self.payment_method_ids.filtered(lambda pm: pm.type == 'cash'):
+                        name_upper = (pm.name or '').upper()
+                        if '$' in name_upper or 'USD' in name_upper:
+                            default_cash_payment_method_id = pm
+                            break
                 orders = self.order_ids.filtered(lambda o: o.state == 'paid' or o.state == 'invoiced')
                 total_cash = sum(
                     orders.payment_ids.filtered(lambda p: p.payment_method_id == default_cash_payment_method_id).mapped(
-                        'amount')
-                ) + self.cash_register_balance_start_mn_ref
+                        'amount_ref')
+                ) + self.cash_register_balance_start_mn_ref if default_cash_payment_method_id else self.cash_register_balance_start_mn_ref
                 session.cash_register_balance_end_real_mn_ref = total_cash
             return session.action_pos_session_validate_ref(balancing_account, amount_to_balance,
                                                            bank_payment_method_diffs)
@@ -540,12 +586,14 @@ class PosSession(models.Model):
                 last_session = self.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
                                            limit=1)
                 session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref
+            session.tax_today = session.config_id.show_currency_rate if session.config_id.show_currency_rate > 0 else 1
         return super(PosSession, self).action_pos_session_open()
 
     @api.depends('config_id')
     def _tax_today(self):
         for rec in self:
-            rec.tax_today = 1 / rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
+            if not rec.tax_today or rec.state == 'opening_control':
+                rec.tax_today = rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
 
     def _create_cash_statement_lines_and_cash_move_lines(self, data):
         MoveLine = data.get('MoveLine')
@@ -555,7 +603,7 @@ class PosSession(models.Model):
         split_cash_receivable_vals = []
         for payment, amounts in split_receivables_cash.items():
             journal_id = payment.payment_method_id.journal_id.id
-            amount = float_round(amounts['amount'] if (payment.payment_method_id.currency_id == self.company_id.currency_id or not payment.payment_method_id.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+            amount = float_round(amounts['amount'] if (payment.payment_method_id.currency_id == self.company_id.currency_id or not payment.payment_method_id.currency_id) else convert_ref(amounts['amount'], self.config_id.show_currency_rate, payment.payment_method_id.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
             amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
             split_cash_statement_line_vals.append(
                 self._get_split_statement_line_vals(journal_id, amount, payment)
@@ -567,7 +615,7 @@ class PosSession(models.Model):
         combine_cash_receivable_vals = []
         for payment_method, amounts in combine_receivables_cash.items():
             if not float_is_zero(amounts['amount'], precision_rounding=self.currency_id.rounding):
-                amount = float_round(amounts['amount'] if (payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+                amount = float_round(amounts['amount'] if (payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else convert_ref(amounts['amount'], self.config_id.show_currency_rate, payment_method.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
                 amount_converted = float_round(amounts['amount_converted'], precision_rounding=self.company_id.currency_id.rounding)
                 combine_cash_statement_line_vals.append(
                     self._get_combine_statement_line_vals(payment_method.journal_id.id, amount, payment_method)
@@ -600,10 +648,10 @@ class PosSession(models.Model):
         for payment_method, amounts in combine_receivables_bank.items():
             amount = float_round(amounts['amount'] if (
                         payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else \
-            amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+            convert_ref(amounts['amount'], self.config_id.show_currency_rate, payment_method.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
             amount_converted = float_round(amounts['amount_converted'] if (
                         payment_method.currency_id == self.company_id.currency_id or not payment_method.currency_id) else \
-                amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+                convert_ref(amounts['amount_converted'], self.config_id.show_currency_rate, payment_method.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
             combine_receivable_line = MoveLine.create(self._get_combine_receivable_vals(payment_method, amount, amount_converted))
             amounts['amount'] = amount
             amounts['amount_converted'] = amount_converted
@@ -612,10 +660,10 @@ class PosSession(models.Model):
         for payment, amounts in split_receivables_bank.items():
             amount = float_round(amounts['amount'] if (
                     payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
-                amounts['amount'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+                convert_ref(amounts['amount'], self.config_id.show_currency_rate, payment.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
             amount_converted = float_round(amounts['amount_converted'] if (
                     payment.currency_id == self.company_id.currency_id or not payment.currency_id) else \
-                amounts['amount_converted'] * self.config_id.show_currency_rate, precision_rounding=self.currency_id.rounding)
+                convert_ref(amounts['amount_converted'], self.config_id.show_currency_rate, payment.currency_id, self.company_id.currency_id), precision_rounding=self.currency_id.rounding)
             split_receivable_line = MoveLine.create(self._get_split_receivable_vals(payment, amount, amount_converted))
             amounts['amount'] = amount
             amounts['amount_converted'] = amount_converted

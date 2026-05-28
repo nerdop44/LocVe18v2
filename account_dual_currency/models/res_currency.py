@@ -238,12 +238,15 @@ class ResCurrency(models.Model):
             dolar_tag = html.find('div', {'id': 'dolar'})
             if not dolar_tag:
                 return False
-            dolar = str(dolar_tag.find('strong')).split()
-            if len(dolar) < 2:
-                return False
-            dolar = str.replace(dolar[1], '.', '')
+            strong_tag = dolar_tag.find('strong') or dolar_tag.find('span')
+            if not strong_tag:
+                # Intento de último recurso por si el formato cambió pero hay texto con número
+                dolar_text = dolar_tag.text.replace('USD', '').strip()
+            else:
+                dolar_text = strong_tag.text.strip()
+            dolar_clean = dolar_text.replace('.', '').replace(',', '.')
             try:
-                val_usd = float(str.replace(dolar, ',', '.'))
+                val_usd = float(dolar_clean)
             except ValueError:
                 return False
 
@@ -251,14 +254,15 @@ class ResCurrency(models.Model):
             if not euro_tag:
                 val_eur = 0.0
             else:
-                euro = str(euro_tag.find('strong')).split()
-                if len(euro) > 1:
-                    euro = str.replace(euro[1], '.', '')
-                    try:
-                        val_eur = float(str.replace(euro, ',', '.'))
-                    except ValueError:
-                        val_eur = 0.0
+                strong_eur = euro_tag.find('strong') or euro_tag.find('span')
+                if not strong_eur:
+                    eur_text = euro_tag.text.replace('EUR', '').strip()
                 else:
+                    eur_text = strong_eur.text.strip()
+                eur_clean = eur_text.replace('.', '').replace(',', '.')
+                try:
+                    val_eur = float(eur_clean)
+                except ValueError:
                     val_eur = 0.0
 
             curr_name = self.name
