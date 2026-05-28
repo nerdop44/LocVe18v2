@@ -105,6 +105,30 @@ class ReportSaleDetails(models.AbstractModel):
                     invoice['total_ref'] = invoice.get('total', 0.0) / rate_today if rate_today else 0.0
         data['invoiceTotal_ref'] = data.get('invoiceTotal', 0.0) / rate_today if rate_today else 0.0
 
+        # Totales de IGTF recaudado para reporte Z
+        orders_domain = [('state', 'in', ['paid', 'invoiced', 'done'])]
+        if session_ids:
+            orders_domain = AND([orders_domain, [('session_id', 'in', session_ids)]])
+        else:
+            if date_start:
+                orders_domain = AND([orders_domain, [('date_order', '>=', date_start)]])
+            if date_stop:
+                orders_domain = AND([orders_domain, [('date_order', '<=', date_stop)]])
+            if config_ids:
+                orders_domain = AND([orders_domain, [('config_id', 'in', config_ids)]])
+        
+        rep_orders = self.env['pos.order'].search(orders_domain)
+        rep_payments = rep_orders.payment_ids
+        total_igtf_bs = sum(rep_orders.mapped('x_igtf_amount'))
+        total_igtf_base_bs = sum(rep_payments.filtered(lambda p: p.payment_method_id.x_is_foreign_exchange).mapped('amount'))
+        
+        data['igtf_totals'] = {
+            'total_igtf_bs': total_igtf_bs,
+            'total_igtf_ref': total_igtf_bs / rate_today if rate_today else 0.0,
+            'total_igtf_base_bs': total_igtf_base_bs,
+            'total_igtf_base_ref': total_igtf_base_bs / rate_today if rate_today else 0.0,
+        }
+
         return data
 
     def update_key_values_data(self, date_start=False, date_stop=False, config_ids=False, session_ids=False):

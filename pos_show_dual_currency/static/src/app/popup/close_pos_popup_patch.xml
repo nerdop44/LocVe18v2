@@ -1,76 +1,113 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
-    <!-- Pachacutec: v135 - Migración Extension XML Cierre de Caja Odoo 18 -->
+    <!-- Pachacutec: v18.0.1.1.15 - Estabilización de UI Dual e IGTF en Cierre de Caja -->
     <t t-name="ClosePosPopupPatch" t-inherit="point_of_sale.ClosePosPopup" t-inherit-mode="extension">
         
-        <!-- Total Orders in USD -->
+        <!-- Mostrar total de órdenes en USD también en la cabecera -->
         <xpath expr="//div[hasclass('total-orders')]" position="inside">
-            <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em;">
+            <div class="currency-ref-total" style="color: #6c757d; font-size: 0.9em; font-weight: normal;">
                 (<t t-esc="pos.getAmountInRefCurrency(props.orders_details.amount, true)"/>)
             </div>
         </xpath>
 
-        <!-- Cash Overview headers / body modifications -->
-        <!-- Injecting USD counted cash row -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]" position="before">
-            <t t-if="pos.config.cash_control and props.default_cash_details and props.default_cash_details.default_cash_details_ref and state.payments_usd[props.default_cash_details.default_cash_details_ref.id]">
-                <div class="cash-overview-usd-container mb-3" style="border: 1px solid #dee2e6; border-radius: 4px; padding: 10px;">
-                    <h4 style="color: #008784; border-bottom: 1px solid #eee; padding-bottom: 5px;">Resumen USD</h4>
-                    <div class="cash-row-usd d-flex justify-content-between align-items-center">
-                        <div><t t-esc="props.default_cash_details.default_cash_details_ref.name"/></div>
-                        <div class="text-end font-weight-bold">
-                            Total Sistema: <span style="color: #008784;" t-esc="pos.format_currency_ref(props.default_cash_details.default_cash_details_ref.amount)"/>
+        <!-- Inyectar el campo de conteo físico de bolívares (VES) justo debajo de su diferencia -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]/div[@t-if='pos.config.cash_control']//span[hasclass('cash-difference')]/.." position="after">
+            <div class="cash-count-input-group mt-2 border-start ps-2 pb-2" style="background-color: #f8f9fa; border-radius: 4px; padding: 6px;">
+                <label class="form-label mb-1 fw-bold text-muted" style="font-size: 0.85em;">Conteo Físico VES (Bs):</label>
+                <div class="d-flex w-100 gap-2 mt-1">
+                    <Input tModel="[state.payments[props.default_cash_details.id], 'counted']"
+                        callback.bind="(value) =>  this.setManualCashInput(value)"
+                        isValid.bind="env.utils.isValidFloat" class="'cash-input w-100'"/>
+                    <button class="icon fa fa-money btn btn-secondary" t-on-click="openDetailsPopup" title="Calculadora Bs" />
+                    <button class="icon fa fa-clone btn btn-secondary" t-on-click="autoFillCashCount" title="Copiar del Sistema" />
+                </div>
+            </div>
+        </xpath>
+
+        <!-- Inyectar bloque completo de Efectivo USD justo debajo del bloque de Efectivo Bs -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]/div[@t-if='pos.config.cash_control']" position="after">
+            <t t-if="pos.config.cash_control and props.default_cash_details_ref and props.default_cash_details_ref.id">
+                <div class="w-100 mb-3 mt-3 pt-3 border-top border-2">
+                    <t t-set="diff_usd" t-value="getDifference(props.default_cash_details_ref.id)" />
+                    <t t-set="counted_usd" t-value="state.payments_usd[props.default_cash_details_ref.id]?.counted || 0" />
+                    
+                    <div class="d-flex align-items-center justify-content-between fs-3" style="color: #008784;">
+                        <span t-esc="props.default_cash_details_ref.name" />
+                        <span t-esc="pos.format_currency_ref(props.default_cash_details_ref.amount)" />
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                        <span>Opening USD</span>
+                        <span t-esc="pos.format_currency_ref(props.default_cash_details_ref.opening)" />
+                    </div>
+                    <div t-if="props.default_cash_details_ref.payment_amount" class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                        <span>Payments in USD</span>
+                        <span class="align-top" t-esc="pos.format_currency_ref(props.default_cash_details_ref.payment_amount)"/>
+                    </div>
+                    
+                    <t t-if="props.default_cash_details_ref.moves and props.default_cash_details_ref.moves.length > 0">
+                        <PaymentMethodBreakdown title.translate="Cash In / Out USD" total_amount="props.default_cash_details_ref.payment_amount" transactions="props.default_cash_details_ref.moves"/>
+                    </t>
+                    
+                    <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2">
+                        <span>Counted USD</span>
+                        <span t-esc="pos.format_currency_ref(counted_usd)" />
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between text-muted border-start ps-2" t-att-class="{'text-danger fw-bold': diff_usd}">
+                        <span>Difference USD</span>
+                        <span class="cash-difference-usd" t-esc="pos.format_currency_ref(diff_usd)" />
+                    </div>
+                    
+                    <!-- Campo de Conteo Físico USD contiguo -->
+                    <div class="cash-count-input-group mt-2 border-start ps-2 pb-2" style="background-color: #f4fcfb; border-radius: 4px; padding: 6px; border: 1px solid #c3e6e5;">
+                        <label class="form-label mb-1 fw-bold" style="font-size: 0.85em; color: #008784;">Conteo Físico USD ($):</label>
+                        <div class="d-flex w-100 gap-2 mt-1">
+                            <input class="form-control" type="number" step="0.01" style="border-color: #a3d9d7;"
+                                   t-model.number="state.payments_usd[props.default_cash_details_ref.id].counted"
+                                   t-on-input="() => this.handleInputChangeUSD(props.default_cash_details_ref.id)"/>
+                            <button class="btn btn-outline-secondary" t-on-click="openDetailsPopupUSD" title="Calculadora USD">
+                                <i class="fa fa-calculator" role="img"/>
+                            </button>
+                            <button class="btn btn-outline-secondary" t-on-click="() => { state.payments_usd[props.default_cash_details_ref.id].counted = props.default_cash_details_ref.amount; this.handleInputChangeUSD(props.default_cash_details_ref.id); }" title="Copiar del Sistema">
+                                <i class="fa fa-clone" role="img"/>
+                            </button>
                         </div>
-                    </div>
-                    <div class="input-group mt-2">
-                        <span class="input-group-text">Contado USD</span>
-                        <input class="form-control" type="number" step="0.01"
-                               t-model.number="state.payments_usd[props.default_cash_details.default_cash_details_ref.id].counted"
-                               t-on-input="() => this.handleInputChangeUSD(props.default_cash_details.default_cash_details_ref.id)"/>
-                        <button class="btn btn-outline-secondary" t-on-click="openDetailsPopupUSD">
-                            <i class="fa fa-calculator" role="img" title="Calculadora USD"/>
-                        </button>
-                    </div>
-                    <div class="mt-2 text-end" t-att-class="{'text-danger': state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference}">
-                        Diferencia: <t t-esc="pos.format_currency_ref(state.payments_usd[props.default_cash_details.default_cash_details_ref.id].difference)"/>
                     </div>
                 </div>
             </t>
         </xpath>
-        
-        <!-- Multi-currency columns in payment methods (Stuctural XPath: added after amount span) -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('fs-3')]/span[2]" position="after">
+
+        <!-- Agregar equivalencia USD en métodos de pago no efectivo -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]/div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('fs-3')]/span[2]" position="after">
             <span class="usd-amount ms-2 text-muted" style="font-size: 0.8em;">
                 (<t t-esc="pos.getAmountInRefCurrency(pm.amount, true)"/>)
             </span>
         </xpath>
 
-        <!-- Modificar _showDiff para que también sea true si es el método de efectivo USD -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']/t[@t-set='_showDiff']" position="replace">
-            <t t-set="_showDiff" t-value="(pm.type === 'bank' and pm.number !== 0) or (props.default_cash_details and props.default_cash_details.default_cash_details_ref and pm.id === props.default_cash_details.default_cash_details_ref.id)" />
+        <!-- Eliminar bloque de entrada de efectivo principal nativo inferior para evitar duplicidad -->
+        <xpath expr="//div[@t-if='pos.config.cash_control' and label[text()='Cash Count']]" position="replace">
+            <!-- Removido para mostrar de forma contigua en el resumen superior -->
         </xpath>
 
-        <!-- Modificar counted para que si es el método de efectivo USD, busque en state.payments_usd -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']/t[@t-set='counted']" position="replace">
-            <t t-set="counted" t-value="_showDiff ? (props.default_cash_details and props.default_cash_details.default_cash_details_ref and pm.id === props.default_cash_details.default_cash_details_ref.id ? state.payments_usd[pm.id].counted : env.utils.parseValidFloat(state.payments[pm.id].counted)) : 0" />
-        </xpath>
-
-        <!-- Mostrar el valor contado en USD para el método de efectivo USD -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('text-muted')][1]/span[2]" position="replace">
-            <span t-esc="props.default_cash_details and props.default_cash_details.default_cash_details_ref and pm.id === props.default_cash_details.default_cash_details_ref.id ? pos.format_currency_ref(counted) : env.utils.formatCurrency(counted)" />
-        </xpath>
-
-        <!-- Mostrar la diferencia en USD para el método de efectivo USD -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('text-muted')][2]/span[2]" position="replace">
-            <span t-esc="props.default_cash_details and props.default_cash_details.default_cash_details_ref and pm.id === props.default_cash_details.default_cash_details_ref.id ? pos.format_currency_ref(diff) : env.utils.formatCurrency(diff)" />
-        </xpath>
-
-        <!-- Evitar input de conteo duplicado abajo para efectivo USD -->
-        <xpath expr="//div[hasclass('notes-container')]/preceding-sibling::div[@t-foreach='props.non_cash_payment_methods']/t[@t-if='_showDiff']" position="replace">
-            <t t-if="pm.type === 'bank' and pm.number !== 0">
-                <span><t t-esc="pm.name" /> Count</span>
-                <Input tModel="[state.payments[pm.id], 'counted']"
-                    isValid.bind="env.utils.isValidFloat" />
+        <!-- Desglose de IGTF en Cierre encima de las Notas -->
+        <xpath expr="//div[hasclass('notes-container')]" position="before">
+            <t t-if="props.igtf_totals and props.igtf_totals.total_igtf_bs > 0">
+                <div class="igtf-closing-summary mt-3 mb-3 p-3" style="background-color: #fdf5e6; border: 1px solid #f5deb3; border-radius: 4px;">
+                    <h4 style="color: #a04000; border-bottom: 1px solid #f5deb3; padding-bottom: 5px; margin-bottom: 10px;">Impuesto IGTF Recaudado (3%)</h4>
+                    <div class="d-flex align-items-center justify-content-between text-muted mb-1" style="font-size: 0.9em;">
+                        <span>Base de Transacciones Divisa:</span>
+                        <span class="fw-bold text-dark">
+                            <t t-esc="env.utils.formatCurrency(props.igtf_totals.total_igtf_base_bs)"/>
+                            / <span style="color: #008784;"><t t-esc="pos.format_currency_ref(props.igtf_totals.total_igtf_base_ref)"/></span>
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between fw-bold mt-1" style="font-size: 1.05em;">
+                        <span style="color: #a04000;">Total IGTF 3%:</span>
+                        <span style="color: #a04000;">
+                            <t t-esc="env.utils.formatCurrency(props.igtf_totals.total_igtf_bs)"/>
+                            / <span style="color: #008784;"><t t-esc="pos.format_currency_ref(props.igtf_totals.total_igtf_ref)"/></span>
+                        </span>
+                    </div>
+                </div>
             </t>
         </xpath>
     </t>

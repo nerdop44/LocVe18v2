@@ -1,15 +1,13 @@
-/** @doo-module */
 /** @odoo-module */
 
 import { ClosePosPopup } from "@point_of_sale/app/navbar/closing_popup/closing_popup";
 import { patch } from "@web/core/utils/patch";
-import { useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
 import { _t } from "@web/core/l10n/translation";
 
-// Pachacutec: v18.0.1.1.11 - Estabilización de Assets y Templates Odoo 18
+// Pachacutec: v18.0.1.1.15 - Estabilización de Assets y Templates Odoo 18
 ClosePosPopup.props = false;
 
 patch(ClosePosPopup.prototype, {
@@ -24,22 +22,20 @@ patch(ClosePosPopup.prototype, {
             this.state.payments_usd = {};
         }
         
-        const cashDetails = this.props.default_cash_details;
-        if (this.pos.config.cash_control && cashDetails && cashDetails.default_cash_details_ref) {
-            const ref_id = cashDetails.default_cash_details_ref.id;
-            if (ref_id) {
-                if (!this.state.payments_usd[ref_id]) {
-                    this.state.payments_usd[ref_id] = {
-                        counted: 0,
-                        difference: -(cashDetails.default_cash_details_ref.amount || 0),
-                        number: 0
-                    };
-                }
-                if (!this.state.payments[ref_id]) {
-                    this.state.payments[ref_id] = {
-                        counted: "0",
-                    };
-                }
+        const cashDetailsRef = this.props.default_cash_details_ref;
+        if (this.pos.config.cash_control && cashDetailsRef && cashDetailsRef.id) {
+            const ref_id = cashDetailsRef.id;
+            if (!this.state.payments_usd[ref_id]) {
+                this.state.payments_usd[ref_id] = {
+                    counted: 0,
+                    difference: -(cashDetailsRef.amount || 0),
+                    number: 0
+                };
+            }
+            if (!this.state.payments[ref_id]) {
+                this.state.payments[ref_id] = {
+                    counted: "0",
+                };
             }
         }
     },
@@ -67,7 +63,7 @@ patch(ClosePosPopup.prototype, {
     },
 
     openDetailsPopupUSD() {
-        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        const ref_id = this.props.default_cash_details_ref?.id;
         if (!ref_id || !this.state.payments_usd[ref_id]) return;
 
         const action = _t("Cash control USD - closing");
@@ -79,7 +75,7 @@ patch(ClosePosPopup.prototype, {
                     const { total, moneyDetailsNotes, moneyDetails } = payload;
                     this.state.payments_usd[ref_id].counted = total;
                     this.state.payments_usd[ref_id].difference =
-                        this.pos.round_decimals_currency(total - this.props.default_cash_details.default_cash_details_ref.amount);
+                        this.pos.round_decimals_currency(total - this.props.default_cash_details_ref.amount);
                     
                     if (this.state.payments[ref_id]) {
                         this.state.payments[ref_id].counted = total.toString();
@@ -96,13 +92,13 @@ patch(ClosePosPopup.prototype, {
     },
 
     handleInputChangeUSD(paymentId) {
-        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        const ref_id = this.props.default_cash_details_ref?.id;
         if (!this.state.payments_usd || !this.state.payments_usd[paymentId]) return;
 
-        let expectedAmount;
+        let expectedAmount = 0;
         if (paymentId === ref_id) {
             this.manualInputCashCountUSD = true;
-            expectedAmount = this.props.default_cash_details.default_cash_details_ref.amount;
+            expectedAmount = this.props.default_cash_details_ref.amount;
         } else {
             expectedAmount = this.props.non_cash_payment_methods.find(pm => paymentId === pm.id)?.amount || 0;
         }
@@ -119,7 +115,7 @@ patch(ClosePosPopup.prototype, {
     },
 
     getDifference(paymentId) {
-        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        const ref_id = this.props.default_cash_details_ref?.id;
         if (ref_id && paymentId === ref_id) {
             if (!this.state.payments_usd || !this.state.payments_usd[paymentId]) {
                 return 0;
@@ -144,7 +140,7 @@ patch(ClosePosPopup.prototype, {
     async closeSession() {
         if (!this.closeSessionClicked) {
             this.closeSessionClicked = true;
-            const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+            const ref_id = this.props.default_cash_details_ref?.id;
             if (this.pos.config.cash_control && ref_id && this.state.payments_usd && this.state.payments_usd[ref_id]) {
                 const response = await this.pos.data.call('pos.session', 'post_closing_cash_details_ref', [
                     [this.pos.pos_session.id]

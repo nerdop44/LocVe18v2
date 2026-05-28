@@ -104,5 +104,45 @@
         <xpath expr="//t[@id='closing_session']//tr[@t-foreach=&quot;method['cash_moves']&quot;]/td[3]" position="inside">
             / <span style="color: red"><t t-esc="move['amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
+
+        <!-- Desglose de IGTF en Reporte Z -->
+        <xpath expr="//div[@id='taxe_sales']" position="after">
+            <t t-if="igtf_totals and igtf_totals['total_igtf_bs'] > 0">
+                <div style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background-color: #fafafa;">
+                    <h5 style="color: #a04000; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">
+                        Impuesto IGTF Recaudado (3%)
+                    </h5>
+                    <table class="table table-sm" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th>Concepto</th>
+                                <th class="text-end">Monto Bs</th>
+                                <th class="text-end">Monto USD ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Base Imponible Divisa</td>
+                                <td class="text-end">
+                                    <t t-esc="igtf_totals['total_igtf_base_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
+                                </td>
+                                <td class="text-end" style="color: #008784;">
+                                    <t t-esc="igtf_totals['total_igtf_base_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
+                                </td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #a04000;">
+                                <td>Impuesto IGTF (3%)</td>
+                                <td class="text-end">
+                                    <t t-esc="igtf_totals['total_igtf_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
+                                </td>
+                                <td class="text-end" style="color: #008784;">
+                                    <t t-esc="igtf_totals['total_igtf_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </t>
+        </xpath>
     </template>
 </odoo>
