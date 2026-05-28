@@ -30,12 +30,19 @@ patch(ClosePosPopup.prototype, {
         const cashDetails = this.props.default_cash_details;
         if (this.pos.config.cash_control && cashDetails && cashDetails.default_cash_details_ref) {
             const ref_id = cashDetails.default_cash_details_ref.id;
-            if (ref_id && !this.state.payments_usd[ref_id]) {
-                this.state.payments_usd[ref_id] = {
-                    counted: 0,
-                    difference: -(cashDetails.default_cash_details_ref.amount || 0),
-                    number: 0
-                };
+            if (ref_id) {
+                if (!this.state.payments_usd[ref_id]) {
+                    this.state.payments_usd[ref_id] = {
+                        counted: 0,
+                        difference: -(cashDetails.default_cash_details_ref.amount || 0),
+                        number: 0
+                    };
+                }
+                if (!this.state.payments[ref_id]) {
+                    this.state.payments[ref_id] = {
+                        counted: "0",
+                    };
+                }
             }
         }
 
@@ -89,8 +96,16 @@ patch(ClosePosPopup.prototype, {
         } else {
             expectedAmount = this.props.non_cash_payment_methods.find(pm => paymentId === pm.id)?.amount || 0;
         }
+        
+        const rawCounted = this.state.payments_usd[paymentId].counted;
+        const parsedCounted = this.env.utils.isValidFloat(rawCounted) ? parseFloat(rawCounted) : 0;
+
         this.state.payments_usd[paymentId].difference =
-            this.pos.round_decimals_currency(this.state.payments_usd[paymentId].counted - expectedAmount);
+            this.pos.round_decimals_currency(parsedCounted - expectedAmount);
+
+        if (this.state.payments[paymentId]) {
+            this.state.payments[paymentId].counted = rawCounted.toString();
+        }
     },
 
     updateCountedCashUSD({ total_ref, moneyDetailsNotesRef }) {
@@ -101,11 +116,26 @@ patch(ClosePosPopup.prototype, {
         this.state.payments_usd[ref_id].difference =
             this.pos.round_decimals_currency(this.state.payments_usd[ref_id].counted - this.props.default_cash_details.default_cash_details_ref.amount);
         
+        if (this.state.payments[ref_id]) {
+            this.state.payments[ref_id].counted = total_ref.toString();
+        }
+
         if (moneyDetailsNotesRef) {
             this.state.notes += moneyDetailsNotesRef;
         }
         this.manualInputCashCountUSD = false;
         this.closeDetailsPopupUSD();
+    },
+
+    getDifference(paymentId) {
+        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
+        if (ref_id && paymentId === ref_id) {
+            if (!this.state.payments_usd || !this.state.payments_usd[paymentId]) {
+                return 0;
+            }
+            return this.state.payments_usd[paymentId].difference;
+        }
+        return super.getDifference(paymentId);
     },
 
     hasDifferenceUSD() {
