@@ -7,7 +7,7 @@
         </xpath>
 
         <!-- 2. Líneas de productos en ventas -->
-        <xpath expr="//tr[@t-foreach='category[\'products\']']/td[4]" position="inside">
+        <xpath expr="//tr[@t-foreach=&quot;category['products']&quot;]/td[4]" position="inside">
             / <span style="color: red"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
 
@@ -36,7 +36,7 @@
             / <span style="color: red"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Líneas de productos en devoluciones -->
-        <xpath expr="//div[@id='refunds']//tr[@t-foreach='category[\'products\']']/td[3]" position="inside">
+        <xpath expr="//div[@id='refunds']//tr[@t-foreach=&quot;category['products']&quot;]/td[3]" position="inside">
             / <span style="color: red"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Total general de devoluciones -->
@@ -78,7 +78,7 @@
         </xpath>
 
         <!-- 9. Facturas -->
-        <xpath expr="//div[@id='invoices']//tr[@t-foreach='invoiceSession[\&quot;invoices\&quot;]']/td[3]" position="inside">
+        <xpath expr="//div[@id='invoices']//tr[@t-foreach='invoiceSession[&quot;invoices&quot;]']/td[3]" position="inside">
             / <span style="color: red"><t t-esc="invoice['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Fila Total de facturas -->
@@ -101,7 +101,7 @@
             / <span style="color: red"><t t-esc="method['money_difference_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Movimientos de efectivo (cash_moves) -->
-        <xpath expr="//t[@id='closing_session']//tr[@t-foreach='method[\'cash_moves\']']/td[3]" position="inside">
+        <xpath expr="//t[@id='closing_session']//tr[@t-foreach=&quot;method['cash_moves']&quot;]/td[3]" position="inside">
             / <span style="color: red"><t t-esc="move['amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
     </template>
