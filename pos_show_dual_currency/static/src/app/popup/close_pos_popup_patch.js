@@ -1,3 +1,4 @@
+/** @doo-module */
 /** @odoo-module */
 
 import { ClosePosPopup } from "@point_of_sale/app/navbar/closing_popup/closing_popup";
@@ -6,6 +7,7 @@ import { useState } from "@odoo/owl";
 import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
+import { _t } from "@web/core/l10n/translation";
 
 // Pachacutec: v18.0.1.1.11 - Estabilización de Assets y Templates Odoo 18
 ClosePosPopup.props = false;
@@ -47,17 +49,17 @@ patch(ClosePosPopup.prototype, {
             return super.confirm();
         } else if (this.hasUserAuthorityUSD()) {
             const confirmed = await this.dialog.add(ConfirmationDialog, {
-                title: this.env._t("Currency Ref Payments Difference"),
-                body: this.env._t("Do you want to accept currency ref payments difference and post a profit/loss journal entry?"),
+                title: _t("Currency Ref Payments Difference"),
+                body: _t("Do you want to accept currency ref payments difference and post a profit/loss journal entry?"),
             });
             if (confirmed) {
                 return super.confirm();
             }
         } else {
             await this.dialog.add(ConfirmationDialog, {
-                title: this.env._t("Currency Ref Payments Difference"),
+                title: _t("Currency Ref Payments Difference"),
                 body: _.str.sprintf(
-                    this.env._t("The maximum difference by currency ref allowed is %s.\nContact your manager to accept."),
+                    _t("The maximum difference by currency ref allowed is %s.\nContact your manager to accept."),
                     this.pos.format_currency_ref(this.props.amount_authorized_diff_ref)
                 ),
             });
@@ -68,7 +70,7 @@ patch(ClosePosPopup.prototype, {
         const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
         if (!ref_id || !this.state.payments_usd[ref_id]) return;
 
-        const action = this.env._t("Cash control USD - closing");
+        const action = _t("Cash control USD - closing");
         this.dialog.add(MoneyDetailsPopupUSD, {
             moneyDetails: this.moneyDetailsUSD || null,
             action: action,

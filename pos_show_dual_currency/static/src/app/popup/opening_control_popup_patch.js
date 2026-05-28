@@ -5,6 +5,7 @@ import { patch } from "@web/core/utils/patch";
 import { useState } from "@odoo/owl";
 import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
 import { parseFloat } from "@web/views/fields/parsers";
+import { _t } from "@web/core/l10n/translation";
 
 OpeningControlPopup.props = false;
 
@@ -43,7 +44,7 @@ patch(OpeningControlPopup.prototype, {
     },
 
     openDetailsPopupUSD() {
-        const action = this.env._t("Cash control USD - opening");
+        const action = _t("Cash control USD - opening");
         this.dialog.add(MoneyDetailsPopupUSD, {
             moneyDetails: this.moneyDetailsUSD || null,
             action: action,
