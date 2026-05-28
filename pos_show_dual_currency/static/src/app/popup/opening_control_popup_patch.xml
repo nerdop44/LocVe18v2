@@ -15,13 +15,5 @@
                 </div>
             </div>
         </xpath>
-        <xpath expr="//textarea[@id='openingNotes']" position="after">
-            <MoneyDetailsPopupUSD
-                t-if="state.displayMoneyDetailsPopupUSD"
-                manualInputCashCountUSD="manualInputCashCountUSD"
-                onConfirm="(payload) => this.updateCashOpeningUSD(payload)"
-                onDiscard.bind="closeDetailsPopupUSD"
-            />
-        </xpath>
     </t>
 </templates>

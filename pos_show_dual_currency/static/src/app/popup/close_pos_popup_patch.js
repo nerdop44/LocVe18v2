@@ -7,20 +7,15 @@ import { useService } from "@web/core/utils/hooks";
 import { ConfirmationDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
 
-// Pachacutec: v137 - Estabilización de Assets y Templates Odoo 18
-// Elimina AlertDialog (no disponible en assets_pos) y renombra parches.
-
-// Pachacutec: v18.0.1.1.6 - OPCIÓN NUCLEAR (Blindaje Definitivo)
-// Desactivamos la validación de props de Owl para este componente.
-// Esto evita el crash 'toLowerCase' causado por conflictos de infraestructura entre parches.
+// Pachacutec: v18.0.1.1.11 - Estabilización de Assets y Templates Odoo 18
 ClosePosPopup.props = false;
-ClosePosPopup.components = { ...ClosePosPopup.components, MoneyDetailsPopupUSD };
 
 patch(ClosePosPopup.prototype, {
     setup() {
         super.setup();
         this.dialog = useService("dialog");
         this.manualInputCashCountUSD = false;
+        this.moneyDetailsUSD = null;
 
         // Initialize state payments_usd safely
         if (!this.state.payments_usd) {
@@ -45,10 +40,6 @@ patch(ClosePosPopup.prototype, {
                 }
             }
         }
-
-        Object.assign(this.state, {
-            displayMoneyDetailsPopupUSD: false,
-        });
     },
 
     async confirm() {
@@ -76,13 +67,30 @@ patch(ClosePosPopup.prototype, {
     openDetailsPopupUSD() {
         const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
         if (!ref_id || !this.state.payments_usd[ref_id]) return;
-        this.state.payments_usd[ref_id].counted = 0;
-        this.state.payments_usd[ref_id].difference = -(this.props.default_cash_details.default_cash_details_ref.amount || 0);
-        this.state.displayMoneyDetailsPopupUSD = true;
-    },
 
-    closeDetailsPopupUSD() {
-        this.state.displayMoneyDetailsPopupUSD = false;
+        const action = this.env._t("Cash control USD - closing");
+        this.dialog.add(MoneyDetailsPopupUSD, {
+            moneyDetails: this.moneyDetailsUSD || null,
+            action: action,
+            getPayload: (payload) => {
+                if (payload) {
+                    const { total, moneyDetailsNotes, moneyDetails } = payload;
+                    this.state.payments_usd[ref_id].counted = total;
+                    this.state.payments_usd[ref_id].difference =
+                        this.pos.round_decimals_currency(total - this.props.default_cash_details.default_cash_details_ref.amount);
+                    
+                    if (this.state.payments[ref_id]) {
+                        this.state.payments[ref_id].counted = total.toString();
+                    }
+
+                    if (moneyDetailsNotes) {
+                        this.state.notes = (this.state.notes ? this.state.notes + "\n" : "") + moneyDetailsNotes;
+                    }
+                    this.moneyDetailsUSD = moneyDetails;
+                }
+            },
+            context: "Closing USD",
+        });
     },
 
     handleInputChangeUSD(paymentId) {
@@ -106,25 +114,6 @@ patch(ClosePosPopup.prototype, {
         if (this.state.payments[paymentId]) {
             this.state.payments[paymentId].counted = rawCounted.toString();
         }
-    },
-
-    updateCountedCashUSD({ total_ref, moneyDetailsNotesRef }) {
-        const ref_id = this.props.default_cash_details?.default_cash_details_ref?.id;
-        if (!ref_id || !this.state.payments_usd || !this.state.payments_usd[ref_id]) return;
-
-        this.state.payments_usd[ref_id].counted = total_ref;
-        this.state.payments_usd[ref_id].difference =
-            this.pos.round_decimals_currency(this.state.payments_usd[ref_id].counted - this.props.default_cash_details.default_cash_details_ref.amount);
-        
-        if (this.state.payments[ref_id]) {
-            this.state.payments[ref_id].counted = total_ref.toString();
-        }
-
-        if (moneyDetailsNotesRef) {
-            this.state.notes += moneyDetailsNotesRef;
-        }
-        this.manualInputCashCountUSD = false;
-        this.closeDetailsPopupUSD();
     },
 
     getDifference(paymentId) {

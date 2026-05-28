@@ -1,67 +1,75 @@
 /** @odoo-module */
 
-import { Component, useState, onWillStart } from "@odoo/owl";
+import { Dialog } from "@web/core/dialog/dialog";
+import { Component, useState } from "@odoo/owl";
+import { usePos } from "@point_of_sale/app/store/pos_hook";
+import { floatIsZero } from "@web/core/utils/numbers";
+import { NumericInput } from "@point_of_sale/app/generic_components/inputs/numeric_input/numeric_input";
+import { _t } from "@web/core/l10n/translation";
 import { useService } from "@web/core/utils/hooks";
 
-// Pachacutec: v135 - Migración MoneyDetailsPopupUSD Odoo 18
 export class MoneyDetailsPopupUSD extends Component {
     static template = "pos_show_dual_currency.MoneyDetailsPopupUSD";
-    static props = false;
+    static components = { NumericInput, Dialog };
+    static props = {
+        moneyDetails: { type: [Object, { value: null }], optional: true },
+        action: String,
+        getPayload: Function,
+        close: Function,
+        context: { type: String, optional: true },
+    };
+    static defaultProps = {
+        moneyDetails: null,
+    };
 
     setup() {
-        this.pos = useService("pos");
+        super.setup();
+        this.pos = usePos();
+        this.ui = useService("ui");
         this.currency_ref = this.pos.res_currency_ref;
         this.state = useState({
-            moneyDetailsRef: Object.fromEntries(this.pos.bills.map(bill => ([bill.value, 0]))),
-            total_ref: 0,
+            moneyDetails: this.props.moneyDetails
+                ? { ...this.props.moneyDetails }
+                : Object.fromEntries(this.pos.models["pos.bill"].map((bill) => [bill.value, 0])),
         });
-
-        if (this.props.manualInputCashCountUSD) {
-            this.reset();
-        }
     }
 
-    get firstHalfMoneyDetailsRef() {
-        const moneyDetailsKeysRef = Object.keys(this.state.moneyDetailsRef).sort((a, b) => a - b);
-        return moneyDetailsKeysRef.slice(0, Math.ceil(moneyDetailsKeysRef.length / 2));
-    }
-
-    get lastHalfMoneyDetailsRef() {
-        const moneyDetailsKeysRef = Object.keys(this.state.moneyDetailsRef).sort((a, b) => a - b);
-        return moneyDetailsKeysRef.slice(Math.ceil(moneyDetailsKeysRef.length / 2), moneyDetailsKeysRef.length);
-    }
-
-    updateMoneyDetailsAmountRef() {
-        let total_ref = Object.entries(this.state.moneyDetailsRef).reduce(
-            (acc, [value, qty]) => acc + parseFloat(value) * (qty || 0), 0
-        );
-        this.state.total_ref = this.pos.round_decimals_currency(total_ref);
+    computeTotal(moneyDetails = this.state.moneyDetails) {
+        return Object.entries(moneyDetails).reduce((total, [value, inputQty]) => {
+            const quantity = isNaN(inputQty) ? 0 : inputQty;
+            return total + parseFloat(value) * quantity;
+        }, 0);
     }
 
     confirm() {
-        let moneyDetailsNotesRef = this.state.total_ref ? 'Ref Currency Money details: \n' : null;
-        this.pos.bills.forEach(bill => {
-            if (this.state.moneyDetailsRef[bill.value]) {
-                moneyDetailsNotesRef += `  - ${this.state.moneyDetailsRef[bill.value]} x ${this.pos.format_currency_ref(bill.value)}\n`;
+        let moneyDetailsNotes = !floatIsZero(this.computeTotal(), this.currency_ref.decimal_places)
+            ? this.props.context + " details USD: \n"
+            : null;
+        this.pos.models["pos.bill"].forEach((bill) => {
+            if (this.state.moneyDetails[bill.value]) {
+                moneyDetailsNotes +=
+                    "\t" +
+                    `${this.state.moneyDetails[bill.value]} x ${this.pos.format_currency_ref(
+                        bill.value
+                    )}\n`;
             }
         });
-        const payload = { 
-            total_ref: this.state.total_ref, 
-            moneyDetailsNotesRef, 
-            moneyDetailsRef: { ...this.state.moneyDetailsRef } 
-        };
-        this.props.onConfirm(payload);
-    }
-
-    reset() {
-        for (let key in this.state.moneyDetailsRef) {
-            this.state.moneyDetailsRef[key] = 0;
+        if (moneyDetailsNotes) {
+            moneyDetailsNotes += _t(
+                "Total USD: %s",
+                this.pos.format_currency_ref(this.computeTotal())
+            );
         }
-        this.state.total_ref = 0;
+        this.props.getPayload({
+            total: this.computeTotal(),
+            moneyDetailsNotes,
+            moneyDetails: { ...this.state.moneyDetails },
+            action: this.props.action,
+        });
+        this.props.close();
     }
 
-    discard() {
-        this.reset();
-        this.props.onDiscard();
+    _parseFloat(value) {
+        return parseFloat(value);
     }
 }

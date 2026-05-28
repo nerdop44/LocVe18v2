@@ -7,19 +7,18 @@ import { MoneyDetailsPopupUSD } from "./money_details_popup_usd";
 import { parseFloat } from "@web/views/fields/parsers";
 
 OpeningControlPopup.props = false;
-OpeningControlPopup.components = { ...OpeningControlPopup.components, MoneyDetailsPopupUSD };
 
 patch(OpeningControlPopup.prototype, {
     setup() {
         super.setup();
         this.manualInputCashCountUSD = false;
+        this.moneyDetailsUSD = null;
         
         Object.assign(this.state, {
             openingCashUSD: this.env.utils.formatCurrency(
                 this.pos.session.cash_register_balance_start_mn_ref || 0,
                 false
             ),
-            displayMoneyDetailsPopupUSD: false,
         });
     },
 
@@ -44,21 +43,22 @@ patch(OpeningControlPopup.prototype, {
     },
 
     openDetailsPopupUSD() {
-        this.state.openingCashUSD = this.env.utils.formatCurrency(0, false);
-        this.state.displayMoneyDetailsPopupUSD = true;
-    },
-
-    closeDetailsPopupUSD() {
-        this.state.displayMoneyDetailsPopupUSD = false;
-    },
-
-    updateCashOpeningUSD({ total_ref, moneyDetailsNotesRef }) {
-        this.state.openingCashUSD = this.env.utils.formatCurrency(total_ref, false);
-        if (moneyDetailsNotesRef) {
-            this.state.notes += "\n" + moneyDetailsNotesRef;
-        }
-        this.manualInputCashCountUSD = false;
-        this.closeDetailsPopupUSD();
+        const action = this.env._t("Cash control USD - opening");
+        this.dialog.add(MoneyDetailsPopupUSD, {
+            moneyDetails: this.moneyDetailsUSD || null,
+            action: action,
+            getPayload: (payload) => {
+                if (payload) {
+                    const { total, moneyDetailsNotes, moneyDetails } = payload;
+                    this.state.openingCashUSD = this.env.utils.formatCurrency(total, false);
+                    if (moneyDetailsNotes) {
+                        this.state.notes = (this.state.notes ? this.state.notes + "\n" : "") + moneyDetailsNotes;
+                    }
+                    this.moneyDetailsUSD = moneyDetails;
+                }
+            },
+            context: "Opening USD",
+        });
     },
 
     handleInputChangeUSD() {

@@ -37,16 +37,6 @@
                 </div>
             </t>
         </xpath>
-
-        <!-- Money Details Popup Instance (v18 compatible component) -->
-        <xpath expr="//div[hasclass('payment-methods-overview')]" position="after">
-            <MoneyDetailsPopupUSD
-                t-if="state.displayMoneyDetailsPopupUSD"
-                manualInputCashCountUSD="manualInputCashCountUSD"
-                onConfirm.bind="updateCountedCashUSD"
-                onDiscard.bind="closeDetailsPopupUSD"
-            />
-        </xpath>
         
         <!-- Multi-currency columns in payment methods (Stuctural XPath: added after amount span) -->
         <xpath expr="//div[hasclass('payment-methods-overview')]//div[@t-foreach='props.non_cash_payment_methods']//div[hasclass('fs-3')]/span[2]" position="after">
@@ -85,4 +75,3 @@
         </xpath>
     </t>
 </templates>
-
