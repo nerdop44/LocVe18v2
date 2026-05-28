@@ -1,6 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<odoo>
-    <template id="pos_daily_report" inherit_id="point_of_sale.pos_session_sales_details">
+<data inherit_id="point_of_sale.pos_session_sales_details">
         <!-- 1. Categorías de productos en ventas -->
         <xpath expr="//tr[@t-foreach='products']/td[4]" position="inside">
             / <span style="color: red"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
@@ -12,7 +10,7 @@
         </xpath>
 
         <!-- 3. Total general de ventas de productos -->
-        <xpath expr="//div[@id='sales']//tr[last()]/td[4]" position="inside">
+        <xpath expr="//div[@id='sales']//tr[td/strong[text()='Total']]/td[4]" position="inside">
             / <span style="color: red"><strong><t t-esc="products_info['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
 
@@ -24,10 +22,10 @@
             / <span style="color: red"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Fila Total de impuestos -->
-        <xpath expr="//div[@id='taxe_sales']//tr[last()]/td[2]" position="inside">
+        <xpath expr="//div[@id='taxe_sales']//tr[td/strong[text()='Total']]/td[2]" position="inside">
             / <span style="color: red"><strong><t t-esc="taxes_info['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
-        <xpath expr="//div[@id='taxe_sales']//tr[last()]/td[3]" position="inside">
+        <xpath expr="//div[@id='taxe_sales']//tr[td/strong[text()='Total']]/td[3]" position="inside">
             / <span style="color: red"><strong><t t-esc="taxes_info['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
 
@@ -40,7 +38,7 @@
             / <span style="color: red"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Total general de devoluciones -->
-        <xpath expr="//div[@id='refunds']//tr[last()]/td[5]" position="inside">
+        <xpath expr="//div[@id='refunds']//tr[td/strong[text()='Total']]/td[5]" position="inside">
             / <span style="color: red"><strong><t t-esc="refund_info['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
 
@@ -52,10 +50,10 @@
             / <span style="color: red"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Fila Total de impuestos en devoluciones -->
-        <xpath expr="//div[@id='taxe_refunds']//tr[last()]/td[2]" position="inside">
+        <xpath expr="//div[@id='taxe_refunds']//tr[td/strong[text()='Total']]/td[2]" position="inside">
             / <span style="color: red"><strong><t t-esc="refund_taxes_info['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
-        <xpath expr="//div[@id='taxe_refunds']//tr[last()]/td[3]" position="inside">
+        <xpath expr="//div[@id='taxe_refunds']//tr[td/strong[text()='Total']]/td[3]" position="inside">
             / <span style="color: red"><strong><t t-esc="refund_taxes_info['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
 
@@ -64,7 +62,7 @@
             / <span style="color: red"><t t-esc="payment['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Fila Total de pagos -->
-        <xpath expr="//div[@id='payments']//table[2]//tr[@class='fs-5']/th[2]" position="inside">
+        <xpath expr="//div[@id='payments']//tr[th[text()='Total']]/th[2]" position="inside">
             / <span style="color: red"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Métodos de pago por sesión -->
@@ -82,12 +80,12 @@
             / <span style="color: red"><t t-esc="invoice['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Fila Total de facturas -->
-        <xpath expr="//div[@id='invoices']//tr[last()]/td[3]" position="inside">
+        <xpath expr="//div[@id='invoices']//tr[td/strong[text()='Total']]/td[3]" position="inside">
             / <span style="color: red"><strong><t t-esc="invoiceTotal_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
         </xpath>
 
         <!-- 10. Control de Sesión (Session Control) -->
-        <xpath expr="//t[@id='closing_session']/div[2]/strong[1]" position="inside">
+        <xpath expr="//t[@id='closing_session']/div/strong[contains(text(), 'Total:')]" position="inside">
             / <span style="color: red"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
         </xpath>
         <!-- Expected, Counted, Difference en Control de Sesión -->
@@ -107,7 +105,7 @@
 
         <!-- Desglose de IGTF en Reporte Z -->
         <xpath expr="//div[@id='taxe_sales']" position="after">
-            <t t-if="igtf_totals and igtf_totals['total_igtf_bs'] > 0">
+            <t t-if="igtf_totals and igtf_totals['total_igtf_bs'] &gt; 0">
                 <div style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background-color: #fafafa;">
                     <h5 style="color: #a04000; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">
                         Impuesto IGTF Recaudado (3%)
@@ -144,5 +142,4 @@
                 </div>
             </t>
         </xpath>
-    </template>
-</odoo>
+    </data>

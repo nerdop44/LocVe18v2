@@ -86,12 +86,9 @@ class PosOrder(models.Model):
 
     @api.model
     def sync_from_ui(self, orders):
-        # Pachacutec: v18.0.1.1.0 - MULTI-COMPANY & ACL SHIELD
+        # Pachacutec: v18.0.1.1.16 - MULTI-COMPANY & ACL SHIELD
         # Elevamos privilegios mediante el modelo para asegurar que la sincronización
         # de pedidos pueda escribir en metadatos de moneda (ACL write res.currency) 
         # y leer tipos de picking de otras sucursales en entornos de grupo.
-        try:
-            return super(PosOrder, self.env['pos.order'].sudo()).sync_from_ui(orders)
-        except Exception as e:
-            _logger.error("[POS Sync] Error en sync_from_ui (sudo): %s", str(e))
-            return super().sync_from_ui(orders)
+        # Se elimina el bloque try-except de reintento para evitar colisiones de UUID (pos_payment_uuid_unique).
+        return super(PosOrder, self.sudo()).sync_from_ui(orders)
