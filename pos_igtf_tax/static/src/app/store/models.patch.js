@@ -67,15 +67,7 @@ patch(PosPayment.prototype, {
     set_amount(value) {
         if (window.__pachacutec_global_lock) return super.set_amount(value);
         
-        const config = this.models?.["pos.config"]?.getFirst();
-        let amount = value;
-        if (this.isForeignExchange && this.pos_order_id && config) {
-            const rate = config.show_currency_rate;
-            if (rate && rate > 0 && rate < 1) {
-                amount = value / rate;
-            }
-        }
-        super.set_amount(amount);
+        super.set_amount(value);
         
         if (this.pos_order_id && !window.__pachacutec_global_lock && typeof this.pos_order_id.refreshIGTF === "function") {
             try {
