@@ -75,6 +75,9 @@ class ReportSaleDetails(models.AbstractModel):
                 for cm in payment['cash_moves']:
                     cm['amount_ref'] = cm.get('amount', 0.0) / rate_today if rate_today else 0.0
 
+        if 'payments_per_method' in data:
+            data['payments_per_method'] = list(data['payments_per_method'])
+
         for ppm in data.get('payments_per_method', []):
             ppm['total_ref'] = ppm.get('total', 0.0) / rate_today if rate_today else 0.0
 
