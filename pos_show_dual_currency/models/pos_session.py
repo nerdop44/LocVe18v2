@@ -283,7 +283,9 @@ class PosSession(models.Model):
                 'opening': self.cash_register_balance_start_mn_ref,
                 'payment_amount': total_ref_payment_amount,
                 'moves': cash_in_out_list_ref,
-                'id': default_cash_payment_ref_method_id.id
+                'id': default_cash_payment_ref_method_id.id,
+                'igtf_amount': sum(p.amount * 0.03 for p in ref_payments),
+                'igtf_amount_ref': sum(p.amount_ref * 0.03 for p in ref_payments),
             }
         else:
             closing_control_data['default_cash_details_ref'] = {}
@@ -293,6 +295,7 @@ class PosSession(models.Model):
         non_cash_list = []
         for pm in non_cash_methods:
             pm_payments = payments.filtered(lambda p: p.payment_method_id == pm)
+            is_foreign = pm.x_is_foreign_exchange
             non_cash_list.append({
                 'name': pm.name,
                 'amount': sum(pm_payments.mapped('amount')),
@@ -300,6 +303,9 @@ class PosSession(models.Model):
                 'number': len(pm_payments),
                 'id': pm.id,
                 'type': pm.type,
+                'x_is_foreign_exchange': is_foreign,
+                'igtf_amount': sum(p.amount * 0.03 for p in pm_payments) if is_foreign else 0.0,
+                'igtf_amount_ref': sum(p.amount_ref * 0.03 for p in pm_payments) if is_foreign else 0.0,
             })
         closing_control_data['non_cash_payment_methods'] = non_cash_list
         

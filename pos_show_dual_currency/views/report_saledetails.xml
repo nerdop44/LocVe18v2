@@ -1,148 +1,440 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
     <template id="pos_daily_report" inherit_id="point_of_sale.pos_session_sales_details">
-        <!-- 1. Categorías de productos en ventas -->
-        <xpath expr="//tr[@t-foreach='products']/td[4]" position="inside">
-            / <span style="color: red"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
+        <xpath expr="//div[hasclass('page')]" position="replace">
+            <div class="page">
+                <!-- Pachacutec: v18.0.1.2.0 - Reporte Detallado de Ventas Paginado y Multi-moneda Inteligente -->
+                <!-- Iteramos sobre los días del reporte para paginación diaria -->
+                <t t-foreach="days_data or [None]" t-as="day">
+                    <t t-if="day">
+                        <!-- Redefinir variables nativas en el contexto de este día -->
+                        <t t-set="products" t-value="day.get('products', [])"/>
+                        <t t-set="refund_products" t-value="day.get('refund_products', [])"/>
+                        <t t-set="payments" t-value="day.get('payments', [])"/>
+                        <t t-set="payments_per_method" t-value="day.get('payments_per_method', [])"/>
+                        <t t-set="taxes" t-value="day.get('taxes', [])"/>
+                        <t t-set="refund_taxes" t-value="day.get('refund_taxes', [])"/>
+                        <t t-set="products_info" t-value="day.get('products_info', {})"/>
+                        <t t-set="refund_info" t-value="day.get('refund_info', {})"/>
+                        <t t-set="taxes_info" t-value="day.get('taxes_info', {})"/>
+                        <t t-set="refund_taxes_info" t-value="day.get('refund_taxes_info', {})"/>
+                        <t t-set="total_paid" t-value="day.get('total_paid', 0.0)"/>
+                        <t t-set="total_paid_ref" t-value="day.get('total_paid_ref', 0.0)"/>
+                        <t t-set="discount_number" t-value="day.get('discount_number', 0)"/>
+                        <t t-set="discount_amount" t-value="day.get('discount_amount', 0.0)"/>
+                        <t t-set="discount_amount_ref" t-value="day.get('discount_amount_ref', 0.0)"/>
+                        <t t-set="invoiceList" t-value="day.get('invoiceList', [])"/>
+                        <t t-set="invoiceTotal" t-value="day.get('invoiceTotal', 0.0)"/>
+                        <t t-set="invoiceTotal_ref" t-value="day.get('invoiceTotal_ref', 0.0)"/>
+                        <t t-set="nbr_orders" t-value="day.get('nbr_orders', 0)"/>
+                        <t t-set="opening_note" t-value="day.get('opening_note', '')"/>
+                        <t t-set="closing_note" t-value="day.get('closing_note', '')"/>
+                        <t t-set="igtf_totals" t-value="day.get('igtf_totals', {})"/>
+                        <t t-set="rate_today" t-value="day.get('rate_today', 1.0)"/>
+                        <t t-set="symbol" t-value="day.get('symbol', '$')"/>
+                        <t t-set="symbol_ref" t-value="day.get('symbol_ref', 'Bs')"/>
+                        <t t-set="currency_precision_ref" t-value="day.get('currency_precision_ref', 2)"/>
+                        <t t-set="day_date" t-value="day.get('day_date', '')"/>
+                    </t>
+                    <t t-else="">
+                        <!-- Fallback a variables nativas globales si no hay day (compatibilidad) -->
+                        <t t-set="rate_today" t-value="rate_today or 1.0"/>
+                        <t t-set="symbol" t-value="symbol or '$'"/>
+                        <t t-set="symbol_ref" t-value="symbol_ref or 'Bs'"/>
+                        <t t-set="currency_precision_ref" t-value="currency_precision_ref or 2"/>
+                        <t t-set="day_date" t-value="''"/>
+                    </t>
 
-        <!-- 2. Líneas de productos en ventas -->
-        <xpath expr="//tr[@t-foreach=&quot;category['products']&quot;]/td[4]" position="inside">
-            / <span style="color: red"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
+                    <div class="day-report-block" style="page-break-after: always; margin-bottom: 30px;">
+                        <!-- Cabecera de Página -->
+                        <div class="bg-secondary p-3" id="header" style="border-radius: 4px;">
+                            <div class="row align-items-center">
+                                <div class="col-3 d-flex flex-column justify-content-center">
+                                    <div class="text-start" style="font-size:0.85rem; font-weight: bold;">
+                                        <span t-esc="company.name"/><br/>
+                                        <address class="mb-0 text-muted" t-field="env.company.partner_id" t-options='{"widget": "contact", "fields": ["address"], "no_marker": True}' style="font-weight: normal; font-size: 0.8rem;"/>
+                                    </div>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <h2 t-if="state == 'closed' or state == 'opened'" id="daily_report_title" style="margin-bottom: 2px;">Daily Sales Report
+                                        <t t-if="state == 'closed'">Z</t>
+                                        <t t-else="">X</t>
+                                    </h2>
+                                    <h2 t-else="" style="margin-bottom: 2px;">Sales Details</h2>
+                                    <t t-if="session_name">
+                                        Session ID: <span t-out="session_name" style="font-weight: bold;">987657</span>
+                                    </t>
+                                    <t t-if="rate_today">
+                                        <div class="mt-1" style="font-size: 1.05em; font-weight: bold; color: #008784;">
+                                            Tasa de Uso: <t t-esc="rate_today" t-options="{'widget': 'float', 'precision': 4}"/> <t t-esc="symbol"/> / <t t-esc="symbol_ref"/>
+                                        </div>
+                                    </t>
+                                </div>
+                                <div class="col-3 text-end">
+                                    <span class="badge bg-light text-dark border border-dark p-2" style="font-size: 0.85rem;">
+                                        <strong>As of <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%m/%d/%Y')"/></strong>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
 
-        <!-- 3. Total general de ventas de productos -->
-        <xpath expr="//div[@id='sales']//tr[last()]/td[4]" position="inside">
-            / <span style="color: red"><strong><t t-esc="products_info['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
+                        <!-- Fechas del Reporte -->
+                        <div class="text-center mt-3" style="break-inside: avoid;">
+                            <t t-if="day_date">
+                                <h4 style="font-weight: bold; color: #333;">Fecha Reporte: <span t-esc="day_date" t-options='{"widget": "date"}'/></h4>
+                            </t>
+                            <t t-else="">
+                                <t t-if="date_start and date_stop">
+                                    <span t-out="date_start" t-options="{'widget': 'datetime'}">2-03-2000 9:00 AM</span> - <span t-out="date_stop" t-options="{'widget': 'datetime'}">Demo 3-03-2000 5:00 PM</span>
+                                </t>
+                            </t>
+                        </div>
+                        <br/>
 
-        <!-- 4. Impuestos en Ventas -->
-        <xpath expr="//div[@id='taxe_sales']//tr[@t-foreach='taxes']/td[2]" position="inside">
-            / <span style="color: red"><t t-esc="tax['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <xpath expr="//div[@id='taxe_sales']//tr[@t-foreach='taxes']/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Fila Total de impuestos -->
-        <xpath expr="//div[@id='taxe_sales']//tr[last()]/td[2]" position="inside">
-            / <span style="color: red"><strong><t t-esc="taxes_info['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
-        <xpath expr="//div[@id='taxe_sales']//tr[last()]/td[3]" position="inside">
-            / <span style="color: red"><strong><t t-esc="taxes_info['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
+                        <!-- 1. Sección de Ventas -->
+                        <div t-if="products" id="sales">
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Sales</h6>
+                            <table class="table table-sm table-borderless">
+                                <tbody>
+                                    <t t-foreach="products" t-as="category">
+                                        <tr class="border-bottom border-secondary">
+                                            <td class="ps-2 fw-bold"><span t-out="category['name']">Technical Stuffs</span></td>
+                                            <td class="fw-bold"/>
+                                            <td class="text-end fw-bold"><span t-out="category['qty']">5</span></td>
+                                            <td class="text-end fw-bold">
+                                                <t t-esc="category['total']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                / <span style="color: #008784;"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                            </td>
+                                        </tr>
+                                        <tr t-foreach="category['products']" t-as="line" class="border-bottom border-secondary">
+                                            <t t-set="internal_reference" t-value="line['code'] and '[%s] ' % line['code'] or ''"/>
+                                            <td class="ps-5 text-muted"><span t-out="internal_reference">Ref</span><span t-out="line['product_name']">Laptop</span></td>
+                                            <td/>
+                                            <td class="text-end">
+                                                <span t-out="line['quantity']">5</span>
+                                                <t t-if="line['uom'] != 'Units'">
+                                                    <span t-out="line['uom']">Unit</span>
+                                                </t>
+                                            </td>
+                                            <td class="text-end">
+                                                <t t-esc="line['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                / <span style="color: #008784;"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                <t t-if="line['discount'] != 0">
+                                                    Disc: <span t-out="line['discount']"/>%
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <tr style="border-top: 1px solid #aaa;">
+                                        <td><strong>Total</strong></td>
+                                        <td/>
+                                        <td class="text-end"><strong><span t-out="products_info.get('qty', 0)">5</span></strong></td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="products_info.get('total', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="products_info.get('total_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- 5. Categorías de productos en devoluciones -->
-        <xpath expr="//tr[@t-foreach='refund_products']/td[5]" position="inside">
-            / <span style="color: red"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Líneas de productos en devoluciones -->
-        <xpath expr="//div[@id='refunds']//tr[@t-foreach=&quot;category['products']&quot;]/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Total general de devoluciones -->
-        <xpath expr="//div[@id='refunds']//tr[last()]/td[5]" position="inside">
-            / <span style="color: red"><strong><t t-esc="refund_info['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
+                        <!-- 2. Sección de Impuestos en Ventas -->
+                        <div t-if="taxes" id="taxe_sales" style="page-break-inside: avoid;">
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Taxes on sales</h6>
+                            <table class="table table-sm table-borderless w-50 ms-auto">
+                                <tbody>
+                                    <tr t-foreach="taxes" t-as="tax" class="border-bottom border-secondary">
+                                        <td class="ps-2 fw-bold"><span t-out="tax['name']">Tax Name</span></td>
+                                        <td class="text-end">
+                                            <t t-esc="tax['tax_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                            / <span style="color: #008784;"><t t-esc="tax['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-esc="tax['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                            / <span style="color: #008784;"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                        </td>
+                                    </tr>
+                                    <tr style="border-top: 1px solid #aaa;">
+                                        <td><strong>Total</strong></td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="taxes_info.get('tax_amount', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="taxes_info.get('tax_amount_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="taxes_info.get('base_amount', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="taxes_info.get('base_amount_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- 6. Impuestos en Devoluciones -->
-        <xpath expr="//div[@id='taxe_refunds']//tr[@t-foreach='refund_taxes']/td[2]" position="inside">
-            / <span style="color: red"><t t-esc="tax['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <xpath expr="//div[@id='taxe_refunds']//tr[@t-foreach='refund_taxes']/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Fila Total de impuestos en devoluciones -->
-        <xpath expr="//div[@id='taxe_refunds']//tr[last()]/td[2]" position="inside">
-            / <span style="color: red"><strong><t t-esc="refund_taxes_info['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
-        <xpath expr="//div[@id='taxe_refunds']//tr[last()]/td[3]" position="inside">
-            / <span style="color: red"><strong><t t-esc="refund_taxes_info['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
+                        <!-- 3. Sección de Devoluciones (Refunds) -->
+                        <div t-if="refund_products" id="refunds">
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Refunds</h6>
+                            <table class="table table-sm table-borderless">
+                                <tbody>
+                                    <t t-foreach="refund_products" t-as="category">
+                                        <tr class="border-bottom border-secondary">
+                                            <td class="ps-2 fw-bold"><span t-out="category['name']">Technical Stuff</span></td>
+                                            <td class="fw-bold"/>
+                                            <td class="text-end fw-bold"/>
+                                            <td class="text-end fw-bold"><span t-out="category['qty']">0</span></td>
+                                            <td class="text-end fw-bold">
+                                                <t t-esc="category['total']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                / <span style="color: #008784;"><t t-esc="category['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                            </td>
+                                        </tr>
+                                        <tr t-foreach="category['products']" t-as="line" class="border-bottom border-secondary">
+                                            <t t-set="internal_reference" t-value="line['code'] and '[%s] ' % line['code'] or ''"/>
+                                            <td class="ps-5 text-muted"><span t-out="internal_reference">Ref</span><span t-out="line['product_name']">Laptop</span></td>
+                                            <td class="text-end">
+                                                <span t-out="line['quantity']">0</span>
+                                                <t t-if="line['uom'] != 'Units'">
+                                                    <span t-out="line['uom']">Unit</span>
+                                                </t>
+                                            </td>
+                                            <td class="text-end">
+                                                <t t-esc="line['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                / <span style="color: #008784;"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                <t t-if="line['discount'] != 0">
+                                                    Disc: <span t-out="line['discount']"/>%
+                                                </t>
+                                            </td>
+                                        </tr>
+                                    </t>
+                                    <tr style="border-top: 1px solid #aaa;">
+                                        <td><strong>Total</strong></td>
+                                        <td/>
+                                        <td/>
+                                        <td class="text-end"><strong><span t-out="refund_info.get('qty', 0)">0</span></strong></td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="refund_info.get('total', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="refund_info.get('total_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- 7. Pagos -->
-        <xpath expr="//div[@id='payments']//tr[@t-foreach='payments']/td[2]" position="inside">
-            / <span style="color: red"><t t-esc="payment['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Fila Total de pagos -->
-        <xpath expr="//div[@id='payments']//table[2]//tr[@class='fs-5']/th[2]" position="inside">
-            / <span style="color: red"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Métodos de pago por sesión -->
-        <xpath expr="//div[@id='payments']//tr[@t-foreach='payments_per_method']/td[2]" position="inside">
-            / <span style="color: red"><t t-esc="ppm['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
+                        <!-- 4. Sección de Impuestos en Devoluciones -->
+                        <div t-if="refund_taxes" id="taxe_refunds" style="page-break-inside: avoid;">
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Taxes on refunds</h6>
+                            <table class="table table-sm table-borderless w-50 ms-auto">
+                                <tbody>
+                                    <tr t-foreach="refund_taxes" t-as="tax" class="border-bottom border-secondary">
+                                        <td class="ps-2 fw-bold"><span t-out="tax['name']">Tax Name</span></td>
+                                        <td class="text-end">
+                                            <t t-esc="tax['tax_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                            / <span style="color: #008784;"><t t-esc="tax['tax_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-esc="tax['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                            / <span style="color: #008784;"><t t-esc="tax['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                        </td>
+                                    </tr>
+                                    <tr style="border-top: 1px solid #aaa;">
+                                        <td><strong>Total</strong></td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="refund_taxes_info.get('tax_amount', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="refund_taxes_info.get('tax_amount_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                        <td class="text-end">
+                                            <strong><t t-esc="refund_taxes_info.get('base_amount', 0.0)" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="refund_taxes_info.get('base_amount_ref', 0.0)" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- 8. Descuentos -->
-        <xpath expr="//div[@id='discounts']/div[2]/div" position="inside">
-            / <span style="color: red"><t t-esc="discount_amount_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
+                        <!-- Desglose de IGTF en Reporte Z / X -->
+                        <div t-if="igtf_totals and igtf_totals.get('total_igtf_bs', 0.0) > 0" style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background-color: #fafafa; page-break-inside: avoid;">
+                            <h5 style="color: #a04000; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">
+                                Impuesto IGTF Recaudado (3%)
+                            </h5>
+                            <table class="table table-sm" style="margin-bottom: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>Concepto</th>
+                                        <th class="text-end">Monto Bs</th>
+                                        <th class="text-end">Monto USD ($)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Base Imponible Divisa</td>
+                                        <td class="text-end">
+                                            <t t-esc="igtf_totals['total_igtf_base_bs']" t-options="{'widget': 'float', 'precision': 2}"/> Bs
+                                        </td>
+                                        <td class="text-end" style="color: #008784;">
+                                            <t t-esc="igtf_totals['total_igtf_base_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> $
+                                        </td>
+                                    </tr>
+                                    <tr style="font-weight: bold; color: #a04000;">
+                                        <td>Impuesto IGTF (3%)</td>
+                                        <td class="text-end">
+                                            <t t-esc="igtf_totals['total_igtf_bs']" t-options="{'widget': 'float', 'precision': 2}"/> Bs
+                                        </td>
+                                        <td class="text-end" style="color: #008784;">
+                                            <t t-esc="igtf_totals['total_igtf_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> $
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-        <!-- 9. Facturas -->
-        <xpath expr="//div[@id='invoices']//tr[@t-foreach='invoiceSession[&quot;invoices&quot;]']/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="invoice['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Fila Total de facturas -->
-        <xpath expr="//div[@id='invoices']//tr[last()]/td[3]" position="inside">
-            / <span style="color: red"><strong><t t-esc="invoiceTotal_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
-        </xpath>
+                        <!-- 5. Sección de Pagos -->
+                        <div t-if="payments" id="payments" style="page-break-inside: avoid;">
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Payments</h6>
+                            <table class="table table-sm table-borderless w-50 ms-auto">
+                                <tbody>
+                                    <tr t-foreach="payments" t-as="payment">
+                                        <td class="ps-2 fw-bold"><span t-out="payment['name']">Payment Name</span></td>
+                                        <td class="text-end">
+                                            <t t-esc="payment['total']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                            / <span style="color: #008784;"><t t-esc="payment['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <table class="table table-sm table-borderless w-50 ms-auto border-top">
+                                <tr class="fs-5" style="border-bottom: 1px solid #aaa;">
+                                    <th class="ps-2 fw-bolder">Total</th>
+                                    <th class="text-end fw-bolder">
+                                        <t t-esc="total_paid" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                        / <span style="color: #008784;"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                    </th>
+                                </tr>
+                                <tr t-if="show_payment_per_method" t-foreach="payments_per_method" t-as="ppm">
+                                    <td class="ps-2 fw-bold"><t t-out="ppm['name']"/></td>
+                                    <td class="text-end">
+                                        <t t-esc="ppm['total']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                        / <span style="color: #008784;"><t t-esc="ppm['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
 
-        <!-- 10. Control de Sesión (Session Control) -->
-        <xpath expr="//t[@id='closing_session']/div[2]/strong[1]" position="inside">
-            / <span style="color: red"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Expected, Counted, Difference en Control de Sesión -->
-        <xpath expr="//t[@id='closing_session']//t[@t-foreach='payments']//tr[1]/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="method['final_count_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <xpath expr="//t[@id='closing_session']//t[@t-foreach='payments']//tr[1]/td[4]" position="inside">
-            / <span style="color: red"><t t-esc="method['money_counted_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <xpath expr="//t[@id='closing_session']//t[@t-foreach='payments']//tr[1]/td[5]" position="inside">
-            / <span style="color: red"><t t-esc="method['money_difference_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
-        <!-- Movimientos de efectivo (cash_moves) -->
-        <xpath expr="//t[@id='closing_session']//tr[@t-foreach=&quot;method['cash_moves']&quot;]/td[3]" position="inside">
-            / <span style="color: red"><t t-esc="move['amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
-        </xpath>
+                        <!-- 6. Sección de Descuentos -->
+                        <div id="discounts" style="break-inside: avoid; page-break-inside: avoid;">
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Discounts</h6>
+                            <div class="row">
+                                <div class="col-12">
+                                    <strong>Number of discounts</strong>: <span t-out="discount_number">5</span>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
+                                    <strong>Amount of discounts</strong>:
+                                    <t t-esc="discount_amount" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                    / <span style="color: #008784;"><t t-esc="discount_amount_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                </div>
+                            </div>
+                            <br/>
+                        </div>
 
-        <!-- Desglose de IGTF en Reporte Z -->
-        <xpath expr="//div[@id='taxe_sales']" position="after">
-            <t t-if="igtf_totals and igtf_totals['total_igtf_bs'] > 0">
-                <div style="margin-top: 15px; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background-color: #fafafa;">
-                    <h5 style="color: #a04000; border-bottom: 1px solid #dee2e6; padding-bottom: 5px; margin-bottom: 10px; font-weight: bold; font-size: 1.1em;">
-                        Impuesto IGTF Recaudado (3%)
-                    </h5>
-                    <table class="table table-sm" style="margin-bottom: 0;">
-                        <thead>
-                            <tr>
-                                <th>Concepto</th>
-                                <th class="text-end">Monto Bs</th>
-                                <th class="text-end">Monto USD ($)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Base Imponible Divisa</td>
-                                <td class="text-end">
-                                    <t t-esc="igtf_totals['total_igtf_base_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
-                                </td>
-                                <td class="text-end" style="color: #008784;">
-                                    <t t-esc="igtf_totals['total_igtf_base_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
-                                </td>
-                            </tr>
-                            <tr style="font-weight: bold; color: #a04000;">
-                                <td>Impuesto IGTF (3%)</td>
-                                <td class="text-end">
-                                    <t t-esc="igtf_totals['total_igtf_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
-                                </td>
-                                <td class="text-end" style="color: #008784;">
-                                    <t t-esc="igtf_totals['total_igtf_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </t>
+                        <!-- 7. Sección de Facturas -->
+                        <div t-if="invoiceTotal" id="invoices">
+                            <br/>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Invoices</h6>
+                            <table class="table table-sm table-borderless">
+                                <tbody>
+                                    <t t-foreach="invoiceList" t-as="invoiceSession">
+                                        <t t-if="invoiceSession.get('invoices')">
+                                            <tr t-foreach="invoiceSession['invoices']" t-as="invoice">
+                                                <td class="ps-2 fw-bold"><span t-out="invoice['name']">Invoice Name</span></td>
+                                                <td><span t-out="invoice['order_ref']">Order Ref</span></td>
+                                                <td class="text-end">
+                                                    <t t-esc="invoice['total']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                    / <span style="color: #008784;"><t t-esc="invoice['total_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                </td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                    <tr style="border-top: 1px solid #aaa;">
+                                        <td><strong>Total</strong></td>
+                                        <td/>
+                                        <td class="text-end">
+                                            <strong><t t-esc="invoiceTotal" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/></strong>
+                                            / <span style="color: #008784;"><strong><t t-esc="invoiceTotal_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></strong></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 8. Control de Sesión (Session Control) -->
+                        <t id="closing_session">
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Session Control</h6>
+                            <div style="break-inside: avoid;">
+                                <strong>Total:
+                                    <t t-esc="total_paid" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                    / <span style="color: #008784;"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                </strong>
+                                <br/>
+                                <strong>Number of transactions: <span t-out="nbr_orders">10</span></strong>
+                            </div>
+                            <br/>
+                            <table class="table table-sm table-borderless">
+                                <thead>
+                                    <tr>
+                                        <th class="text-start">Name</th>
+                                        <th/>
+                                        <th class="text-end">Expected</th>
+                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Counted</th>
+                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="payments" t-as="method">
+                                        <t t-if="method.get('count')">
+                                            <tr>
+                                                <td><strong><span t-out="method['name']">Cash</span></strong></td>
+                                                <td/>
+                                                <td class="text-end">
+                                                    <t t-esc="method['final_count']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                    / <span style="color: #008784;"><t t-esc="method['final_count_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                </td>
+                                                <td t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">
+                                                    <t t-esc="method['money_counted']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                    / <span style="color: #008784;"><t t-esc="method['money_counted_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                </td>
+                                                <td t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">
+                                                    <t t-esc="method['money_difference']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                    / <span style="color: #008784;"><t t-esc="method['money_difference_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                </td>
+                                            </tr>
+                                            <tr t-if="(state == 'closed' or state == 'multiple') and payments" t-foreach="method.get('cash_moves', [])" t-as="move">
+                                                <td/>
+                                                <td><span t-out="move['name']">Cash Move 1</span></td>
+                                                <td class="text-end">
+                                                    <t t-esc="move['amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
+                                                    / <span style="color: #008784;"><t t-esc="move['amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
+                                                </td>
+                                                <td/>
+                                                <td/>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                </tbody>
+                            </table>
+                            <div t-if="opening_note or closing_note" style="break-inside: avoid;">
+                                <br/>
+                                <span t-if="opening_note" id="opening_note">
+                                    <strong>Opening of session note:</strong>
+                                    <span t-out="opening_note" t-options="{'widget': 'text'}">Sample Opening Note</span>
+                                </span>
+                                <br/>
+                                <span t-if="closing_note" id="closing_note">
+                                    <strong>End of session note:</strong>
+                                    <span t-out="closing_note" t-options="{'widget': 'text'}">Sample Closing Note</span>
+                                </span>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+            </div>
         </xpath>
     </template>
 </odoo>

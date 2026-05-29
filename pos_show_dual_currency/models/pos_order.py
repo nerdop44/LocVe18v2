@@ -92,3 +92,22 @@ class PosOrder(models.Model):
         # y leer tipos de picking de otras sucursales en entornos de grupo.
         # Se elimina el bloque try-except de reintento para evitar colisiones de UUID (pos_payment_uuid_unique).
         return super(PosOrder, self.sudo()).sync_from_ui(orders)
+
+    def write(self, vals):
+        if 'payment_ids' in vals:
+            # Mantener la restricción nativa únicamente para órdenes ya pagadas o facturadas (no en draft)
+            for order in self:
+                if order.state not in ['draft'] and order.nb_print > 0:
+                    raise UserError(_("You cannot change the payment of a printed order."))
+            
+            # Temporizar nb_print a 0 en memoria para las órdenes en borrador y aplicar super()
+            orders_to_bypass = self.filtered(lambda o: o.state == 'draft' and o.nb_print > 0)
+            if orders_to_bypass:
+                original_prints = {o.id: o.nb_print for o in orders_to_bypass}
+                for o in orders_to_bypass:
+                    o.nb_print = 0
+                res = super(PosOrder, self).write(vals)
+                for o in orders_to_bypass:
+                    o.nb_print = original_prints[o.id]
+                return res
+        return super(PosOrder, self).write(vals)

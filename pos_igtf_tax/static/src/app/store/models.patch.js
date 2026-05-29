@@ -223,14 +223,14 @@ patch(PosOrder.prototype, {
             if (igtfProduct && Math.abs(price) > 0.001) {
                 const product = this.models["product.product"]?.get(igtfProduct[0]);
                 if (product) {
-                    this.update({
-                        lines: [["create", {
-                            product_id: product,
-                            price_unit: price,
-                            qty: 1,
-                            price_type: "original",
-                            x_is_igtf_line: true
-                        }]]
+                    this.models["pos.order.line"].create({
+                        order_id: this,
+                        product_id: product,
+                        price_unit: price,
+                        qty: 1,
+                        price_type: "original",
+                        x_is_igtf_line: true,
+                        tax_ids: []
                     });
                     this.recomputeOrderData();
                 }

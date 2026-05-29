@@ -43,6 +43,13 @@
                         <span>Payments in USD</span>
                         <span class="align-top" t-esc="pos.format_currency_ref(props.default_cash_details_ref.payment_amount)"/>
                     </div>
+                    <div t-if="props.default_cash_details_ref.igtf_amount > 0" class="d-flex align-items-center justify-content-between text-muted border-start ps-2" style="color: #a04000 !important; font-weight: bold;">
+                        <span>IGTF Efectivo USD (3%)</span>
+                        <span>
+                            <t t-esc="env.utils.formatCurrency(props.default_cash_details_ref.igtf_amount)"/>
+                            / <span style="color: #008784;"><t t-esc="pos.format_currency_ref(props.default_cash_details_ref.igtf_amount_ref)"/></span>
+                        </span>
+                    </div>
                     
                     <t t-if="props.default_cash_details_ref.moves and props.default_cash_details_ref.moves.length > 0">
                         <PaymentMethodBreakdown title.translate="Cash In / Out USD" total_amount="props.default_cash_details_ref.payment_amount" transactions="props.default_cash_details_ref.moves"/>
@@ -81,6 +88,17 @@
             <span class="usd-amount ms-2 text-muted" style="font-size: 0.8em;">
                 (<t t-esc="pos.getAmountInRefCurrency(pm.amount, true)"/>)
             </span>
+        </xpath>
+
+        <!-- Agregar desglose de IGTF contiguo para métodos de pago no efectivo en divisas -->
+        <xpath expr="//div[hasclass('payment-methods-overview')]/div[@t-foreach='props.non_cash_payment_methods']" position="inside">
+            <div t-if="pm.igtf_amount > 0" class="d-flex align-items-center justify-content-between text-muted border-start ps-2 mt-1" style="font-size: 0.85em; color: #a04000 !important; font-weight: bold; margin-left: 20px;">
+                <span>IGTF Recaudado (3%)</span>
+                <span>
+                    <t t-esc="env.utils.formatCurrency(pm.igtf_amount)"/>
+                    / <span style="color: #008784;"><t t-esc="pos.format_currency_ref(pm.igtf_amount_ref)"/></span>
+                </span>
+            </div>
         </xpath>
 
         <!-- Eliminar bloque de entrada de efectivo principal nativo inferior para evitar duplicidad -->
