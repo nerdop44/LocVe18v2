@@ -40,16 +40,139 @@ class ReportSaleDetails(models.AbstractModel):
                 
         orders = self.env['pos.order'].search(orders_domain)
         
+        comp_currency = self.env.company.currency_id
+        ref_currency = self.env.company.currency_id_dif
+        is_company_usd = comp_currency.name == 'USD'
+        symbol_local = comp_currency.symbol
+        symbol_ref = ref_currency.symbol
+        currency_precision_ref = ref_currency.decimal_places
+
+        def enrich_data_dict(data_dict, rate):
+            # Helper de conversión inteligente
+            def convert_amount(amount):
+                if is_company_usd:
+                    return amount * rate
+                else:
+                    return amount / rate
+
+            # total_paid
+            total_paid = data_dict.get('total_paid', 0.0)
+            data_dict['total_paid_ref'] = ref_currency.round(convert_amount(total_paid))
+
+            # Categorías de productos
+            for category in data_dict.get('products', []):
+                total = category.get('total', 0.0)
+                category['total_ref'] = convert_amount(total)
+                for prod in category.get('products', []):
+                    price_unit = prod.get('price_unit') or prod.get('price', 0.0)
+                    base_amount = prod.get('base_amount', 0.0)
+                    prod['price_unit_ref'] = convert_amount(price_unit)
+                    prod['base_amount_ref'] = convert_amount(base_amount)
+                    
+            if 'products_info' in data_dict and data_dict['products_info']:
+                total = data_dict['products_info'].get('total', 0.0)
+                data_dict['products_info']['total_ref'] = convert_amount(total)
+
+            # Devoluciones
+            for category in data_dict.get('refund_products', []):
+                total = category.get('total', 0.0)
+                category['total_ref'] = convert_amount(total)
+                for prod in category.get('products', []):
+                    price_unit = prod.get('price_unit') or prod.get('price', 0.0)
+                    base_amount = prod.get('base_amount', 0.0)
+                    prod['price_unit_ref'] = convert_amount(price_unit)
+                    prod['base_amount_ref'] = convert_amount(base_amount)
+                    
+            if 'refund_info' in data_dict and data_dict['refund_info']:
+                total = data_dict['refund_info'].get('total', 0.0)
+                data_dict['refund_info']['total_ref'] = convert_amount(total)
+
+            # Pagos
+            for payment in data_dict.get('payments', []):
+                total = payment.get('total', 0.0)
+                final_count = payment.get('final_count', 0.0)
+                money_counted = payment.get('money_counted', 0.0)
+                money_difference = payment.get('money_difference', 0.0)
+                
+                payment['total_ref'] = convert_amount(total)
+                payment['final_count_ref'] = convert_amount(final_count)
+                payment['money_counted_ref'] = convert_amount(money_counted)
+                payment['money_difference_ref'] = convert_amount(money_difference)
+                
+                if 'cash_moves' in payment:
+                    for cm in payment['cash_moves']:
+                        amount = cm.get('amount', 0.0)
+                        cm['amount_ref'] = convert_amount(amount)
+
+            # Payments per method
+            if 'payments_per_method' in data_dict and data_dict['payments_per_method'] is not None:
+                data_dict['payments_per_method'] = list(data_dict['payments_per_method'])
+            for ppm in data_dict.get('payments_per_method', []):
+                total = ppm.get('total', 0.0)
+                ppm['total_ref'] = convert_amount(total)
+
+            # Impuestos
+            for tax in data_dict.get('taxes', []):
+                tax_amount = tax.get('tax_amount', 0.0)
+                base_amount = tax.get('base_amount', 0.0)
+                tax['tax_amount_ref'] = convert_amount(tax_amount)
+                tax['base_amount_ref'] = convert_amount(base_amount)
+                
+            if 'taxes_info' in data_dict and data_dict['taxes_info']:
+                tax_amount = data_dict['taxes_info'].get('tax_amount', 0.0)
+                base_amount = data_dict['taxes_info'].get('base_amount', 0.0)
+                data_dict['taxes_info']['tax_amount_ref'] = convert_amount(tax_amount)
+                data_dict['taxes_info']['base_amount_ref'] = convert_amount(base_amount)
+
+            # Impuestos de devoluciones
+            for tax in data_dict.get('refund_taxes', []):
+                tax_amount = tax.get('tax_amount', 0.0)
+                base_amount = tax.get('base_amount', 0.0)
+                tax['tax_amount_ref'] = convert_amount(tax_amount)
+                tax['base_amount_ref'] = convert_amount(base_amount)
+                
+            if 'refund_taxes_info' in data_dict and data_dict['refund_taxes_info']:
+                tax_amount = data_dict['refund_taxes_info'].get('tax_amount', 0.0)
+                base_amount = data_dict['refund_taxes_info'].get('base_amount', 0.0)
+                data_dict['refund_taxes_info']['tax_amount_ref'] = convert_amount(tax_amount)
+                data_dict['refund_taxes_info']['base_amount_ref'] = convert_amount(base_amount)
+
+            # Descuentos
+            discount_amount = data_dict.get('discount_amount', 0.0)
+            data_dict['discount_amount_ref'] = convert_amount(discount_amount)
+
+            # Facturas
+            for inv in data_dict.get('invoiceList', []):
+                if 'invoices' in inv:
+                    for invoice in inv['invoices']:
+                        total = invoice.get('total', 0.0)
+                        invoice['total_ref'] = convert_amount(total)
+            invoice_total = data_dict.get('invoiceTotal', 0.0)
+            data_dict['invoiceTotal_ref'] = convert_amount(invoice_total)
+
         if not orders:
             data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
+            rate_today = self.env.company.currency_id_dif.get_trm_systray() or 1.0
+            try:
+                rate_today = float(rate_today)
+            except:
+                rate_today = 1.0
+            if not rate_today or rate_today <= 0:
+                rate_today = 1.0
+                
+            enrich_data_dict(data, rate_today)
             data.update({
                 'days_data': [],
-                'currency_precision_ref': self.env.company.currency_id_dif.decimal_places,
-                'symbol_ref': self.env.company.currency_id_dif.symbol,
-                'symbol': self.env.company.currency_id.symbol,
-                'rate_today': 1.0,
-                'total_paid_ref': 0.0,
-                'igtf_totals': {},
+                'currency_precision_ref': currency_precision_ref,
+                'symbol_ref': symbol_ref,
+                'symbol': symbol_local,
+                'rate_today': rate_today,
+                'igtf_totals': {
+                    'total_igtf_bs': 0.0,
+                    'total_igtf_ref': 0.0,
+                    'total_igtf_base_bs': 0.0,
+                    'total_igtf_base_ref': 0.0,
+                },
             })
             return data
             
@@ -110,119 +233,22 @@ class ReportSaleDetails(models.AbstractModel):
             if not rate_today or rate_today <= 0:
                 rate_today = 1.0
                 
-            # Monedas de la empresa y alterna inteligente
-            comp_currency = self.env.company.currency_id
-            ref_currency = self.env.company.currency_id_dif
-            is_company_usd = comp_currency.name == 'USD'
-            
-            symbol_local = comp_currency.symbol
-            symbol_ref = ref_currency.symbol
-            
-            # Helper de conversión inteligente
-            def convert_amount(amount):
-                if is_company_usd:
-                    return amount * rate_today
-                else:
-                    return amount / rate_today
-            
             # Enriquecemos day_data con los campos del día
             day_data['day_date'] = day_str
             day_data['rate_today'] = rate_today
             day_data['symbol'] = symbol_local
             day_data['symbol_ref'] = symbol_ref
-            day_data['currency_precision_ref'] = ref_currency.decimal_places
+            day_data['currency_precision_ref'] = currency_precision_ref
             
-            total_paid = day_data.get('total_paid', 0.0)
-            day_data['total_paid_ref'] = ref_currency.round(convert_amount(total_paid))
-            
-            # Enriquecer categorías de productos en ventas
-            for category in day_data.get('products', []):
-                total = category.get('total', 0.0)
-                category['total_ref'] = convert_amount(total)
-                for prod in category.get('products', []):
-                    price_unit = prod.get('price_unit') or prod.get('price', 0.0)
-                    base_amount = prod.get('base_amount', 0.0)
-                    prod['price_unit_ref'] = convert_amount(price_unit)
-                    prod['base_amount_ref'] = convert_amount(base_amount)
-                    
-            if 'products_info' in day_data:
-                total = day_data['products_info'].get('total', 0.0)
-                day_data['products_info']['total_ref'] = convert_amount(total)
-                
-            # Enriquecer devoluciones
-            for category in day_data.get('refund_products', []):
-                total = category.get('total', 0.0)
-                category['total_ref'] = convert_amount(total)
-                for prod in category.get('products', []):
-                    price_unit = prod.get('price_unit') or prod.get('price', 0.0)
-                    base_amount = prod.get('base_amount', 0.0)
-                    prod['price_unit_ref'] = convert_amount(price_unit)
-                    prod['base_amount_ref'] = convert_amount(base_amount)
-                    
-            if 'refund_info' in day_data:
-                total = day_data['refund_info'].get('total', 0.0)
-                day_data['refund_info']['total_ref'] = convert_amount(total)
-                
-            # Enriquecer pagos nativos
-            for payment in day_data.get('payments', []):
-                total = payment.get('total', 0.0)
-                final_count = payment.get('final_count', 0.0)
-                money_counted = payment.get('money_counted', 0.0)
-                money_difference = payment.get('money_difference', 0.0)
-                
-                payment['total_ref'] = convert_amount(total)
-                payment['final_count_ref'] = convert_amount(final_count)
-                payment['money_counted_ref'] = convert_amount(money_counted)
-                payment['money_difference_ref'] = convert_amount(money_difference)
-                
-                if 'cash_moves' in payment:
-                    for cm in payment['cash_moves']:
-                        amount = cm.get('amount', 0.0)
-                        cm['amount_ref'] = convert_amount(amount)
-                        
-            if 'payments_per_method' in day_data:
-                day_data['payments_per_method'] = list(day_data['payments_per_method'])
-            for ppm in day_data.get('payments_per_method', []):
-                total = ppm.get('total', 0.0)
-                ppm['total_ref'] = convert_amount(total)
-                
-            # Enriquecer impuestos nativos
-            for tax in day_data.get('taxes', []):
-                tax_amount = tax.get('tax_amount', 0.0)
-                base_amount = tax.get('base_amount', 0.0)
-                tax['tax_amount_ref'] = convert_amount(tax_amount)
-                tax['base_amount_ref'] = convert_amount(base_amount)
-                
-            if 'taxes_info' in day_data:
-                tax_amount = day_data['taxes_info'].get('tax_amount', 0.0)
-                base_amount = day_data['taxes_info'].get('base_amount', 0.0)
-                day_data['taxes_info']['tax_amount_ref'] = convert_amount(tax_amount)
-                day_data['taxes_info']['base_amount_ref'] = convert_amount(base_amount)
-                
-            for tax in day_data.get('refund_taxes', []):
-                tax_amount = tax.get('tax_amount', 0.0)
-                base_amount = tax.get('base_amount', 0.0)
-                tax['tax_amount_ref'] = convert_amount(tax_amount)
-                tax['base_amount_ref'] = convert_amount(base_amount)
-                
-            if 'refund_taxes_info' in day_data:
-                tax_amount = day_data['refund_taxes_info'].get('tax_amount', 0.0)
-                base_amount = day_data['refund_taxes_info'].get('base_amount', 0.0)
-                day_data['refund_taxes_info']['tax_amount_ref'] = convert_amount(tax_amount)
-                day_data['refund_taxes_info']['base_amount_ref'] = convert_amount(base_amount)
-                
-            # Descuentos
-            discount_amount = day_data.get('discount_amount', 0.0)
-            day_data['discount_amount_ref'] = convert_amount(discount_amount)
-            
-            # Facturas
-            for inv in day_data.get('invoiceList', []):
-                if 'invoices' in inv:
-                    for invoice in inv['invoices']:
-                        total = invoice.get('total', 0.0)
-                        invoice['total_ref'] = convert_amount(total)
-            invoice_total = day_data.get('invoiceTotal', 0.0)
-            day_data['invoiceTotal_ref'] = convert_amount(invoice_total)
+            # Helper de conversión inteligente local
+            def convert_amount_local(amount):
+                if is_company_usd:
+                    return amount * rate_today
+                else:
+                    return amount / rate_today
+
+            # Enriquecer usando el helper
+            enrich_data_dict(day_data, rate_today)
             
             # IGTF del día
             day_orders_recs = self.env['pos.order'].browse([o.id for o in day_orders])
@@ -232,9 +258,9 @@ class ReportSaleDetails(models.AbstractModel):
             
             day_data['igtf_totals'] = {
                 'total_igtf_bs': total_igtf_bs,
-                'total_igtf_ref': convert_amount(total_igtf_bs),
+                'total_igtf_ref': convert_amount_local(total_igtf_bs),
                 'total_igtf_base_bs': total_igtf_base_bs,
-                'total_igtf_base_ref': convert_amount(total_igtf_base_bs),
+                'total_igtf_base_ref': convert_amount_local(total_igtf_base_bs),
             }
             
             days_data.append(day_data)
@@ -242,14 +268,28 @@ class ReportSaleDetails(models.AbstractModel):
         # 5. Retornar los datos agrupados enriqueciendo también la raíz
         global_data = super(ReportSaleDetails, self).get_sale_details(date_start, date_stop, config_ids, session_ids)
         last_day_data = days_data[-1] if days_data else global_data
+        rate_global = last_day_data.get('rate_today', 1.0)
+        
+        enrich_data_dict(global_data, rate_global)
+        
+        def convert_amount_global(amount):
+            if is_company_usd:
+                return amount * rate_global
+            else:
+                return amount / rate_global
+
         global_data.update({
             'days_data': days_data,
-            'currency_precision_ref': last_day_data.get('currency_precision_ref'),
-            'symbol_ref': last_day_data.get('symbol_ref'),
-            'symbol': last_day_data.get('symbol'),
-            'rate_today': last_day_data.get('rate_today'),
-            'total_paid_ref': last_day_data.get('total_paid_ref'),
-            'igtf_totals': last_day_data.get('igtf_totals'),
+            'currency_precision_ref': currency_precision_ref,
+            'symbol_ref': symbol_ref,
+            'symbol': symbol_local,
+            'rate_today': rate_global,
+            'igtf_totals': last_day_data.get('igtf_totals', {
+                'total_igtf_bs': 0.0,
+                'total_igtf_ref': 0.0,
+                'total_igtf_base_bs': 0.0,
+                'total_igtf_base_ref': 0.0,
+            }),
         })
         
         return global_data
