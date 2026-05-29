@@ -301,7 +301,7 @@ patch(PosStore.prototype, {
             const orderSessionId = order.session_id ? (Array.isArray(order.session_id) ? order.session_id[0] : (typeof order.session_id === 'object' ? order.session_id.id : order.session_id)) : null;
             
             const isLocalId = typeof order.id === 'string';
-            const isDifferentSession = orderSessionId && orderSessionId !== currentSessionId;
+            const isDifferentSession = !orderSessionId || (orderSessionId !== currentSessionId);
             
             return isLocalId && isDifferentSession;
         });

@@ -131,6 +131,18 @@ class PosOrder(models.Model):
         fields.append('x_is_igtf_line')
         
         return fields
+
+    @api.model
+    def _process_order(self, order, existing_order):
+        if order:
+            session_id = order.get('session_id')
+            pos_session = self.env['pos.session'].browse(session_id) if session_id else self.env['pos.session']
+            if not session_id or not pos_session.exists():
+                valid_session = self._get_valid_session(order)
+                if valid_session:
+                    _logger.warning("[IGTF] Reparando session_id nulo/inválido en el pedido. Asignando sesión: %s", valid_session.id)
+                    order['session_id'] = valid_session.id
+        return super()._process_order(order, existing_order)
         
 class PosOrderLine(models.Model):
     _inherit = "pos.order.line"
