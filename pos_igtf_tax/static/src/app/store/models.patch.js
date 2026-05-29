@@ -6,6 +6,7 @@ import { PosOrder } from "@point_of_sale/app/models/pos_order";
 import { PosOrderline } from "@point_of_sale/app/models/pos_order_line";
 import { PosData } from "@point_of_sale/app/models/data_service";
 import DevicesSynchronisation from "@point_of_sale/app/store/devices_synchronisation";
+import { PosStore } from "@point_of_sale/app/store/pos_store";
 import { patch } from "@web/core/utils/patch";
 import { roundDecimals } from "@web/core/utils/numbers";
 
@@ -249,6 +250,70 @@ patch(PosOrder.prototype, {
                     line.delete();
                 } catch (e) {
                     console.warn("Pachacutec: Error deleting IGTF line", e);
+                }
+            }
+        }
+    }
+});
+
+// Pachacutec: v18 - Parche para PosStore para limpiar órdenes zombies y estabilizar envío
+patch(PosStore.prototype, {
+    async afterProcessServerData() {
+        try {
+            await this.purgeGhostOrders();
+        } catch (e) {
+            console.error("Pachacutec: purgeGhostOrders failed:", e);
+        }
+        return await super.afterProcessServerData(...arguments);
+    },
+
+    async syncAllOrders(options = {}) {
+        // Obtenemos los pedidos a procesar
+        const { orderToCreate, orderToUpdate } = this.getPendingOrder();
+        const orders = options.orders || [...orderToCreate, ...orderToUpdate];
+        for (const order of orders) {
+            if (order && !order.finalized && typeof order.refreshIGTF === "function") {
+                try {
+                    order.refreshIGTF();
+                    order.recomputeOrderData();
+                } catch (e) {
+                    console.error("Pachacutec: refreshIGTF failed in syncAllOrders", e);
+                }
+            }
+        }
+        return await super.syncAllOrders(...arguments);
+    },
+
+    async purgeGhostOrders() {
+        if (!this.models || !this.session) return;
+        const currentSessionId = this.session.id;
+        
+        // Buscamos todas las órdenes del store local
+        const orders = this.models["pos.order"]?.getAll() || [];
+        
+        // Filtramos órdenes que:
+        // 1. Tengan un ID de tipo string (lo que indica que se generó de manera local, ej. uuid o temp_id)
+        // 2. O tengan un session_id diferente de la sesión actual.
+        // 3. No estén finalizadas.
+        const ghostOrders = orders.filter(order => {
+            if (order.finalized) return false;
+            
+            const orderSessionId = order.session_id ? (Array.isArray(order.session_id) ? order.session_id[0] : (typeof order.session_id === 'object' ? order.session_id.id : order.session_id)) : null;
+            
+            const isLocalId = typeof order.id === 'string';
+            const isDifferentSession = orderSessionId && orderSessionId !== currentSessionId;
+            
+            return isLocalId && isDifferentSession;
+        });
+
+        if (ghostOrders.length > 0) {
+            console.log(`Pachacutec: Purging ${ghostOrders.length} ghost orders from previous sessions.`, ghostOrders);
+            for (const order of ghostOrders) {
+                try {
+                    // localDeleteCascade limpia todas las líneas de la orden y la elimina del data service.
+                    this.data.localDeleteCascade(order);
+                } catch (e) {
+                    console.error("Pachacutec: Failed to delete ghost order", order.id, e);
                 }
             }
         }

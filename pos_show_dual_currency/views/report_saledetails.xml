@@ -31,21 +31,21 @@
                         <t t-set="closing_note" t-value="day.get('closing_note', '')"/>
                         <t t-set="igtf_totals" t-value="day.get('igtf_totals', {})"/>
                         <t t-set="rate_today" t-value="day.get('rate_today', 1.0)"/>
-                        <t t-set="symbol" t-value="day.get('symbol', '$')"/>
-                        <t t-set="symbol_ref" t-value="day.get('symbol_ref', 'Bs')"/>
+                        <t t-set="symbol" t-value="day.get('symbol', 'Bs.')"/>
+                        <t t-set="symbol_ref" t-value="day.get('symbol_ref', '$')"/>
                         <t t-set="currency_precision_ref" t-value="day.get('currency_precision_ref', 2)"/>
                         <t t-set="day_date" t-value="day.get('day_date', '')"/>
                     </t>
                     <t t-else="">
                         <!-- Fallback a variables nativas globales si no hay day (compatibilidad) -->
                         <t t-set="rate_today" t-value="rate_today or 1.0"/>
-                        <t t-set="symbol" t-value="symbol or '$'"/>
-                        <t t-set="symbol_ref" t-value="symbol_ref or 'Bs'"/>
+                        <t t-set="symbol" t-value="symbol or 'Bs.'"/>
+                        <t t-set="symbol_ref" t-value="symbol_ref or '$'"/>
                         <t t-set="currency_precision_ref" t-value="currency_precision_ref or 2"/>
                         <t t-set="day_date" t-value="''"/>
                     </t>
 
-                    <div class="day-report-block" style="page-break-after: always; margin-bottom: 30px;">
+                    <div class="day-report-block" style="margin-bottom: 30px;">
                         <!-- Cabecera de Página -->
                         <div class="bg-secondary p-3" id="header" style="border-radius: 4px;">
                             <div class="row align-items-center">
@@ -56,13 +56,13 @@
                                     </div>
                                 </div>
                                 <div class="col-6 text-center">
-                                    <h2 t-if="state == 'closed' or state == 'opened'" id="daily_report_title" style="margin-bottom: 2px;">Daily Sales Report
+                                    <h2 t-if="state == 'closed' or state == 'opened'" id="daily_report_title" style="margin-bottom: 2px;">Reporte Diario de Ventas
                                         <t t-if="state == 'closed'">Z</t>
                                         <t t-else="">X</t>
                                     </h2>
-                                    <h2 t-else="" style="margin-bottom: 2px;">Sales Details</h2>
+                                    <h2 t-else="" style="margin-bottom: 2px;">Detalle de Ventas</h2>
                                     <t t-if="session_name">
-                                        Session ID: <span t-out="session_name" style="font-weight: bold;">987657</span>
+                                        ID de Sesión: <span t-out="session_name" style="font-weight: bold;">987657</span>
                                     </t>
                                     <t t-if="rate_today">
                                         <div class="mt-1" style="font-size: 1.05em; font-weight: bold; color: #008784;">
@@ -72,7 +72,7 @@
                                 </div>
                                 <div class="col-3 text-end">
                                     <span class="badge bg-light text-dark border border-dark p-2" style="font-size: 0.85rem;">
-                                        <strong>As of <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%m/%d/%Y')"/></strong>
+                                        <strong>Al <span t-esc="context_timestamp(datetime.datetime.now()).strftime('%d/%m/%Y')"/></strong>
                                     </span>
                                 </div>
                             </div>
@@ -93,7 +93,7 @@
 
                         <!-- 1. Sección de Ventas -->
                         <div t-if="products" id="sales">
-                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Sales</h6>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Ventas</h6>
                             <table class="table table-sm table-borderless">
                                 <tbody>
                                     <t t-foreach="products" t-as="category">
@@ -120,7 +120,7 @@
                                                 <t t-esc="line['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
                                                 / <span style="color: #008784;"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
                                                 <t t-if="line['discount'] != 0">
-                                                    Disc: <span t-out="line['discount']"/>%
+                                                    Desc: <span t-out="line['discount']"/>%
                                                 </t>
                                             </td>
                                         </tr>
@@ -140,7 +140,7 @@
 
                         <!-- 2. Sección de Impuestos en Ventas -->
                         <div t-if="taxes" id="taxe_sales" style="page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Taxes on sales</h6>
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Impuestos sobre ventas</h6>
                             <table class="table table-sm table-borderless w-50 ms-auto">
                                 <tbody>
                                     <tr t-foreach="taxes" t-as="tax" class="border-bottom border-secondary">
@@ -171,7 +171,7 @@
 
                         <!-- 3. Sección de Devoluciones (Refunds) -->
                         <div t-if="refund_products" id="refunds">
-                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Refunds</h6>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Devoluciones</h6>
                             <table class="table table-sm table-borderless">
                                 <tbody>
                                     <t t-foreach="refund_products" t-as="category">
@@ -198,7 +198,7 @@
                                                 <t t-esc="line['base_amount']" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
                                                 / <span style="color: #008784;"><t t-esc="line['base_amount_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
                                                 <t t-if="line['discount'] != 0">
-                                                    Disc: <span t-out="line['discount']"/>%
+                                                    Desc: <span t-out="line['discount']"/>%
                                                 </t>
                                             </td>
                                         </tr>
@@ -219,7 +219,7 @@
 
                         <!-- 4. Sección de Impuestos en Devoluciones -->
                         <div t-if="refund_taxes" id="taxe_refunds" style="page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Taxes on refunds</h6>
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Impuestos sobre devoluciones</h6>
                             <table class="table table-sm table-borderless w-50 ms-auto">
                                 <tbody>
                                     <tr t-foreach="refund_taxes" t-as="tax" class="border-bottom border-secondary">
@@ -257,27 +257,27 @@
                                 <thead>
                                     <tr>
                                         <th>Concepto</th>
-                                        <th class="text-end">Monto Bs</th>
-                                        <th class="text-end">Monto USD ($)</th>
+                                        <th class="text-end">Monto <t t-esc="symbol"/></th>
+                                        <th class="text-end">Monto <t t-esc="symbol_ref"/></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr>
                                         <td>Base Imponible Divisa</td>
                                         <td class="text-end">
-                                            <t t-esc="igtf_totals['total_igtf_base_bs']" t-options="{'widget': 'float', 'precision': 2}"/> Bs
+                                            <t t-esc="igtf_totals['total_igtf_base_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
                                         </td>
                                         <td class="text-end" style="color: #008784;">
-                                            <t t-esc="igtf_totals['total_igtf_base_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> $
+                                            <t t-esc="igtf_totals['total_igtf_base_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
                                         </td>
                                     </tr>
                                     <tr style="font-weight: bold; color: #a04000;">
                                         <td>Impuesto IGTF (3%)</td>
                                         <td class="text-end">
-                                            <t t-esc="igtf_totals['total_igtf_bs']" t-options="{'widget': 'float', 'precision': 2}"/> Bs
+                                            <t t-esc="igtf_totals['total_igtf_bs']" t-options="{'widget': 'float', 'precision': 2}"/> <t t-esc="symbol"/>
                                         </td>
                                         <td class="text-end" style="color: #008784;">
-                                            <t t-esc="igtf_totals['total_igtf_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> $
+                                            <t t-esc="igtf_totals['total_igtf_ref']" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -286,7 +286,7 @@
 
                         <!-- 5. Sección de Pagos -->
                         <div t-if="payments" id="payments" style="page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Payments</h6>
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Pagos</h6>
                             <table class="table table-sm table-borderless w-50 ms-auto">
                                 <tbody>
                                     <tr t-foreach="payments" t-as="payment">
@@ -318,15 +318,15 @@
 
                         <!-- 6. Sección de Descuentos -->
                         <div id="discounts" style="break-inside: avoid; page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Discounts</h6>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Descuentos</h6>
                             <div class="row">
                                 <div class="col-12">
-                                    <strong>Number of discounts</strong>: <span t-out="discount_number">5</span>
+                                    <strong>Número de descuentos</strong>: <span t-out="discount_number">5</span>
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col-12">
-                                    <strong>Amount of discounts</strong>:
+                                    <strong>Monto de descuentos</strong>:
                                     <t t-esc="discount_amount" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
                                     / <span style="color: #008784;"><t t-esc="discount_amount_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
                                 </div>
@@ -337,7 +337,7 @@
                         <!-- 7. Sección de Facturas -->
                         <div t-if="invoiceTotal" id="invoices">
                             <br/>
-                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Invoices</h6>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Facturas</h6>
                             <table class="table table-sm table-borderless">
                                 <tbody>
                                     <t t-foreach="invoiceList" t-as="invoiceSession">
@@ -366,24 +366,24 @@
 
                         <!-- 8. Control de Sesión (Session Control) -->
                         <t id="closing_session">
-                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Session Control</h6>
+                            <h6 class="bg-secondary p-1 fw-bold" style="border-radius: 2px;">Control de Sesión</h6>
                             <div style="break-inside: avoid;">
                                 <strong>Total:
                                     <t t-esc="total_paid" t-options="{'widget': 'float', 'precision': currency['precision']}"/> <t t-esc="symbol"/>
                                     / <span style="color: #008784;"><t t-esc="total_paid_ref" t-options="{'widget': 'float', 'precision': currency_precision_ref}"/> <t t-esc="symbol_ref"/></span>
                                 </strong>
                                 <br/>
-                                <strong>Number of transactions: <span t-out="nbr_orders">10</span></strong>
+                                <strong>Número de transacciones: <span t-out="nbr_orders">10</span></strong>
                             </div>
                             <br/>
                             <table class="table table-sm table-borderless">
                                 <thead>
                                     <tr>
-                                        <th class="text-start">Name</th>
+                                        <th class="text-start">Nombre</th>
                                         <th/>
-                                        <th class="text-end">Expected</th>
-                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Counted</th>
-                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Difference</th>
+                                        <th class="text-end">Esperado</th>
+                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Contado</th>
+                                        <th t-if="(state == 'closed' or state == 'multiple') and payments" class="text-end">Diferencia</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -422,15 +422,18 @@
                             <div t-if="opening_note or closing_note" style="break-inside: avoid;">
                                 <br/>
                                 <span t-if="opening_note" id="opening_note">
-                                    <strong>Opening of session note:</strong>
+                                    <strong>Nota de apertura de sesión:</strong>
                                     <span t-out="opening_note" t-options="{'widget': 'text'}">Sample Opening Note</span>
                                 </span>
                                 <br/>
                                 <span t-if="closing_note" id="closing_note">
-                                    <strong>End of session note:</strong>
+                                    <strong>Nota de cierre de sesión:</strong>
                                     <span t-out="closing_note" t-options="{'widget': 'text'}">Sample Closing Note</span>
                                 </span>
                             </div>
+                        </t>
+                        <t t-if="not day_last">
+                            <div style="page-break-after: always;"/>
                         </t>
                     </div>
                 </t>
