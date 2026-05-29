@@ -726,14 +726,9 @@ class PosConfig(models.Model):
     _inherit = 'pos.config'
     @api.model
     def _load_pos_data_fields(self, config_id):
-        # Shield mechanism to ensure critical fields are always present
-        fields = super()._load_pos_data_fields(config_id)
-        if fields:
-             mandatory = [
-                'use_pricelist', 'show_dual_currency', 'show_currency', 
-                'show_currency_rate', 'show_currency_symbol', 'show_currency_position'
-             ]
-             for f in mandatory:
-                 if f not in fields:
-                     fields.append(f)
-        return fields
+        # En Odoo 18, pos.config no tiene campos declarados en _load_pos_data_fields por defecto,
+        # lo que hace que cargue todos los campos de la base de datos si la lista es vacía [].
+        # Si agregamos campos aquí o si algún otro módulo lo hace, search_read de Odoo 18
+        # sólo lee esos campos y excluye el resto, provocando KeyError en campos del core (como 'use_pricelist').
+        # Por lo tanto, forzamos siempre el retorno de una lista vacía para cargar todo el modelo pos.config de forma segura.
+        return []
