@@ -23,7 +23,12 @@ window.__pachacutec_global_lock = false;
 patch(ProductProduct.prototype, {
     get isIgtfProduct() {
         const config = this.models?.["pos.config"]?.getFirst();
-        return config?.x_igtf_product_id ? config.x_igtf_product_id[0] === this.id : false;
+        if (!config || !config.x_igtf_product_id) return false;
+        const igtfProduct = config.x_igtf_product_id;
+        const igtfProductId = Array.isArray(igtfProduct) 
+            ? igtfProduct[0] 
+            : (typeof igtfProduct === 'object' ? igtfProduct.id : igtfProduct);
+        return igtfProductId === this.id;
     }
 });
 
@@ -107,30 +112,8 @@ patch(PosOrder.prototype, {
         return line && typeof line.getIndexMaps !== "function";
     },
 
-    get_total_with_tax() {
-        let total = super.get_total_with_tax();
-        // Pachacutec: v75 - Sincronización de Total Visual
-        // Evitamos que el widget se ponga en cero si falta el IGTF físico
-        const igtf_monto = this.x_igtf_amount;
-        const has_igtf_line = (this.lines || []).some(l => l && l.x_is_igtf_line);
-        if (igtf_monto > 0.01 && !has_igtf_line) {
-            return total + igtf_monto;
-        }
-        return total;
-    },
-
-    get_total_without_tax() {
-        let total = super.get_total_without_tax();
-        // Pachacutec: v75 - Subtotal Virtual
-        // Si no hay línea de IGTF física, sumamos el monto virtual al subtotal
-        // para que la UI de Odoo 18 no colapse a 0,00 Bs.
-        const igtf_monto = this.x_igtf_amount;
-        const has_igtf_line = (this.lines || []).some(l => l && l.x_is_igtf_line);
-        if (igtf_monto > 0.01 && !has_igtf_line) {
-            return total + igtf_monto;
-        }
-        return total;
-    },
+    // Eliminados overrides virtuales de get_total_with_tax y get_total_without_tax
+    // para usar el cálculo nativo de Odoo 18 basado en la línea de IGTF física.
 
     getDisplayData() {
         return super.getDisplayData(...arguments);
@@ -222,7 +205,10 @@ patch(PosOrder.prototype, {
             const price = this.x_igtf_amount;
 
             if (igtfProduct && Math.abs(price) > 0.001) {
-                const product = this.models["product.product"]?.get(igtfProduct[0]);
+                const igtfProductId = Array.isArray(igtfProduct) 
+                    ? igtfProduct[0] 
+                    : (typeof igtfProduct === 'object' ? igtfProduct.id : igtfProduct);
+                const product = this.models["product.product"]?.get(igtfProductId);
                 if (product) {
                     this.models["pos.order.line"].create({
                         order_id: this,

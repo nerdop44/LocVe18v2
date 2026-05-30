@@ -12,6 +12,37 @@ class PosSession(models.Model):
     # Pachacutec: v18 - Odoo 18 usa _load_pos_data_fields en el modelo.
     # Eliminamos _loader_params obsoletos de Odoo 17/16.
 
+    @api.model
+    def _load_pos_data(self, data):
+        result = super()._load_pos_data(data)
+        
+        # Inyectar dinámicamente el producto IGTF en la caché del POS (product.product)
+        pos_config = self.env['pos.config'].browse(self.env.context.get('pos_config_id'))
+        if pos_config and pos_config.x_igtf_product_id:
+            igtf_product = pos_config.x_igtf_product_id
+            
+            if 'product.product' not in result:
+                result['product.product'] = {'data': []}
+                
+            product_list = result['product.product'].get('data', [])
+            product_ids = {p['id'] for p in product_list}
+            
+            if igtf_product.id not in product_ids:
+                _logger.info("[IGTF] Inyectando producto IGTF '%s' (ID %s) en los datos del POS", igtf_product.name, igtf_product.id)
+                # Cargar el producto usando los campos dinámicos de Odoo 18
+                fields_to_read = self.env['product.product']._load_pos_data_fields(pos_config.id)
+                fields_to_read = list(set(fields_to_read + ['id', 'display_name', 'lst_price']))
+                
+                igtf_product_data = igtf_product.sudo().search_read(
+                    [('id', '=', igtf_product.id)],
+                    fields_to_read
+                )
+                if igtf_product_data:
+                    product_list.append(igtf_product_data[0])
+                    result['product.product']['data'] = product_list
+                    
+        return result
+
     def _get_igtf_fallback_account(self, type='income'):
         """
         Pachacutec: v187 - PUENTE DE EMERGENCIA ODOO 18
