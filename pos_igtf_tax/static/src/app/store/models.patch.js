@@ -239,6 +239,13 @@ patch(PosOrder.prototype, {
                 }
             }
         }
+    },
+
+    export_for_printing() {
+        const result = super.export_for_printing(...arguments);
+        result.x_igtf_amount = this.x_igtf_amount;
+        result.total_with_igtf = this.total_with_igtf;
+        return result;
     }
 });
 

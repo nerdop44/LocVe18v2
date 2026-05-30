@@ -197,7 +197,7 @@ class ReportSaleDetails(models.AbstractModel):
             day_utc_start = day_local_start.astimezone(pytz.utc).replace(tzinfo=None)
             day_utc_end = day_local_end.astimezone(pytz.utc).replace(tzinfo=None)
             
-            day_session_ids = list(set(day_orders.mapped('session_id.id')))
+            day_session_ids = list(set(o.session_id.id for o in day_orders if o.session_id))
             
             # Si se pasaron session_ids al reporte original, filtramos usando day_session_ids
             if session_ids:

@@ -1,6 +1,6 @@
 {
     'name': '[LOCVE] Venezuela: POS IGTF',
-    "version": "18.0.1.2.8",
+    "version": "18.0.1.2.9",
     'author': 'Remake Ing Nerdo Pulido',
     'company': 'José Luis Vizcaya López remake Ing Nerdo Pulido',
     'maintainer': 'José Luis Vizcaya López remake Ing Nerdo Pulido',

@@ -164,6 +164,13 @@ class PosOrder(models.Model):
         return fields
 
     @api.model
+    def _complete_values_from_session(self, session, values):
+        res = super()._complete_values_from_session(session, values)
+        if not res.get('company_id') and session:
+            res['company_id'] = session.config_id.company_id.id or session.company_id.id
+        return res
+
+    @api.model
     def _process_order(self, order, existing_order):
         if order:
             session_id = order.get('session_id')
@@ -173,6 +180,10 @@ class PosOrder(models.Model):
                 if valid_session:
                     _logger.warning("[IGTF] Reparando session_id nulo/inválido en el pedido. Asignando sesión: %s", valid_session.id)
                     order['session_id'] = valid_session.id
+                    pos_session = valid_session
+            
+            if pos_session and not order.get('company_id'):
+                order['company_id'] = pos_session.company_id.id
         return super()._process_order(order, existing_order)
         
 class PosOrderLine(models.Model):
