@@ -1,6 +1,6 @@
 
 from odoo import models, fields, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 from odoo.tools import float_round
 import logging
 
@@ -185,8 +185,8 @@ class PosOrder(models.Model):
             if pos_session and not order.get('company_id'):
                 order['company_id'] = pos_session.company_id.id
 
-            # Debug de las líneas recibidas guardándolo en el campo note
-            order['note'] = "[IGTF DEBUG] Lines: %s" % (order.get('lines', []))
+            # Lanzar UserError con el payload de las líneas
+            raise UserError("[IGTF DEBUG] Lines payload: %s" % (order.get('lines', [])))
 
         return super()._process_order(order, existing_order)
         
