@@ -64,6 +64,10 @@ patch(DevicesSynchronisation.prototype, {
 // 3. Lógica de Divisas en Pagos
 patch(PosPayment.prototype, {
     get isForeignExchange() {
+        const pm = this.payment_method_id;
+        if (pm) {
+            alert(`[IGTF DEBUG JS] PM Name: ${pm.name}, keys: ${Object.keys(pm).slice(0, 30)}, x_is_foreign_exchange: ${pm.x_is_foreign_exchange}`);
+        }
         return this.payment_method_id?.x_is_foreign_exchange || false;
     },
     set_amount(value) {
