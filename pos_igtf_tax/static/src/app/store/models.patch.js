@@ -71,9 +71,9 @@ patch(PosPayment.prototype, {
         
         super.set_amount(value);
         
-        if (this.order_id && !window.__pachacutec_global_lock && typeof this.order_id.refreshIGTF === "function") {
+        if (this.pos_order_id && !window.__pachacutec_global_lock && typeof this.pos_order_id.refreshIGTF === "function") {
             try {
-                this.order_id.refreshIGTF();
+                this.pos_order_id.refreshIGTF();
             } catch (e) {
                 console.warn("Pachacutec: refreshIGTF failed during set_amount", e);
             }
