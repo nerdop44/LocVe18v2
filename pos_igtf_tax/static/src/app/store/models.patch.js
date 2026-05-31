@@ -210,7 +210,7 @@ patch(PosOrder.prototype, {
                     : (typeof igtfProduct === 'object' ? igtfProduct.id : igtfProduct);
                 const product = this.models["product.product"]?.get(igtfProductId);
                 if (product) {
-                    this.models["pos.order.line"].create({
+                    const newLine = this.models["pos.order.line"].create({
                         order_id: this,
                         product_id: product,
                         price_unit: price,
@@ -219,6 +219,9 @@ patch(PosOrder.prototype, {
                         x_is_igtf_line: true,
                         tax_ids: []
                     });
+                    if (newLine && typeof newLine.setLinePrice === "function") {
+                        newLine.setLinePrice();
+                    }
                     this.recomputeOrderData();
                 }
             }
@@ -239,6 +242,17 @@ patch(PosOrder.prototype, {
                 }
             }
         }
+    },
+
+    recomputeOrderData() {
+        if (this.lines) {
+            this.lines.forEach((line) => {
+                if (line && typeof line.setLinePrice === "function") {
+                    line.setLinePrice();
+                }
+            });
+        }
+        super.recomputeOrderData();
     },
 
     export_for_printing() {
