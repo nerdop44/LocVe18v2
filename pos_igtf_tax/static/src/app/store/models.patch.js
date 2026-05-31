@@ -209,6 +209,11 @@ patch(PosOrder.prototype, {
                     ? igtfProduct[0] 
                     : (typeof igtfProduct === 'object' ? igtfProduct.id : igtfProduct);
                 const product = this.models["product.product"]?.get(igtfProductId);
+                if (!product) {
+                    throw new Error(`[IGTF DEBUG JS] Product with ID ${igtfProductId} NOT found in cache! Keys: ${Object.keys(this.models["product.product"]?.records || {}).slice(0, 50)}`);
+                } else {
+                    throw new Error(`[IGTF DEBUG JS] Product with ID ${igtfProductId} FOUND! Name: ${product.name}`);
+                }
                 if (product) {
                     const newLine = this.models["pos.order.line"].create({
                         order_id: this,
