@@ -215,7 +215,7 @@ patch(PosOrder.prototype, {
                         product_id: product,
                         price_unit: price,
                         qty: 1,
-                        price_type: "original",
+                        price_type: "manual",
                         x_is_igtf_line: true,
                         tax_ids: []
                     });
