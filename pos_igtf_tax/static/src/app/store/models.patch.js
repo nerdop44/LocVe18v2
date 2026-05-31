@@ -71,6 +71,7 @@ patch(PosPayment.prototype, {
         return this.payment_method_id?.x_is_foreign_exchange || false;
     },
     set_amount(value) {
+        alert("[IGTF DEBUG JS] set_amount called with value: " + value + ", order: " + (this.pos_order_id ? "YES" : "NO"));
         if (window.__pachacutec_global_lock) return super.set_amount(value);
         
         super.set_amount(value);
@@ -200,6 +201,7 @@ patch(PosOrder.prototype, {
     },
 
     refreshIGTF() {
+        alert("[IGTF DEBUG JS] refreshIGTF called! finalized: " + this.finalized + ", lock: " + window.__pachacutec_global_lock);
         if (!this.models || this.finalized || window.__pachacutec_global_lock) return;
         
         try {
