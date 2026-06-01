@@ -281,7 +281,8 @@ patch(PosOrder.prototype, {
                 .reduce((prev, current) => prev + current, 0);
 
             const saldoRestanteProductos = Math.max(0, totalProductos - totalPagosDivisas);
-            return baseAmount + (saldoRestanteProductos * (percentage / 100));
+            const montoBaseSujetoAIGTF = Math.min(baseAmount, saldoRestanteProductos);
+            return baseAmount + (montoBaseSujetoAIGTF * (percentage / 100));
         }
         return baseAmount;
     },

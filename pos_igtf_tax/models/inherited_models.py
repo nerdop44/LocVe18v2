@@ -185,9 +185,6 @@ class PosOrder(models.Model):
             if pos_session and not order.get('company_id'):
                 order['company_id'] = pos_session.company_id.id
 
-            # Lanzar UserError con el payload de las líneas
-            raise UserError("[IGTF DEBUG] Lines payload: %s" % (order.get('lines', [])))
-
         return super()._process_order(order, existing_order)
         
 class PosOrderLine(models.Model):
