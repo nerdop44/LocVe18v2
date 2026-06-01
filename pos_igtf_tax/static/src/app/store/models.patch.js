@@ -124,12 +124,20 @@ patch(PosOrder.prototype, {
         return super.getDisplayData(...arguments);
     },
 
-    get total_with_igtf() {
-        return this.get_total_with_tax();
+    get sale_total_without_igtf() {
+        // Pachacutec: v18.0.1.2.13 - Cálculo DIRECTO desde las líneas de productos.
+        // NO usar get_total_with_tax() porque cuando existe la línea física de IGTF
+        // ese método ya la incluye, produciendo una resta circular en el panel visual.
+        return (this.lines || [])
+            .filter((l) => l && !l.x_is_igtf_line && !this._pachacutec_is_ghost(l))
+            .map((l) => typeof l.get_price_with_tax === "function" ? l.get_price_with_tax() : 0)
+            .reduce((a, b) => a + b, 0);
     },
 
-    get sale_total_without_igtf() {
-        return this.get_total_with_tax() - this.x_igtf_amount;
+    get total_with_igtf() {
+        // Pachacutec: v18.0.1.2.13 - Suma ADITIVA: subtotal_productos + IGTF.
+        // El IGTF es un servicio que se agrega encima del total de venta, no dentro.
+        return this.sale_total_without_igtf + this.x_igtf_amount;
     },
 
     get igtf_base_bs() {
