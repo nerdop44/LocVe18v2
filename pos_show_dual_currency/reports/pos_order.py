@@ -43,9 +43,9 @@ class ReportSaleDetails(models.AbstractModel):
         comp_currency = self.env.company.currency_id
         ref_currency = self.env.company.currency_id_dif
         is_company_usd = comp_currency.name == 'USD'
-        symbol_local = comp_currency.symbol
-        symbol_ref = ref_currency.symbol
-        currency_precision_ref = ref_currency.decimal_places
+        symbol_local = comp_currency.symbol or 'Bs.'
+        symbol_ref = ref_currency.symbol if ref_currency and ref_currency.symbol and ref_currency.symbol != symbol_local else '$'
+        currency_precision_ref = ref_currency.decimal_places if ref_currency else 2
 
         def enrich_data_dict(data_dict, rate):
             # Helper de conversión inteligente
@@ -253,7 +253,13 @@ class ReportSaleDetails(models.AbstractModel):
             # IGTF del día
             day_orders_recs = self.env['pos.order'].browse([o.id for o in day_orders])
             day_payments = day_orders_recs.payment_ids
-            total_igtf_bs = sum(day_orders_recs.mapped('x_igtf_amount'))
+            
+            igtf_product_ids = self.env['pos.config'].search([]).mapped('x_igtf_product_id.id')
+            day_lines = day_orders_recs.mapped('lines').filtered(
+                lambda l: l.x_is_igtf_line or (l.product_id and l.product_id.id in igtf_product_ids)
+            )
+            total_igtf_bs = sum(day_lines.mapped('price_subtotal_incl'))
+            
             total_igtf_base_bs = sum(day_payments.filtered(lambda p: p.payment_method_id.x_is_foreign_exchange).mapped('amount'))
             
             day_data['igtf_totals'] = {
