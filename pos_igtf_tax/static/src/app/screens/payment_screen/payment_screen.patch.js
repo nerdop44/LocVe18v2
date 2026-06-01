@@ -23,6 +23,7 @@ patch(PaymentScreen.prototype, {
         });
     },
     async addNewPaymentLine(paymentMethod) {
+        console.log("[IGTF DEBUG JS] PaymentScreen.addNewPaymentLine called", paymentMethod?.name);
         const res = await super.addNewPaymentLine(...arguments);
         if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
             try {
@@ -34,6 +35,7 @@ patch(PaymentScreen.prototype, {
         return res;
     },
     deletePaymentLine(uuid) {
+        console.log("[IGTF DEBUG JS] PaymentScreen.deletePaymentLine called", uuid);
         const res = super.deletePaymentLine(...arguments);
         if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
             try {
@@ -45,6 +47,7 @@ patch(PaymentScreen.prototype, {
         return res;
     },
     updateSelectedPaymentline(amount) {
+        console.log("[IGTF DEBUG JS] PaymentScreen.updateSelectedPaymentline called with amount:", amount);
         const res = super.updateSelectedPaymentline(...arguments);
         if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
             try {
