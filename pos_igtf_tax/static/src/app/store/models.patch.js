@@ -144,23 +144,23 @@ patch(PosOrder.prototype, {
     get x_igtf_amount() {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         try {
+            const percentage = this.config?.x_igtf_percentage || 3.0;
             const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
-            const foreignPayments = paymentLines.filter((p) => p.isForeignExchange);
-            
-            const igtf_monto = foreignPayments
-                .map(({ amount, payment_method_id }) => {
-                    const percentage = payment_method_id?.x_igtf_percentage || 3.0;
-                    return (amount || 0) * (percentage / 100);
-                })
+            const totalPagosDivisas = paymentLines
+                .filter((p) => p.isForeignExchange)
+                .map((p) => p.amount || 0)
                 .reduce((prev, current) => prev + current, 0);
 
-            const totalBase = (this.lines || [])
+            const totalProductos = (this.lines || [])
                 .filter((p) => p && !p.x_is_igtf_line && !this._pachacutec_is_ghost(p))
                 .map((p) => typeof p.get_price_with_tax === "function" ? p.get_price_with_tax() : 0)
                 .reduce((prev, current) => prev + current, 0);
 
-            return roundDecimals(Math.min(igtf_monto, totalBase * 0.031), 2);
+            const baseIGTF = Math.min(totalPagosDivisas, totalProductos);
+
+            return roundDecimals(baseIGTF * (percentage / 100), 2);
         } catch (e) {
+            console.error("Pachacutec: Error in x_igtf_amount:", e);
             return 0;
         }
     },
@@ -262,6 +262,28 @@ patch(PosOrder.prototype, {
             });
         }
         super.recomputeOrderData();
+    },
+
+    getDefaultAmountDueToPayIn(paymentMethod) {
+        const baseAmount = super.getDefaultAmountDueToPayIn(paymentMethod);
+        if (paymentMethod && paymentMethod.x_is_foreign_exchange && baseAmount > 0) {
+            const percentage = paymentMethod.x_igtf_percentage || 3.0;
+            
+            const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
+            const totalPagosDivisas = paymentLines
+                .filter((p) => p.isForeignExchange)
+                .map((p) => p.amount || 0)
+                .reduce((prev, current) => prev + current, 0);
+
+            const totalProductos = (this.lines || [])
+                .filter((p) => p && !p.x_is_igtf_line && !this._pachacutec_is_ghost(p))
+                .map((p) => typeof p.get_price_with_tax === "function" ? p.get_price_with_tax() : 0)
+                .reduce((prev, current) => prev + current, 0);
+
+            const saldoRestanteProductos = Math.max(0, totalProductos - totalPagosDivisas);
+            return baseAmount + (saldoRestanteProductos * (percentage / 100));
+        }
+        return baseAmount;
     },
 
     export_for_printing() {
