@@ -215,13 +215,7 @@ patch(PosOrder.prototype, {
                     ? igtfProduct[0] 
                     : (typeof igtfProduct === 'object' ? igtfProduct.id : igtfProduct);
                 const product = this.models["product.product"]?.get(igtfProductId);
-                if (!product) {
-                    alert(`[IGTF DEBUG JS] Product with ID ${igtfProductId} NOT found in cache! Keys: ${Object.keys(this.models["product.product"]?.records || {}).slice(0, 50)}`);
-                    throw new Error("IGTF Product not found");
-                } else {
-                    alert(`[IGTF DEBUG JS] Product with ID ${igtfProductId} FOUND! Name: ${product.name}`);
-                    throw new Error("IGTF Product found");
-                }
+                console.log(`[IGTF DEBUG JS] Found IGTF Product ID: ${igtfProductId}, Object:`, product);
                 if (product) {
                     const newLine = this.models["pos.order.line"].create({
                         order_id: this,
@@ -236,6 +230,8 @@ patch(PosOrder.prototype, {
                         newLine.setLinePrice();
                     }
                     this.recomputeOrderData();
+                } else {
+                    console.error(`[IGTF DEBUG JS] Product with ID ${igtfProductId} NOT found in cache!`);
                 }
             }
         } catch (e) {
