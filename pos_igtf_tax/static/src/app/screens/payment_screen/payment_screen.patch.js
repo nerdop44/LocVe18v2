@@ -21,5 +21,38 @@ patch(PaymentScreen.prototype, {
                 this.currentOrder.removeIGTF();
             }
         });
+    },
+    async addNewPaymentLine(paymentMethod) {
+        const res = await super.addNewPaymentLine(...arguments);
+        if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
+            try {
+                this.currentOrder.refreshIGTF();
+            } catch (e) {
+                console.error("Pachacutec: refreshIGTF failed in addNewPaymentLine", e);
+            }
+        }
+        return res;
+    },
+    deletePaymentLine(uuid) {
+        const res = super.deletePaymentLine(...arguments);
+        if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
+            try {
+                this.currentOrder.refreshIGTF();
+            } catch (e) {
+                console.error("Pachacutec: refreshIGTF failed in deletePaymentLine", e);
+            }
+        }
+        return res;
+    },
+    updateSelectedPaymentline(amount) {
+        const res = super.updateSelectedPaymentline(...arguments);
+        if (this.currentOrder && typeof this.currentOrder.refreshIGTF === "function") {
+            try {
+                this.currentOrder.refreshIGTF();
+            } catch (e) {
+                console.error("Pachacutec: refreshIGTF failed in updateSelectedPaymentline", e);
+            }
+        }
+        return res;
     }
 });
