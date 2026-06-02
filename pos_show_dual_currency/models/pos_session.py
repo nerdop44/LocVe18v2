@@ -311,8 +311,8 @@ class PosSession(models.Model):
         
         # Totales de IGTF recaudado
         rate_today = self.tax_today or 1.0
-        total_igtf_bs = sum(orders.mapped('x_igtf_amount'))
         total_igtf_base_bs = sum(payments.filtered(lambda p: p.payment_method_id.x_is_foreign_exchange).mapped('amount'))
+        total_igtf_bs = total_igtf_base_bs * 0.03
         
         closing_control_data['igtf_totals'] = {
             'total_igtf_bs': total_igtf_bs,

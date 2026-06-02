@@ -138,10 +138,16 @@
                             </table>
                         </div>
 
-                        <!-- 2. Sección de Impuestos en Ventas -->
                         <div t-if="taxes" id="taxe_sales" style="page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Impuestos sobre ventas</h6>
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Desglose de Ventas (Exentas y Gravadas)</h6>
                             <table class="table table-sm table-borderless w-50 ms-auto">
+                                <thead>
+                                    <tr style="font-size: 0.85em; color: #555;">
+                                        <th class="ps-2">Concepto</th>
+                                        <th class="text-end">Impuesto Cobrado</th>
+                                        <th class="text-end">Base Imponible</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     <tr t-foreach="taxes" t-as="tax" class="border-bottom border-secondary">
                                         <td class="ps-2 fw-bold"><span t-out="tax['name']">Tax Name</span></td>
@@ -217,10 +223,16 @@
                             </table>
                         </div>
 
-                        <!-- 4. Sección de Impuestos en Devoluciones -->
                         <div t-if="refund_taxes" id="taxe_refunds" style="page-break-inside: avoid;">
-                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Impuestos sobre devoluciones</h6>
+                            <h6 class="bg-secondary p-1 fw-bold w-50 ms-auto" style="border-radius: 2px;">Desglose de Devoluciones (Exentas y Gravadas)</h6>
                             <table class="table table-sm table-borderless w-50 ms-auto">
+                                <thead>
+                                    <tr style="font-size: 0.85em; color: #555;">
+                                        <th class="ps-2">Concepto</th>
+                                        <th class="text-end">Impuesto Cobrado</th>
+                                        <th class="text-end">Base Imponible</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     <tr t-foreach="refund_taxes" t-as="tax" class="border-bottom border-secondary">
                                         <td class="ps-2 fw-bold"><span t-out="tax['name']">Tax Name</span></td>

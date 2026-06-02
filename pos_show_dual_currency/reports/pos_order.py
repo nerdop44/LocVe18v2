@@ -113,6 +113,10 @@ class ReportSaleDetails(models.AbstractModel):
 
             # Impuestos
             for tax in data_dict.get('taxes', []):
+                if tax.get('name', '') in ['No Taxes', 'Sin impuestos', 'Sin impuestos', '0%', '0.00%'] or (not tax.get('name')):
+                    tax['name'] = 'Ventas Exentas'
+                elif float_is_zero(tax.get('tax_amount', 0.0), precision_digits=2):
+                    tax['name'] = 'Ventas Exentas'
                 tax_amount = tax.get('tax_amount', 0.0)
                 base_amount = tax.get('base_amount', 0.0)
                 tax['tax_amount_ref'] = convert_amount(tax_amount)
@@ -126,6 +130,10 @@ class ReportSaleDetails(models.AbstractModel):
 
             # Impuestos de devoluciones
             for tax in data_dict.get('refund_taxes', []):
+                if tax.get('name', '') in ['No Taxes', 'Sin impuestos', 'Sin impuestos', '0%', '0.00%'] or (not tax.get('name')):
+                    tax['name'] = 'Devoluciones Exentas'
+                elif float_is_zero(tax.get('tax_amount', 0.0), precision_digits=2):
+                    tax['name'] = 'Devoluciones Exentas'
                 tax_amount = tax.get('tax_amount', 0.0)
                 base_amount = tax.get('base_amount', 0.0)
                 tax['tax_amount_ref'] = convert_amount(tax_amount)
@@ -254,13 +262,8 @@ class ReportSaleDetails(models.AbstractModel):
             day_orders_recs = self.env['pos.order'].browse([o.id for o in day_orders])
             day_payments = day_orders_recs.payment_ids
             
-            igtf_product_ids = self.env['pos.config'].search([]).mapped('x_igtf_product_id.id')
-            day_lines = day_orders_recs.mapped('lines').filtered(
-                lambda l: l.x_is_igtf_line or (l.product_id and l.product_id.id in igtf_product_ids)
-            )
-            total_igtf_bs = sum(day_lines.mapped('price_subtotal_incl'))
-            
             total_igtf_base_bs = sum(day_payments.filtered(lambda p: p.payment_method_id.x_is_foreign_exchange).mapped('amount'))
+            total_igtf_bs = total_igtf_base_bs * 0.03
             
             day_data['igtf_totals'] = {
                 'total_igtf_bs': total_igtf_bs,
@@ -365,7 +368,7 @@ class ReportSaleDetails(models.AbstractModel):
                             taxes[tax['id']]['tax_amount_ref'] += tax_amount_ref
                             taxes[tax['id']]['base_amount_ref'] += base_amount_ref
                 else:
-                    taxes.setdefault(0, {'name': _('No Taxes'), 'tax_amount': 0.0, 'base_amount': 0.0,
+                    taxes.setdefault(0, {'name': 'Ventas Exentas', 'tax_amount': 0.0, 'base_amount': 0.0,
                                          'tax_amount_ref': 0.0, 'base_amount_ref': 0.0})
                     taxes[0]['base_amount'] += line.price_subtotal_incl
                     taxes[0]['base_amount_ref'] += line.price_subtotal_incl_ref
