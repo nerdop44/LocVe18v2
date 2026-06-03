@@ -138,16 +138,25 @@ class ResCurrency(models.Model):
                     f._amount_all_usd()
                     f._compute_payments_widget_reconciled_info_USD()
 
-    def actualizar_productos(self):
+    def actualizar_productos(self, tasa_fresca=None):
         """ Actualización masiva de list_price (Bs) basada en list_price_usd y la tasa actual.
         Uso de SQL para evitar Timeouts en catálogos grandes. Pachacutec.
+        Acepta tasa_fresca para usar la tasa BCV recién obtenida sin depender del caché ORM.
         """
         for rec in self:
-            tasa = rec.inverse_rate if rec.name == 'USD' else self.env.company.currency_id_dif.get_trm_systray()
+            if tasa_fresca and tasa_fresca > 0:
+                tasa = tasa_fresca
+            else:
+                tasa = rec.inverse_rate if rec.name == 'USD' else self.env.company.currency_id_dif.get_trm_systray()
+            try:
+                tasa = float(tasa)
+            except (TypeError, ValueError):
+                tasa = 0.0
             if tasa <= 0:
+                _logger.warning(">>>>>> Pachacutec: Tasa inválida en actualizar_productos (%s). Se omite.", tasa)
                 continue
             
-            _logger.info(">>>>>>>> Pachacutec: Iniciando actualización masiva de precios (Tasa: %s)", tasa)
+            _logger.info(">>>>>> Pachacutec: Iniciando actualización masiva de precios (Tasa: %s)", tasa)
             
             # Actualizar Templates (list_price = list_price_usd * tasa)
             query_tmpl = """
@@ -161,7 +170,7 @@ class ResCurrency(models.Model):
             # El campo lst_price no existe en la tabla product_product, por lo que esta consulta es redundante y errónea.
             # Pachacutec: Remoción de query_prod para evitar RPC_ERROR.
             
-            _logger.info(">>>>>>>> Pachacutec: Precios actualizados vía SQL.")
+            _logger.info(">>>>>> Pachacutec: Precios actualizados vía SQL.")
 
     def action_fix_astronomical_prices(self):
         """ Método de emergencia para restaurar precios inflados trillonarios """
@@ -320,7 +329,7 @@ class ResCurrency(models.Model):
                             subtype_xmlid='mail.mt_comment',
                         )
                 if rec.act_productos:
-                    rec.actualizar_productos()
+                    rec.actualizar_productos(tasa_fresca=nueva_tasa_bcv)
 
     @api.model
     def _cron_actualizar_tasa(self):

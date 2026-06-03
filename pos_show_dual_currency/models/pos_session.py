@@ -620,14 +620,14 @@ class PosSession(models.Model):
                 last_session = self.search([('config_id', '=', session.config_id.id), ('id', '!=', session.id)],
                                            limit=1)
                 session.cash_register_balance_start_mn_ref = last_session.cash_register_balance_end_real_mn_ref
-            session.tax_today = session.config_id.show_currency_rate if session.config_id.show_currency_rate > 0 else 1
+            session.tax_today = session.config_id.show_currency_rate_ve if session.config_id.show_currency_rate_ve > 0 else 1
         return super(PosSession, self).action_pos_session_open()
 
     @api.depends('config_id')
     def _tax_today(self):
         for rec in self:
             if not rec.tax_today or rec.state == 'opening_control':
-                rec.tax_today = rec.config_id.show_currency_rate if rec.config_id.show_currency_rate > 0 else 1
+                rec.tax_today = rec.config_id.show_currency_rate_ve if rec.config_id.show_currency_rate_ve > 0 else 1
 
     def _create_cash_statement_lines_and_cash_move_lines(self, data):
         MoveLine = data.get('MoveLine')
