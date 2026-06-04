@@ -434,8 +434,18 @@ class AccountRetention(models.Model):
         Clear retention lines and payments.
         """
         self.ensure_one()
-        if any(isinstance(id, models.NewId) for id in self.retention_line_ids.ids):
-            self.retention_line_ids = [Command.clear()]
+        self.update(
+            {
+                "retention_line_ids": (
+                    Command.clear()
+                    if any(
+                        isinstance(id, models.NewId)
+                        for id in self.retention_line_ids.ids
+                    )
+                    else False
+                ),
+            }
+        )
 
 
 

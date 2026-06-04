@@ -35,47 +35,33 @@ class AccountRetentionLine(models.Model):
         ],
     )
     date_accounting = fields.Date(related="retention_id.date_accounting", store=True)
-    # Para campos no monetarios, puedes usar precisiones estándar o personalizadas.
-    # Si "Tasa" no es un registro en decimal.precision, puedes usar una estándar como 'Account'
-    aliquot = fields.Float() # La precisión por defecto suele ser suficiente
-    retention_rate = fields.Float(store=True)
+    aliquot = fields.Float(digits=(16, 2))
+    retention_rate = fields.Float(store=True, digits="Tasa")
 
-    # Para campos monetarios, Odoo 18 lo gestiona automáticamente
-    # Simplemente elimina el parámetro 'digits'
     invoice_amount = fields.Float(
         string="Taxable income",
+        digits=(16, 2),
         compute="_compute_amounts",
         store=True,
         readonly=False,
     )
     retention_amount = fields.Float(
+        digits="Tasa",
         compute="_compute_retention_amount",
         store=True,
         readonly=False,
     )
-#    aliquot = fields.Float(digits=(16, 2))
-    amount_tax_ret = fields.Float(string="Retained tax")
-    base_ret = fields.Float("Retained base")
-    imp_ret = fields.Float(string="tax incurred")
-    retention_rate = fields.Float(store=True)
+    amount_tax_ret = fields.Float(string="Retained tax", digits=(16, 2))
+    base_ret = fields.Float("Retained base", digits=(16, 2))
+    imp_ret = fields.Float(string="tax incurred", digits=(16, 2))
     move_id = fields.Many2one("account.move", "move", ondelete="cascade", store=True)
     is_retention_client = fields.Boolean(default=True)
     display_invoice_number = fields.Char(
         string="Invoice Number", compute="_compute_display_invoice_number", store=True
     )
-#    invoice_amount = fields.Float(
-#        string="Taxable income",
-#        digits="Tasa",
-#        compute="_compute_amounts",
-#        store=True,
-#        readonly=False,
-#    )
-    invoice_total = fields.Float(string="Total invoiced", store=True)
-    iva_amount = fields.Float(string="IVA")
+    invoice_total = fields.Float(string="Total invoiced", digits="Tasa", store=True)
+    iva_amount = fields.Float(string="IVA", digits=(16, 2))
 
-#    retention_amount = fields.Float(
-#        digits="Tasa", compute="_compute_retention_amount", store=True, readonly=False
-#    )
     foreign_retention_amount = fields.Float(
         compute="_compute_retention_amount", store=True, readonly=False
     )

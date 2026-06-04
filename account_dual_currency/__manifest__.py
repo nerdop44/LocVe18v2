@@ -38,6 +38,7 @@
         'security/ir.model.access.csv',
         'security/res_groups.xml',
         'views/res_currency.xml',
+        'views/ir_cron_views.xml',
         'views/res_config_settings.xml',
         'views/account_move_view.xml',
         'views/account_move_line.xml',

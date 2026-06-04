@@ -44,6 +44,25 @@
                     invisible="move_type not in ('out_invoice', 'out_refund', 'out_receipt', 'in_invoice', 'in_refund', 'in_receipt')"
                     readonly="state == 'draft'"/>
             </xpath>
+            <xpath expr="//notebook" position="inside">
+                <page string="Guía de Despacho" name="delivery_guide" invisible="move_type not in ('out_invoice', 'out_refund')">
+                    <group>
+                        <group string="Identificación de la Guía">
+                            <field name="l10n_ve_guide_number" readonly="1"/>
+                            <field name="l10n_ve_carrier_name" readonly="state == 'posted'"/>
+                            <field name="l10n_ve_carrier_vat" readonly="state == 'posted'"/>
+                        </group>
+                        <group string="Vehículo de Transporte">
+                            <field name="l10n_ve_vehicle_plate" readonly="state == 'posted'"/>
+                            <field name="l10n_ve_vehicle_brand" readonly="state == 'posted'"/>
+                        </group>
+                    </group>
+                    <group string="Ruta de Despacho">
+                        <field name="l10n_ve_starting_point" readonly="state == 'posted'" rows="2"/>
+                        <field name="l10n_ve_ending_point" readonly="state == 'posted'" rows="2"/>
+                    </group>
+                </page>
+            </xpath>
         </field>
     </record>
 
@@ -147,6 +166,16 @@
                     <field name="correlative" optional="hide"/>
                 </xpath>
             </field>
+        </record>
+
+        <!-- Acción para abrir el wizard de la Guía de Despacho desde el menú Acciones/Imprimir de la Factura -->
+        <record id="action_l10n_ve_delivery_guide_wizard_move" model="ir.actions.act_window">
+            <field name="name">Imprimir Guía de Despacho</field>
+            <field name="res_model">l10n_ve.delivery.guide.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+            <field name="binding_model_id" ref="account.model_account_move"/>
+            <field name="binding_view_types">form,list</field>
         </record>
 
 </odoo>
