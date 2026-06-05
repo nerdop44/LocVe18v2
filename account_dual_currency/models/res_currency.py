@@ -141,17 +141,25 @@ class ResCurrency(models.Model):
         Uso de SQL para evitar Timeouts en catálogos grandes. Pachacutec.
         Acepta tasa_fresca para usar la tasa BCV recién obtenida sin depender del caché ORM.
         """
+        usd_currency = self.env['res.currency'].search([('name', 'in', ['USD', 'US$'])], limit=1)
+        if not usd_currency:
+            _logger.warning(">>>>>> Pachacutec: No se encontró la moneda USD en la base de datos. Se cancela la actualización de productos.")
+            return
+
         for rec in self:
-            if tasa_fresca and tasa_fresca > 0:
+            if tasa_fresca and tasa_fresca > 1.0:
                 tasa = tasa_fresca
             else:
-                tasa = rec.inverse_rate if rec.name == 'USD' else self.env.company.currency_id_dif.get_trm_systray()
+                # Priorizar la tasa de la moneda USD sobre la configurada en la compañía activa
+                tasa = usd_currency.inverse_rate
+                if tasa <= 1.0:
+                    tasa = usd_currency.get_trm_systray()
             try:
                 tasa = float(tasa)
             except (TypeError, ValueError):
                 tasa = 0.0
-            if tasa <= 0:
-                _logger.warning(">>>>>> Pachacutec: Tasa inválida en actualizar_productos (%s). Se omite.", tasa)
+            if tasa <= 1.0:
+                _logger.warning(">>>>>> Pachacutec: Tasa inválida o igual a 1.0 (%s). Se omite la actualización de precios de productos para evitar corrupción.", tasa)
                 continue
             
             _logger.info(">>>>>> Pachacutec: Iniciando actualización masiva de precios (Tasa: %s)", tasa)
@@ -331,7 +339,7 @@ class ResCurrency(models.Model):
                             subtype_xmlid='mail.mt_comment',
                         )
                 if rec.act_productos:
-                    rec.actualizar_productos()
+                    rec.actualizar_productos(tasa_fresca=nueva_tasa_bcv)
 
     @api.model
     def _cron_actualizar_tasa(self):
