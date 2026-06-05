@@ -267,16 +267,12 @@ class AccountMoveRetention(models.Model):
             "foreign_inverse_rate": self.foreign_inverse_rate,
             "currency_id": self.company_id.currency_id.id,
         }
-        if type_retention == "islr":
-            payment_vals["retention_line_ids"] = [
-                Command.set(self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
-            ]
-        elif type_retention == "municipal":
-            payment_vals["retention_line_ids"] = [
-                Command.set(self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
-            ]
-
         payment = Payment.create(payment_vals)
+        if type_retention == "islr":
+            self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").write({"payment_id": payment.id})
+        elif type_retention == "municipal":
+            self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").write({"payment_id": payment.id})
+
         retention_vals = {
             "payment_ids": [Command.link(payment.id)],
             "date_accounting": self.date,
@@ -291,16 +287,18 @@ class AccountMoveRetention(models.Model):
             retention_vals["retention_line_ids"] = [
                 Command.create(line) for line in retention_lines_data
             ]
-        elif type_retention == "islr":
-            retention_vals["retention_line_ids"] = [
-                Command.set(self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
-            ]
+            retention = Retention.create(retention_vals)
         else:
-            retention_vals["retention_line_ids"] = [
-                Command.set(self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
-            ]
+            if type_retention == "islr":
+                retention_vals["retention_line_ids"] = [
+                    Command.set(self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+                ]
+            elif type_retention == "municipal":
+                retention_vals["retention_line_ids"] = [
+                    Command.set(self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+                ]
+            retention = Retention.create(retention_vals)
 
-        retention = Retention.create(retention_vals)
         payment.compute_retention_amount_from_retention_lines()
         return retention
 
