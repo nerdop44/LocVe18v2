@@ -1707,7 +1707,7 @@ class AccountRetention(models.Model):
                         "name": _("Iva Retention"),
                         "invoice_type": invoice_id.move_type,
                         "move_id": invoice_id.id,
-                        "payment_id": payment.id if payment else None,
+                        "payment_id": payment.id if payment else False,
                         "aliquot": tax.amount,
                         # Montos en moneda empresa (según moneda compañía)
                         "invoice_amount": invoice_amount,
