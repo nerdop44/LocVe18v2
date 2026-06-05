@@ -268,13 +268,13 @@ class AccountMoveRetention(models.Model):
             "currency_id": self.company_id.currency_id.id,
         }
         if type_retention == "islr":
-            payment_vals["retention_line_ids"] = self.retention_islr_line_ids.filtered(
-                lambda rl: rl.state != "cancel"
-            ).ids
+            payment_vals["retention_line_ids"] = [
+                Command.set(self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+            ]
         elif type_retention == "municipal":
-            payment_vals["retention_line_ids"] = self.retention_municipal_line_ids.filtered(
-                lambda rl: rl.state != "cancel"
-            ).ids
+            payment_vals["retention_line_ids"] = [
+                Command.set(self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+            ]
 
         payment = Payment.create(payment_vals)
         retention_vals = {
