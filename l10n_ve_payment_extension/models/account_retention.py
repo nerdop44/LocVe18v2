@@ -953,6 +953,9 @@ class AccountRetention(models.Model):
             # Odoo 18 requiere payment_method_line_id
             payment_method_line = (journal.outbound_payment_method_line_ids if payment_type == "outbound" else journal.inbound_payment_method_line_ids)[:1]
             if not payment_method_line:
+                payment_method_line = journal._get_available_payment_method_lines(payment_type)[:1]
+            
+            if not payment_method_line:
                 _logger.warning("El diario %s no tiene configurado un método de pago para pagos de tipo %s. El pago no se sincronizará automáticamente.", journal.display_name, payment_type)
                 continue
 
