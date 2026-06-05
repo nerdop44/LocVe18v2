@@ -1089,6 +1089,7 @@ class AccountRetention(models.Model):
                     payment._synchronize_to_moves(set())
                     
                     _logger.info(f"Procesando pago {payment.id}")
+                    _logger.warning(f"DETALLE PAGO DE RETENCIÓN {payment.id}: state={payment.state}, amount={payment.amount}, journal={payment.journal_id.name} (tipo {payment.journal_id.type}), move_id={payment.move_id}")
                     if not payment.move_id:
                         if hasattr(payment, 'action_create'):
                             _logger.info("Creando asiento contable para el pago")
