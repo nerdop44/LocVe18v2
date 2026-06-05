@@ -184,11 +184,10 @@ class AccountMoveRetention(models.Model):
         self.ensure_one()
         if not self.env.company.islr_supplier_retention_journal_id:
             raise UserError(_("The company must have a journal for ISLR supplier retention."))
-        islr_retention = self.retention_islr_line_ids
-        sum_invoice_amount = sum(
-            islr_retention.filtered(lambda rl: rl.state != "cancel").mapped("invoice_amount")
-        )
-        if sum_invoice_amount > self.tax_totals["amount_untaxed"]:
+        islr_retention = self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel")
+        is_vef = self.currency_id.name in ('VEF', 'VES')
+        sum_invoice_amount = sum(islr_retention.mapped("invoice_amount" if is_vef else "foreign_invoice_amount"))
+        if sum_invoice_amount > self.amount_untaxed:
             raise UserError(
                 _("The amount of the retention is greater than the total amount of the invoice.")
             )
