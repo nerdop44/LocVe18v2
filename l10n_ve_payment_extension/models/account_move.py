@@ -243,9 +243,9 @@ class AccountMoveRetention(models.Model):
             payment_type = "inbound"
 
         journals = {
-            "iva": self.env.company.iva_supplier_retention_journal_id,
-            "islr": self.env.company.islr_supplier_retention_journal_id,
-            "municipal": self.env.company.municipal_supplier_retention_journal_id,
+            "iva": self.company_id.iva_supplier_retention_journal_id,
+            "islr": self.company_id.islr_supplier_retention_journal_id,
+            "municipal": self.company_id.municipal_supplier_retention_journal_id,
         }
 
         Payment = self.env["account.payment"]
@@ -265,7 +265,7 @@ class AccountMoveRetention(models.Model):
             "is_retention": True,
             "foreign_rate": self.foreign_rate,
             "foreign_inverse_rate": self.foreign_inverse_rate,
-            "currency_id": self.env.user.company_id.currency_id.id,
+            "currency_id": self.company_id.currency_id.id,
         }
         if type_retention == "islr":
             payment_vals["retention_line_ids"] = self.retention_islr_line_ids.filtered(
