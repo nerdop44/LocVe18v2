@@ -173,10 +173,13 @@ class AccountPayment(models.Model):
     #     return res
 
     def unlink(self):
-        for payment in self:
+        existing_payments = self.exists()
+        if not existing_payments:
+            return True
+        for payment in existing_payments:
             if payment.retention_line_ids:
                 payment.retention_line_ids.write({"payment_id": False})
-        return super().unlink()
+        return super(AccountPayment, existing_payments).unlink()
 
     def compute_retention_amount_from_retention_lines(self):
         """
