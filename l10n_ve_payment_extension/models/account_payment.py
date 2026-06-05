@@ -36,7 +36,6 @@ class AccountPayment(models.Model):
         "account.retention.line",
         "payment_id",
         string="Retention Lines",
-        store=True,
         copy=False,
     )
 
@@ -44,7 +43,6 @@ class AccountPayment(models.Model):
         "account.move.line",
         domain="[('tax_ids', '!=', False)]",
         string="Invoice Lines",
-        store=True,
         copy=False,
     )
 
