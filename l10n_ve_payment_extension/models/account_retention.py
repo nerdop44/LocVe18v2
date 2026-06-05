@@ -1086,19 +1086,21 @@ class AccountRetention(models.Model):
                 # Procesar cada pago con contexto seguro (se mantiene igual)
                 for payment in retention.payment_ids.with_context(skip_manually_modified_check=True):
                     # FORZAR SINCRONIZACIÓN DEL CORRELATIVO AL PAGO AHORA QUE HAY NÚMERO
+                # Procesar cada pago con contexto seguro (se mantiene igual)
+                details = []
+                for payment in retention.payment_ids.with_context(skip_manually_modified_check=True):
+                    # FORZAR SINCRONIZACIÓN DEL CORRELATIVO AL PAGO AHORA QUE HAY NÚMERO
                     payment._synchronize_to_moves(set())
+                    details.append(f"Pago {payment.id}: state={payment.state}, amount={payment.amount}, journal={payment.journal_id.name} (tipo {payment.journal_id.type}), move_id={payment.move_id.id if payment.move_id else 'None'}, move_state={payment.move_id.state if payment.move_id else 'N/A'}")
                     
                     _logger.info(f"Procesando pago {payment.id}")
-                    _logger.warning(f"DETALLE PAGO DE RETENCIÓN {payment.id}: state={payment.state}, amount={payment.amount}, journal={payment.journal_id.name} (tipo {payment.journal_id.type}), move_id={payment.move_id}")
                     if not payment.move_id:
                         if hasattr(payment, 'action_create'):
-                            _logger.info("Creando asiento contable para el pago")
                             payment.action_create()
-                        else:
-                            _logger.info("Publicando pago (versión moderna)")
                         payment.with_context(skip_manually_modified_check=True).action_post()
                     elif payment.state != 'posted':
                         payment.with_context(skip_manually_modified_check=True).action_post()
+                raise UserError("DIAGNÓSTICO PAGOS:\n" + "\n".join(details))
 
                 # Asignar número de comprobante a facturas (se mantiene igual)
                 move_ids = retention.mapped("retention_line_ids.move_id")
