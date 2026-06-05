@@ -988,6 +988,7 @@ class AccountRetention(models.Model):
         # 3. Eliminar pagos que ya no son necesarios
         payments_to_remove = self.payment_ids.filtered(lambda p: p not in payments_to_keep and p.state == 'draft')
         if payments_to_remove:
+            self.payment_ids -= payments_to_remove
             payments_to_remove.unlink()
 
         return payments_to_keep
