@@ -1113,8 +1113,10 @@ class AccountRetention(models.Model):
                 retention.write({'state': 'emitted'})
                 _logger.info(f"Retención {retention.id} marcada como emitida")
             except Exception as e:
-                _logger.error("Error al publicar retención %s: %s", retention.id, str(e), exc_info=True)
-                raise UserError(_("Error al publicar la retención: %s") % str(e))
+                import traceback
+                tb = traceback.format_exc()
+                _logger.error("Error al publicar retención %s: %s", retention.id, tb)
+                raise UserError(_("Error al publicar la retención:\n%s") % tb)
 
     def _create_islr_payments(self):
         """
