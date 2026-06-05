@@ -1538,15 +1538,17 @@ class AccountRetention(models.Model):
 
             tax_totals = invoice_id.tax_totals
 
-            # Identificar el VEF como moneda objetivo de retención
-            # Se asume que company.currency_foreign_id es VEF (configurado por el módulo)
+            # Identificar el VEF de forma robusta por su nombre, mitigando configuraciones de moneda de la compañía invertidas
             vef_currency = self.env.company.currency_foreign_id
+            if not vef_currency or vef_currency.name not in ('VEF', 'VES'):
+                vef_currency = self.env.company.currency_id
+                if vef_currency.name not in ('VEF', 'VES'):
+                    vef_currency = self.env['res.currency'].search([('name', 'in', ('VEF', 'VES'))], limit=1) or self.env.company.currency_id
+
             invoice_currency = invoice_id.currency_id
 
-            # ¿La factura ya está en VEF?
-            invoice_is_in_vef = (vef_currency and invoice_currency == vef_currency) or (
-                not vef_currency and invoice_currency == self.env.company.currency_id
-            )
+            # ¿La factura ya está en VEF/VES?
+            invoice_is_in_vef = invoice_currency.name in ('VEF', 'VES')
 
             # Montos globales en VEF precalculados por l10n_ve_tax en _get_tax_totals_summary
             global_vef_untaxed = tax_totals.get("foreign_amount_untaxed", 0.0)
