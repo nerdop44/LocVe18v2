@@ -1512,6 +1512,8 @@ class AccountRetention(models.Model):
         list[dict]
             The retention lines data.
         """
+        if isinstance(invoice_id, int):
+            invoice_id = self.env['account.move'].browse(invoice_id)
         _logger.warning(f"compute_retention_lines_data: Procesando factura con ID {invoice_id.id}")
         _logger.warning(f"compute_retention_lines_data: Atributos de la factura: {invoice_id._fields.keys()}")
         if hasattr(invoice_id, 'number'):
