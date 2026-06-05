@@ -916,9 +916,9 @@ class AccountRetention(models.Model):
         Rate = self.env["res.currency.rate"]
 
         journal_id = (
-            self.env.company.islr_supplier_retention_journal_id.id
+            self.company_id.islr_supplier_retention_journal_id.id
             if self.type == 'in_invoice'
-            else self.env.company.islr_customer_retention_journal_id.id
+            else self.company_id.islr_customer_retention_journal_id.id
         )
         journal = self.env['account.journal'].browse(journal_id)
         if not journal:
@@ -970,7 +970,6 @@ class AccountRetention(models.Model):
                 'amount': total_retention_vef,
                 'currency_id': currency_vef.id,
                 'date': self.date_accounting or fields.Date.context_today(self),
-                "retention_line_ids": [Command.set(lines.ids)],
             }
 
             # Si ya existe un pago para este concepto, se actualiza. Si no, se crea.
