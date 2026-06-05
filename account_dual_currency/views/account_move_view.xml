@@ -59,15 +59,15 @@
                     <group class="oe_subtotal_footer">
                         <field name="amount_untaxed_usd" string="Base Ref. ($)" widget='monetary' options="{'currency_field': 'currency_id_dif'}"/>
                         <field name="amount_tax_usd" string="IVA Ref. ($)" widget='monetary' options="{'currency_field': 'currency_id_dif'}"/>
-                        <field name="amount_total_usd" string="Total Ref. ($)" class="oe_subtotal_footer_separator" widget='monetary' options="{'currency_field': 'currency_id_dif'}"/>
-                        <field name="amount_residual_usd" string="Saldo Ref. ($)" class="oe_subtotal_footer_separator" widget='monetary' options="{'currency_field': 'currency_id_dif'}" invisible="state == 'draft'"/>
+                        <field name="amount_total_usd" string="Total Ref. ($)" class="fw-bold" widget='monetary' options="{'currency_field': 'currency_id_dif'}"/>
+                        <field name="amount_residual_usd" string="Saldo Ref. ($)" class="fw-bold" widget='monetary' options="{'currency_field': 'currency_id_dif'}" invisible="state == 'draft'"/>
                     </group>
 
                     <!-- Columna Bolívares (Bs.) -->
                     <group class="oe_subtotal_footer">
                         <field name="amount_untaxed_bs" string="Base Bs." widget='monetary' options="{'currency_field': 'currency_vef_id'}"/>
                         <field name="amount_tax_bs" string="IVA Bs." widget='monetary' options="{'currency_field': 'currency_vef_id'}"/>
-                        <field name="amount_total_bs" string="Total Bs." class="oe_subtotal_footer_separator" widget='monetary' options="{'currency_field': 'currency_vef_id'}"/>
+                        <field name="amount_total_bs" string="Total Bs." class="fw-bold" widget='monetary' options="{'currency_field': 'currency_vef_id'}"/>
                     </group>
                 </div>
             </xpath>
