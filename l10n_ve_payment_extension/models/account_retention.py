@@ -600,6 +600,10 @@ class AccountRetention(models.Model):
 
             # Moneda del pago: VEF (Regla universal venezolana)
             currency_vef = self.env.company.currency_foreign_id
+            if not currency_vef or currency_vef.name not in ('VEF', 'VES'):
+                currency_vef = self.env.company.currency_id
+                if currency_vef.name not in ('VEF', 'VES'):
+                    currency_vef = self.env['res.currency'].search([('name', 'in', ('VEF', 'VES'))], limit=1) or self.env.company.currency_id
             # Monto en VEF
             total_retention_vef = sum(lines.mapped("foreign_retention_amount"))
             # Tasa
@@ -932,6 +936,10 @@ class AccountRetention(models.Model):
         for (concept, move), lines in lines_by_concept_and_move.items():
             # Moneda VEF
             currency_vef = self.env.company.currency_foreign_id
+            if not currency_vef or currency_vef.name not in ('VEF', 'VES'):
+                currency_vef = self.env.company.currency_id
+                if currency_vef.name not in ('VEF', 'VES'):
+                    currency_vef = self.env['res.currency'].search([('name', 'in', ('VEF', 'VES'))], limit=1) or self.env.company.currency_id
             total_retention_vef = sum(lines.mapped('foreign_retention_amount'))
             
             if currency_vef.is_zero(total_retention_vef):
@@ -1478,6 +1486,10 @@ class AccountRetention(models.Model):
             _logger.warning(f"compute_retention_lines_data: El atributo 'name' EXISTE: {invoice_id.name}")
         else:
             _logger.warning(f"compute_retention_lines_data: El atributo 'name' NO EXISTE.")
+        # Tasa de la factura (moneda empresa → VEF)
+        foreign_rate = invoice_id.foreign_rate or 1.0
+        foreign_inverse_rate = invoice_id.foreign_inverse_rate or (1.0 / foreign_rate if foreign_rate else 0.0)
+
         # --- INICIO DE LA VALIDACIÓN CRÍTICA ---
         if invoice_id.currency_id != self.env.company.currency_id and (not foreign_rate or foreign_rate == 0.0):
             _logger.error(
@@ -1530,10 +1542,6 @@ class AccountRetention(models.Model):
             # Se asume que company.currency_foreign_id es VEF (configurado por el módulo)
             vef_currency = self.env.company.currency_foreign_id
             invoice_currency = invoice_id.currency_id
-
-            # Tasa de la factura (moneda empresa → VEF)
-            foreign_rate = invoice_id.foreign_rate or 1.0
-            foreign_inverse_rate = 1.0 / foreign_rate if foreign_rate else 0.0
 
             # ¿La factura ya está en VEF?
             invoice_is_in_vef = (vef_currency and invoice_currency == vef_currency) or (
