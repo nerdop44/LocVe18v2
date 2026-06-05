@@ -292,13 +292,13 @@ class AccountMoveRetention(models.Model):
                 Command.create(line) for line in retention_lines_data
             ]
         elif type_retention == "islr":
-            retention_vals["retention_line_ids"] = self.retention_islr_line_ids.filtered(
-                lambda rl: rl.state != "cancel"
-            ).ids
+            retention_vals["retention_line_ids"] = [
+                Command.set(self.retention_islr_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+            ]
         else:
-            retention_vals["retention_line_ids"] = self.retention_municipal_line_ids.filtered(
-                lambda rl: rl.state != "cancel"
-            ).ids
+            retention_vals["retention_line_ids"] = [
+                Command.set(self.retention_municipal_line_ids.filtered(lambda rl: rl.state != "cancel").ids)
+            ]
 
         retention = Retention.create(retention_vals)
         payment.compute_retention_amount_from_retention_lines()
