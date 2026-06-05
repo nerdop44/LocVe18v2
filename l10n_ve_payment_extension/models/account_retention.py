@@ -1041,6 +1041,15 @@ class AccountRetention(models.Model):
 
                 _logger.info(f"Iniciando publicación de retención {retention.id}")
 
+                # Establecer fechas si no están definidas antes de asignar secuencia
+                today = fields.Date.context_today(self)
+                if not retention.date_accounting:
+                    retention.date_accounting = today
+                    _logger.info(f"Fecha contable establecida: {retention.date_accounting}")
+                if not retention.date:
+                    retention.date = today
+                    _logger.info(f"Fecha de retención establecida: {retention.date}")
+
                 # Asignar número de secuencia si no existe
                 if not retention.number:
                     _logger.info(f"Asignando número de secuencia a retención {retention.id}")
@@ -1051,15 +1060,6 @@ class AccountRetention(models.Model):
                     error_msg = f"Retención {retention.id} no tiene número asignado"
                     _logger.error(error_msg)
                     raise UserError(_("Debe ingresar un número para la retención"))
-        
-                # Establecer fechas si no están definidas
-                today = fields.Date.context_today(self)
-                if not retention.date_accounting:
-                    retention.date_accounting = today
-                    _logger.info(f"Fecha contable establecida: {retention.date_accounting}")
-                if not retention.date:
-                    retention.date = today
-                    _logger.info(f"Fecha de retención establecida: {retention.date}")
 
                 # VALIDACIONES ESPECÍFICAS PARA ISLR (NUEVO)
                 if retention.type_retention == 'islr':
