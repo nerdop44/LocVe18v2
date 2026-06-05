@@ -146,6 +146,39 @@ class AccountRetention(models.Model):
         store=True,
         help="Total monto retenido en VEF",
     )
+
+    vef_currency_id = fields.Many2one(
+        "res.currency", string="Moneda de visualización (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_total_invoice_amount = fields.Float(
+        string="Total Facturado (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_total_iva_amount = fields.Float(
+        string="Total IVA (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_total_retention_amount = fields.Float(
+        string="Total Retenido (Bs.)", compute="_compute_vef_fields"
+    )
+
+    @api.depends("company_currency_id", "foreign_currency_id", 
+                 "total_invoice_amount", "foreign_total_invoice_amount",
+                 "total_iva_amount", "foreign_total_iva_amount",
+                 "total_retention_amount", "foreign_total_retention_amount")
+    def _compute_vef_fields(self):
+        vef_currency = self.env['res.currency'].search([('name', 'in', ('VEF', 'VES'))], limit=1)
+        if not vef_currency:
+            vef_currency = self.env.company.currency_id
+        for record in self:
+            record.vef_currency_id = vef_currency
+            if record.company_currency_id and record.company_currency_id.name in ('VEF', 'VES'):
+                record.vef_total_invoice_amount = record.total_invoice_amount
+                record.vef_total_iva_amount = record.total_iva_amount
+                record.vef_total_retention_amount = record.total_retention_amount
+            else:
+                record.vef_total_invoice_amount = record.foreign_total_invoice_amount
+                record.vef_total_iva_amount = record.foreign_total_iva_amount
+                record.vef_total_retention_amount = record.foreign_total_retention_amount
+
     original_lines_per_invoice_counter = fields.Char(
         help=(
             "Technical field to store the quantity of retention lines per invoice before the user"
@@ -1490,8 +1523,14 @@ class AccountRetention(models.Model):
         else:
             _logger.warning(f"compute_retention_lines_data: El atributo 'name' NO EXISTE.")
         # Tasa de la factura (moneda empresa → VEF)
-        foreign_rate = invoice_id.foreign_rate or 1.0
-        foreign_inverse_rate = invoice_id.foreign_inverse_rate or (1.0 / foreign_rate if foreign_rate else 0.0)
+        foreign_rate = getattr(invoice_id, 'tax_today', 0.0)
+        if not foreign_rate or foreign_rate == 1.0:
+            foreign_rate = getattr(invoice_id, 'foreign_rate', 0.0)
+        if not foreign_rate:
+            foreign_rate = 1.0
+
+        foreign_inverse_rate = getattr(invoice_id, 'foreign_inverse_rate', 0.0) or (1.0 / foreign_rate if foreign_rate else 0.0)
+
 
         # --- INICIO DE LA VALIDACIÓN CRÍTICA ---
         if invoice_id.currency_id != self.env.company.currency_id and (not foreign_rate or foreign_rate == 0.0):
@@ -1626,6 +1665,34 @@ class AccountRetention(models.Model):
                         "total_amount_currency", tax_totals.get("total_amount", 0.0)
                     )
 
+                    company_currency = self.env.company.currency_id
+                    company_is_vef = company_currency.name in ('VEF', 'VES')
+
+                    if company_is_vef:
+                        # Locales en VEF
+                        invoice_amount = vef_invoice_amount
+                        iva_amount = vef_iva_amount
+                        invoice_total = vef_invoice_total
+                        retention_amount = vef_retention_amount
+                        
+                        # Foreign en la moneda de la factura (USD)
+                        foreign_invoice_amount = invoice_amount_company
+                        foreign_iva_amount = iva_amount_company
+                        foreign_invoice_total = invoice_total_company
+                        foreign_retention_amount = retention_amount_company
+                    else:
+                        # Locales en USD/Moneda empresa
+                        invoice_amount = invoice_amount_company
+                        iva_amount = iva_amount_company
+                        invoice_total = invoice_total_company
+                        retention_amount = retention_amount_company
+                        
+                        # Foreign en VEF
+                        foreign_invoice_amount = vef_invoice_amount
+                        foreign_iva_amount = vef_iva_amount
+                        foreign_invoice_total = vef_invoice_total
+                        foreign_retention_amount = vef_retention_amount
+
                     _logger.warning(
                         f"Retención calculada: "
                         f"invoice={invoice_amount_company} {invoice_currency.name}, "
@@ -1640,16 +1707,16 @@ class AccountRetention(models.Model):
                         "move_id": invoice_id.id,
                         "payment_id": payment.id if payment else None,
                         "aliquot": tax.amount,
-                        # Montos en moneda empresa
-                        "invoice_amount": invoice_amount_company,
-                        "iva_amount": iva_amount_company,
-                        "invoice_total": invoice_total_company,
-                        "retention_amount": retention_amount_company,
-                        # Montos en VEF (siempre — regla universal de retenciones VE)
-                        "foreign_invoice_amount": vef_invoice_amount,
-                        "foreign_iva_amount": vef_iva_amount,
-                        "foreign_invoice_total": vef_invoice_total,
-                        "foreign_retention_amount": vef_retention_amount,
+                        # Montos en moneda empresa (según moneda compañía)
+                        "invoice_amount": invoice_amount,
+                        "iva_amount": iva_amount,
+                        "invoice_total": invoice_total,
+                        "retention_amount": retention_amount,
+                        # Montos en VEF / Foreign
+                        "foreign_invoice_amount": foreign_invoice_amount,
+                        "foreign_iva_amount": foreign_iva_amount,
+                        "foreign_invoice_total": foreign_invoice_total,
+                        "foreign_retention_amount": foreign_retention_amount,
                         # Tasa
                         "foreign_currency_rate": foreign_rate,
                         "foreign_currency_inverse_rate": foreign_inverse_rate,

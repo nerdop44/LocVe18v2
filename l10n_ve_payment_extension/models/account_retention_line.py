@@ -124,6 +124,44 @@ class AccountRetentionLine(models.Model):
     foreign_currency_rate = fields.Float(string="Tasa (Extensión de Pago)")
     foreign_currency_inverse_rate = fields.Float(string="Inverse Rate")
 
+    vef_currency_id = fields.Many2one(
+        "res.currency", string="Moneda de visualización (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_invoice_total = fields.Float(
+        string="Total Factura (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_invoice_amount = fields.Float(
+        string="Base Imponible (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_iva_amount = fields.Float(
+        string="IVA (Bs.)", compute="_compute_vef_fields"
+    )
+    vef_retention_amount = fields.Float(
+        string="Monto Retenido (Bs.)", compute="_compute_vef_fields"
+    )
+
+    @api.depends("company_currency_id", "foreign_currency_id",
+                 "invoice_total", "foreign_invoice_total",
+                 "invoice_amount", "foreign_invoice_amount",
+                 "iva_amount", "foreign_iva_amount",
+                 "retention_amount", "foreign_retention_amount")
+    def _compute_vef_fields(self):
+        vef_currency = self.env['res.currency'].search([('name', 'in', ('VEF', 'VES'))], limit=1)
+        if not vef_currency:
+            vef_currency = self.env.company.currency_id
+        for record in self:
+            record.vef_currency_id = vef_currency
+            if record.company_currency_id and record.company_currency_id.name in ('VEF', 'VES'):
+                record.vef_invoice_total = record.invoice_total
+                record.vef_invoice_amount = record.invoice_amount
+                record.vef_iva_amount = record.iva_amount
+                record.vef_retention_amount = record.retention_amount
+            else:
+                record.vef_invoice_total = record.foreign_invoice_total
+                record.vef_invoice_amount = record.foreign_invoice_amount
+                record.vef_iva_amount = record.foreign_iva_amount
+                record.vef_retention_amount = record.foreign_retention_amount
+
     # Después de la definición de tus fields (campos) y antes de tus @api.depends o @api.onchange existentes.
     # Por ejemplo, puedes ponerlo después de 'foreign_currency_rate = fields.Float(string="Rate")'
 
@@ -279,10 +317,12 @@ class AccountRetentionLine(models.Model):
             if not record.move_id:
                 continue
             
+            # Si el registro ya existe en BD y tiene valores asignados, no sobreescribir con valores globales de la factura
+            if record.id and not isinstance(record.id, models.NewId) and (record.invoice_amount or record.foreign_invoice_amount):
+                continue
+            
             invoice = record.move_id
-            # Monto base de la factura (USD)
             amount_untaxed = invoice.amount_untaxed
-            # Regla de Oro: Siempre convertir a VEF si la factura no está en VEF
             currency_name = invoice.currency_id.name if invoice.currency_id else ''
             is_vef = currency_name in ['VES', 'VEF']
             
@@ -290,14 +330,13 @@ class AccountRetentionLine(models.Model):
             vef_untaxed = getattr(invoice, 'amount_untaxed_bs', 0.0)
             vef_total = getattr(invoice, 'amount_total_bs', 0.0)
             vef_iva = getattr(invoice, 'amount_tax_bs', 0.0)
-            # Priorizar foreign_rate si tax_today es 1.0 (caso común de facturas en USD con compañía USD)
+            
             rate = getattr(invoice, 'tax_today', 0.0)
             if not rate or rate == 1.0:
                 rate = getattr(invoice, 'foreign_rate', 0.0)
             if not rate:
                 rate = 1.0
             
-            # Si no es VEF o los campos duales están vacíos, forzamos conversión por tasa
             if not is_vef or not vef_untaxed:
                 vef_untaxed = amount_untaxed * (rate if rate else 1.0)
             if not is_vef or not vef_total:
@@ -305,13 +344,29 @@ class AccountRetentionLine(models.Model):
             if not is_vef or not vef_iva:
                 vef_iva = invoice.amount_tax * (rate if rate else 1.0)
 
-            record.invoice_amount = amount_untaxed
-            record.foreign_invoice_amount = vef_untaxed or amount_untaxed
-            record.invoice_total = invoice.amount_total
-            record.foreign_invoice_total = vef_total or invoice.amount_total
+            company_is_vef = record.company_currency_id.name in ('VEF', 'VES') if record.company_currency_id else False
+
+            if company_is_vef:
+                # Caso VEF: locales están en VEF/VES
+                record.invoice_amount = vef_untaxed or amount_untaxed
+                record.invoice_total = vef_total or invoice.amount_total
+                record.iva_amount = vef_iva or invoice.amount_tax
+                
+                # Caso VEF: foreign están en la moneda de la factura (USD)
+                record.foreign_invoice_amount = amount_untaxed
+                record.foreign_invoice_total = invoice.amount_total
+                record.foreign_iva_amount = invoice.amount_tax
+            else:
+                # Caso tradicional (Compañía USD): locales están en USD
+                record.invoice_amount = amount_untaxed
+                record.invoice_total = invoice.amount_total
+                record.iva_amount = invoice.amount_tax
+                
+                # Caso tradicional (Compañía USD): foreign están en VEF/VES
+                record.foreign_invoice_amount = vef_untaxed or amount_untaxed
+                record.foreign_invoice_total = vef_total or invoice.amount_total
+                record.foreign_iva_amount = vef_iva or invoice.amount_tax
             
-            record.iva_amount = invoice.amount_tax
-            record.foreign_iva_amount = vef_iva or invoice.amount_tax
             record.foreign_currency_rate = rate
 
     @api.depends(
