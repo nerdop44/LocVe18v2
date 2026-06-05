@@ -1629,7 +1629,7 @@ class AccountRetention(models.Model):
                         vef_invoice_total = tax_totals.get(
                             "total_amount_currency", tax_totals.get("total_amount", 0.0)
                         )
-                    elif global_vef_untaxed > 0:
+                    elif global_vef_untaxed > invoice_amount_company:
                         # La factura está en otra moneda y l10n_ve_tax ya calculó los VEF
                         # Usar los valores globales precalculados (proporcional si hay múltiples grupos)
                         if  total_groups == 1:
