@@ -299,7 +299,8 @@ class AccountMoveRetention(models.Model):
                 ]
             retention = Retention.create(retention_vals)
 
-        payment.compute_retention_amount_from_retention_lines()
+        for p in retention.payment_ids.exists():
+            p.compute_retention_amount_from_retention_lines()
         return retention
 
     def action_register_payment(self):
