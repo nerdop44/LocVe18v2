@@ -42,13 +42,14 @@ class AccountPaymentIgtf(models.Model):
         store=True,
     )
 
-    @api.depends('partner_id', 'amount', 'is_igtf_on_foreign_exchange')
+    @api.depends('partner_id', 'amount', 'is_igtf_on_foreign_exchange', 'company_id.taxpayer_type', 'payment_type')
     def _compute_igtf_percentage(self):
         for payment in self:
-            payment.igtf_percentage = payment.env.company.igtf_percentage
+            company = payment.company_id or payment.env.company
+            payment.igtf_percentage = company.igtf_percentage
             if (
                 payment.is_igtf_on_foreign_exchange
-                and payment.env.company.taxpayer_type == "special"
+                and company.taxpayer_type == "special"
                 and payment.partner_id.taxpayer_type != "special"
                 and payment.partner_type == "supplier"
             ):
@@ -65,11 +66,19 @@ class AccountPaymentIgtf(models.Model):
             if not payment.amount_with_igtf:
                 payment.amount_with_igtf = payment.amount + payment.igtf_amount
 
-    @api.depends("journal_id")
+    @api.depends("journal_id", "payment_type", "company_id.taxpayer_type")
     def _compute_is_igtf(self):
         for payment in self:
+            payment.is_igtf_on_foreign_exchange = False
             if payment.journal_id.is_igtf:
-                payment.is_igtf_on_foreign_exchange = True
+                # Si es cobro de cliente (inbound), la propia compañía debe ser contribuyente especial
+                if payment.payment_type == 'inbound':
+                    company = payment.company_id or payment.env.company
+                    if company.taxpayer_type == 'special':
+                        payment.is_igtf_on_foreign_exchange = True
+                else:
+                    # En pagos a proveedores (outbound), se puede pagar IGTF siempre
+                    payment.is_igtf_on_foreign_exchange = True
 
     @api.depends("amount", "is_igtf_on_foreign_exchange", "journal_id", "currency_id")
     def _compute_igtf_amount(self):

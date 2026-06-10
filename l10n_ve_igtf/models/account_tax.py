@@ -78,23 +78,46 @@ class AccountTax(models.Model):
         foreign_currency = self.env.company.currency_foreign_id
         rate = 0
 
+        # Resolver compañía y verificar si es transacción de salida (Venta/Ingreso)
+        company = self.env.company
+        is_sale = False
+        if type_model == "account.move.line" and invoice:
+            company = invoice.company_id
+            if invoice.move_type in ['out_invoice', 'out_refund']:
+                is_sale = True
+        elif type_model == "sale.order.line" and order:
+            company = order.company_id
+            is_sale = True
+
         if type_model == "account.move.line":
             rate = invoice.foreign_inverse_rate
-        #elif type_model == "sale.order.line": 
         if type_model == "sale.order.line":
             rate = order.foreign_inverse_rate
 
         float_igtf_percentage = (
-            self.env.company.igtf_percentage if not invoice.is_two_percentage else 2
+            company.igtf_percentage if not invoice.is_two_percentage else 2
         )
         igtf_percentage = (float_igtf_percentage or 0) / 100
 
-        if type_model == "account.move.line" and self.env.company.show_igtf_suggested_account_move:
+        # Si es una transacción de venta y la empresa no es contribuyente especial, no se cobra IGTF
+        if is_sale and company.taxpayer_type != 'special':
+            is_igtf_suggested = False
+            apply_igtf = False
+            base_igtf = 0
+            foreign_base_igtf = 0
+            if "igtf" in res:
+                res.pop("igtf")
+            res["amount_total_igtf"] = res["amount_total"]
+            res["formatted_amount_total_igtf"] = formatLang(self.env, res["amount_total_igtf"], currency_obj=currency)
+            res["foreign_amount_total_igtf"] = res["foreign_amount_total"]
+            res["formatted_foreign_amount_total_igtf"] = formatLang(self.env, res["foreign_amount_total_igtf"], currency_obj=foreign_currency)
+            return res
+
+        if type_model == "account.move.line" and company.show_igtf_suggested_account_move:
             is_igtf_suggested = True
             base_igtf = res.get("amount_total", 0)
             foreign_base_igtf = res.get("foreign_amount_total", 0)
-        # elif type_model == "sale.order.line" and self.env.company.show_igtf_suggested_sale_order:
-        if type_model == "sale.order.line" and self.env.company.show_igtf_suggested_sale_order:
+        if type_model == "sale.order.line" and company.show_igtf_suggested_sale_order:
             is_igtf_suggested = True
             base_igtf = res.get("amount_total", 0)
             foreign_base_igtf = res.get("foreign_amount_total", 0)
@@ -124,10 +147,9 @@ class AccountTax(models.Model):
         foreign_igtf_amount = float_round(
             foreign_igtf_base_amount * igtf_percentage, precision_rounding=foreign_currency.rounding
         )
-######
+
         if "igtf" not in res:
             res["igtf"] = {}
-       #### res["igtf"] = {}
         res["igtf"]["apply_igtf"] = apply_igtf
         res["igtf"]["name"] = f"{float_igtf_percentage} %"
 
@@ -163,5 +185,7 @@ class AccountTax(models.Model):
             self.env, res["foreign_amount_total_igtf"], currency_obj=foreign_currency
         )
         res["igtf"]["is_igtf_suggested"] = is_igtf_suggested
+
+        return res
 
         return res

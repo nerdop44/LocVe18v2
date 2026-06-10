@@ -152,7 +152,14 @@ patch(PosOrder.prototype, {
     get x_igtf_amount() {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         try {
-            const percentage = this.config?.x_igtf_percentage || 3.0;
+            const config = this.config;
+            const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
+            const company = this.models["res.company"]?.get(companyId);
+            if (!company || company.taxpayer_type !== 'special') {
+                return 0;
+            }
+
+            const percentage = config?.x_igtf_percentage || 3.0;
             const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);
             const totalPagosDivisas = paymentLines
                 .filter((p) => p.isForeignExchange)
@@ -275,6 +282,13 @@ patch(PosOrder.prototype, {
     getDefaultAmountDueToPayIn(paymentMethod) {
         const baseAmount = super.getDefaultAmountDueToPayIn(paymentMethod);
         if (paymentMethod && paymentMethod.x_is_foreign_exchange && baseAmount > 0) {
+            const config = this.config;
+            const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
+            const company = this.models["res.company"]?.get(companyId);
+            if (!company || company.taxpayer_type !== 'special') {
+                return baseAmount;
+            }
+
             const percentage = paymentMethod.x_igtf_percentage || 3.0;
             
             const paymentLines = (this.payment_ids || []).filter(p => p && p.payment_method_id);

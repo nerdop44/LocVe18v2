@@ -94,9 +94,9 @@ class PosSession(models.Model):
         """
         data = super()._accumulate_amounts(data)
 
-        # Solo aplicar si el POS está configurado para IGTF
+        # Solo aplicar si el POS está configurado para IGTF y la compañía es contribuyente especial
         igtf_product = self.config_id.x_igtf_product_id
-        if not igtf_product or not self.config_id.aplicar_igtf:
+        if not igtf_product or not self.config_id.aplicar_igtf or self.config_id.company_id.taxpayer_type != 'special':
             return data
 
         # Cuenta de ingresos del producto IGTF: buscar via jerarquía template→categoría
@@ -262,3 +262,10 @@ class ResConfigSettings(models.TransientModel):
                 raise ValidationError("El producto IGTF debe tener una cuenta de ingresos configurada")
             if sum(rec.pos_x_igtf_product_id.taxes_id.mapped("amount")) != 0:
                 raise ValidationError("El producto IGTF debe ser exento")
+
+class ResCompany(models.Model):
+    _inherit = 'res.company'
+
+    @api.model
+    def _load_pos_data_fields(self, config_id):
+        return super()._load_pos_data_fields(config_id) + ['taxpayer_type']

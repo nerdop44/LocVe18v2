@@ -261,14 +261,21 @@ class PosSession(models.Model):
                 'name': default_cash_payment_method_id.name,
                 'amount': self.cash_register_balance_start 
                           + total_local_payment_amount 
-                          + sum(self.sudo().statement_line_ids.filtered(lambda s: s.currency_id != self.ref_me_currency_id).mapped('amount')),
+                          + sum(self.sudo().statement_line_ids.filtered(lambda s: s.currency_id.id != (self.ref_me_currency_id.id or 0)).mapped('amount')),
                 'opening': self.cash_register_balance_start,
                 'payment_amount': total_local_payment_amount,
                 'moves': cash_in_out_list,
                 'id': default_cash_payment_method_id.id
             }
         else:
-            closing_control_data['default_cash_details'] = {}
+            closing_control_data['default_cash_details'] = {
+                'name': '',
+                'amount': 0.0,
+                'opening': 0.0,
+                'payment_amount': 0.0,
+                'moves': [],
+                'id': False
+            }
             
         # Estructurar detalles de efectivo USD (referencia)
         if default_cash_payment_ref_method_id:
@@ -279,7 +286,7 @@ class PosSession(models.Model):
                 'name': default_cash_payment_ref_method_id.name,
                 'amount': self.cash_register_balance_start_mn_ref 
                           + total_ref_payment_amount 
-                          + sum(self.sudo().statement_line_ids.filtered(lambda s: s.currency_id == self.ref_me_currency_id).mapped('amount')),
+                          + sum(self.sudo().statement_line_ids.filtered(lambda s: s.currency_id.id == (self.ref_me_currency_id.id or 0)).mapped('amount')),
                 'opening': self.cash_register_balance_start_mn_ref,
                 'payment_amount': total_ref_payment_amount,
                 'moves': cash_in_out_list_ref,
@@ -288,7 +295,16 @@ class PosSession(models.Model):
                 'igtf_amount_ref': sum(p.amount_ref * 0.03 for p in ref_payments),
             }
         else:
-            closing_control_data['default_cash_details_ref'] = {}
+            closing_control_data['default_cash_details_ref'] = {
+                'name': '',
+                'amount': 0.0,
+                'opening': 0.0,
+                'payment_amount': 0.0,
+                'moves': [],
+                'id': False,
+                'igtf_amount': 0.0,
+                'igtf_amount_ref': 0.0,
+            }
             
         # Re-calcular non_cash_payment_methods excluyendo ambos efectivos
         non_cash_methods = self.payment_method_ids.filtered(lambda pm: pm.type != 'cash')
