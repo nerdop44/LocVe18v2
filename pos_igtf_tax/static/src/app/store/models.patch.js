@@ -153,6 +153,9 @@ patch(PosOrder.prototype, {
         if (window.__pachacutec_global_lock || !this.models) return 0;
         try {
             const config = this.config;
+            if (!config || !config.aplicar_igtf) {
+                return 0;
+            }
             const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
             const company = this.models["res.company"]?.get(companyId);
             if (!company || company.taxpayer_type !== 'special') {
@@ -283,6 +286,9 @@ patch(PosOrder.prototype, {
         const baseAmount = super.getDefaultAmountDueToPayIn(paymentMethod);
         if (paymentMethod && paymentMethod.x_is_foreign_exchange && baseAmount > 0) {
             const config = this.config;
+            if (!config || !config.aplicar_igtf) {
+                return baseAmount;
+            }
             const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
             const company = this.models["res.company"]?.get(companyId);
             if (!company || company.taxpayer_type !== 'special') {

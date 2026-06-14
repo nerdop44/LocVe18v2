@@ -250,23 +250,27 @@ class ReportSaleDetails(models.AbstractModel):
                     rate_today = 1.0
             if not rate_today or rate_today <= 0:
                 rate_today = 1.0
-                
-            # Enriquecemos day_data con los campos del día
+                     # Enriquecemos day_data con los campos del día
             day_data['day_date'] = day_str
-            day_data['rate_today'] = rate_today
             day_data['symbol'] = symbol_local
             day_data['symbol_ref'] = symbol_ref
             day_data['currency_precision_ref'] = currency_precision_ref
             
             # Helper de conversión inteligente local
+            # Estandarizamos la normalización a formato Odoo (< 1.0)
+            rate_today_norm = rate_today
+            if rate_today_norm > 1.0:
+                rate_today_norm = 1.0 / rate_today_norm
+
             def convert_amount_local(amount):
                 if is_company_usd:
-                    return amount * rate_today
+                    tasa_humana = 1.0 / rate_today_norm if rate_today_norm > 0 else 1.0
+                    return amount * tasa_humana
                 else:
-                    return amount / rate_today
+                    return amount * rate_today_norm
 
             # Enriquecer usando el helper
-            enrich_data_dict(day_data, rate_today)
+            enrich_data_dict(day_data, rate_today_norm)
             
             # IGTF del día
             day_orders_recs = self.env['pos.order'].browse([o.id for o in day_orders])
@@ -282,6 +286,8 @@ class ReportSaleDetails(models.AbstractModel):
                 'total_igtf_base_ref': convert_amount_local(total_igtf_base_bs),
             }
             
+            # Convertimos la tasa a formato humano para la presentación del reporte
+            day_data['rate_today'] = 1.0 / rate_today_norm if (rate_today_norm < 1.0 and rate_today_norm > 0) else rate_today_norm
             days_data.append(day_data)
             
         # 5. Retornar los datos agrupados enriqueciendo también la raíz
@@ -289,20 +295,26 @@ class ReportSaleDetails(models.AbstractModel):
         last_day_data = days_data[-1] if days_data else global_data
         rate_global = last_day_data.get('rate_today', 1.0)
         
-        enrich_data_dict(global_data, rate_global)
+        # Estandarizamos la normalización a formato Odoo (< 1.0)
+        rate_global_norm = rate_global
+        if rate_global_norm > 1.0:
+            rate_global_norm = 1.0 / rate_global_norm
+            
+        enrich_data_dict(global_data, rate_global_norm)
         
         def convert_amount_global(amount):
             if is_company_usd:
-                return amount * rate_global
+                tasa_humana = 1.0 / rate_global_norm if rate_global_norm > 0 else 1.0
+                return amount * tasa_humana
             else:
-                return amount / rate_global
+                return amount * rate_global_norm
 
         global_data.update({
             'days_data': days_data,
             'currency_precision_ref': currency_precision_ref,
             'symbol_ref': symbol_ref,
             'symbol': symbol_local,
-            'rate_today': rate_global,
+            'rate_today': 1.0 / rate_global_norm if (rate_global_norm < 1.0 and rate_global_norm > 0) else rate_global_norm,
             'igtf_totals': last_day_data.get('igtf_totals', {
                 'total_igtf_bs': 0.0,
                 'total_igtf_ref': 0.0,
