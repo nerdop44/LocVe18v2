@@ -18,7 +18,7 @@ class PosPayment(models.Model):
     @api.depends('amount', 'tax_today')
     def _compute_amount_ref(self):
         for payment in self:
-            payment.amount_ref = payment.amount / (payment.tax_today if payment.tax_today > 0 else 1)
+            payment.amount_ref = payment.amount * payment.tax_today
 
     def name_get(self):
         res = []

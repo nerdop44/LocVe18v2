@@ -332,9 +332,9 @@ class PosSession(models.Model):
         
         closing_control_data['igtf_totals'] = {
             'total_igtf_bs': total_igtf_bs,
-            'total_igtf_ref': total_igtf_bs / rate_today if rate_today else 0.0,
+            'total_igtf_ref': total_igtf_bs * rate_today,
             'total_igtf_base_bs': total_igtf_base_bs,
-            'total_igtf_base_ref': total_igtf_base_bs / rate_today if rate_today else 0.0,
+            'total_igtf_base_ref': total_igtf_base_bs * rate_today,
         }
         
         return closing_control_data

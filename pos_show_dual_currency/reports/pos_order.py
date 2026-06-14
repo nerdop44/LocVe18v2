@@ -385,8 +385,8 @@ class ReportSaleDetails(models.AbstractModel):
                         taxes[tax['id']]['tax_amount'] += tax['amount']
                         taxes[tax['id']]['base_amount'] += tax['base']
                         if order.session_rate != 0:
-                            tax_amount_ref = tax['amount']/order.session_rate
-                            base_amount_ref = tax['base']/order.session_rate
+                            tax_amount_ref = tax['amount'] * order.session_rate
+                            base_amount_ref = tax['base'] * order.session_rate
                             taxes[tax['id']]['tax_amount_ref'] += tax_amount_ref
                             taxes[tax['id']]['base_amount_ref'] += base_amount_ref
                 else:
