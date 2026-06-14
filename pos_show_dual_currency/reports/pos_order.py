@@ -48,6 +48,16 @@ class ReportSaleDetails(models.AbstractModel):
         currency_precision_ref = ref_currency.decimal_places if ref_currency else 2
 
         def enrich_data_dict(data_dict, rate):
+            # Convert dict_values to list for XML-RPC marshalling compatibility
+            if 'taxes' in data_dict and not isinstance(data_dict['taxes'], list):
+                data_dict['taxes'] = list(data_dict['taxes'])
+            if 'refund_taxes' in data_dict and not isinstance(data_dict['refund_taxes'], list):
+                data_dict['refund_taxes'] = list(data_dict['refund_taxes'])
+            if 'payments' in data_dict and not isinstance(data_dict['payments'], list):
+                data_dict['payments'] = list(data_dict['payments'])
+            if 'products' in data_dict and not isinstance(data_dict['products'], list):
+                data_dict['products'] = list(data_dict['products'])
+
             # Helper de conversión inteligente
             def convert_amount(amount):
                 if is_company_usd:
