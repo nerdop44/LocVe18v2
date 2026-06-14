@@ -156,8 +156,7 @@ patch(PosOrder.prototype, {
             if (!config || !config.aplicar_igtf) {
                 return 0;
             }
-            const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
-            const company = this.models["res.company"]?.get(companyId);
+            const company = this.company;
             if (!company || company.taxpayer_type !== 'special') {
                 return 0;
             }
@@ -289,8 +288,7 @@ patch(PosOrder.prototype, {
             if (!config || !config.aplicar_igtf) {
                 return baseAmount;
             }
-            const companyId = Array.isArray(config.company_id) ? config.company_id[0] : config.company_id;
-            const company = this.models["res.company"]?.get(companyId);
+            const company = this.company;
             if (!company || company.taxpayer_type !== 'special') {
                 return baseAmount;
             }
